@@ -1,0 +1,20 @@
+# 构建产物与本地环境
+**/build/
+**/.gradle/
+**/.kotlin/
+**/local.properties
+*.iml
+.idea/
+.DS_Store
+Thumbs.db
+*.log
+node_modules/
+**/dist/
+panel/public/assets/vendor/
+
+# 产物与密钥一律不入库
+*.apk
+*.aab
+*.idsig
+*.jks
+*.keystore

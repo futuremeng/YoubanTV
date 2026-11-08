@@ -1,0 +1,104 @@
+name: checks
+
+on:
+  push: {}
+  pull_request: {}
+
+jobs:
+  provenance:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      # 血统扫描：新项目里不许出现被禁标识（见 docs/PROVENANCE.md）
+      - name: Forbidden identifiers
+        run: |
+          set -e
+          # 代码与规格里一律不许出现；提及上游只允许在 docs/PROVENANCE.md、NOTICE、docs/NAMING.md §3
+          PATTERN='StudyOnTV|studyontv|chadyi|qilegeti'
+          if grep -rnE "$PATTERN" core device panel sensor tools contract spec README.md THIRD_PARTY_NOTICES.md 2>/dev/null; then
+            echo '✗ 代码/规格里出现被禁标识。见 docs/PROVENANCE.md。'
+            exit 1
+          fi
+          grep -q 'StudyOnTV' docs/PROVENANCE.md || { echo '✗ 致谢段丢了。'; exit 1; }
+
+      # 追溯扫描：每个源文件都要指向存在的规格条目
+      - name: SPEC traceability
+        run: |
+          set -e
+          fail=0
+          for f in $(find core device panel sensor tools -name '*.kt' -o -name '*.ts' -o -name '*.tsx' 2>/dev/null); do
+            grep -q 'SPEC: ' "$f" || { echo "缺 SPEC 标签：$f"; fail=1; }
+          done
+          for id in $(grep -rhoE 'SPEC: [A-Z]+-[0-9]+' --include='*.kt' --include='*.ts' --include='*.tsx' . | awk '{print $2}' | sort -u); do
+            grep -rq "^### $id" spec/ docs/ || { echo "规格条目不存在：$id"; fail=1; }
+          done
+          exit $fail
+
+      # 出网白名单：新增出网调用必须登记
+      - name: Network egress allowlist
+        run: |
+          set -e
+          hits=$(grep -rnoE 'https?://[a-zA-Z0-9./_-]+' --include='*.kt' core device sensor tools 2>/dev/null \
+                 | grep -vE 'apache\.org|github\.com/futuremeng/YoubanTV|localhost|127\.0\.0\.1|example\.com' || true)
+          if [ -n "$hits" ]; then
+            echo '✗ 出现未登记的出网地址。URL 必须由家长配置或登记进 docs/PRIVACY.md §2 后，'
+            echo '  再把它加进本文件的白名单：'; echo "$hits"; exit 1
+          fi
+
+      # 架构约束：内核不感知执行手段；前台判定不返回包名
+      - name: Enforcement is not in the kernel
+        run: |
+          set -e
+          if grep -rnE 'enforcement|Enforcement|OVERLAY|悬浮窗' core 2>/dev/null; then
+            echo '✗ 内核不应知道执行手段。见 docs/LAYERING.md §6、docs/ARCHITECTURE.md §9。'; exit 1
+          fi
+          if grep -rnE 'packageName|包名' core 2>/dev/null; then
+            echo '✗ 内核只接受 isControlledContent: Boolean + 时长，不得出现包名。见 AUTO-11。'; exit 1
+          fi
+          if grep -rn 'androidx\.' core 2>/dev/null; then echo '✗ core 不得依赖 androidx'; exit 1; fi
+
+      # 机制不分身份：除内容绑定与默认值挑选，不得按 audience 分支
+      - name: Features do not branch on audience
+        run: |
+          set -e
+          hits=$(grep -rnE 'audience' core device --include='*.kt' --include='*.ts' 2>/dev/null \
+                 | grep -vE 'core/(profile|content)/|defaults' || true)
+          if [ -n "$hits" ]; then
+            echo '✗ 功能代码按身份分支了。身份只绑内容与默认值，见 spec/PROFILE.md#PROFILE-02。'; echo "$hits"; exit 1
+          fi
+
+      # 约定取代闸门：代码里不许有阻断观看的路径（L4 已整层删除）
+      - name: No path that blocks viewing
+        run: |
+          set -e
+          hits=$(grep -rniE 'locktask|setlocktask|deviceadmin|device_admin|removeTask|performGlobalAction|FLAG_SECURE|SYSTEM_ALERT_WINDOW.*full|blockView|interceptScreen' core device --include='*.kt' --include='*.xml' 2>/dev/null || true)
+          if [ -n "$hits" ]; then
+            echo '✗ 出现了阻断观看/强制设备控制的路径。闸门已改为约定，见 spec/COMMIT.md#COMMIT-10。'; echo "$hits"; exit 1
+          fi
+
+      # 伴看上下文：默认关、只读前台标题；禁止截屏/OCR/音频指纹/按键
+      - name: Companion context stays title-only and off by default
+        run: |
+          set -e
+          hits=$(grep -rniE 'MediaProjection|ScreenCapture|AccessibilityScreenshot|VibrationEffect.*audio|AudioRecord|MediaMetadataRetriever' device --include='*.kt' 2>/dev/null || true)
+          if [ -n "$hits" ]; then
+            echo '✗ 伴看上下文不许读画面或声音。见 spec/CONTEXT.md#CONTEXT-02。'; echo "$hits"; exit 1
+          fi
+
+      # 内容许可：packs/ 只能出现 CC0 / CC-BY
+      - name: Content license allowlist
+        run: |
+          set -e
+          if grep -rniE 'by-nc|noncommercial|all rights reserved' packs 2>/dev/null; then
+            echo '✗ packs/ 里的内容必须是 CC0 / CC-BY；BY-NC 数据一律走内容包。见 THIRD_PARTY_NOTICES.md。'; exit 1
+          fi
+
+      # 反 dark pattern：孩子端文案被禁句式
+      - name: No dark patterns in child-facing copy
+        run: |
+          set -e
+          if grep -rnE '(再不学就|你对不起|浪费了.*时间|可惜|连击|成就解锁|等级|打卡|排名|惩罚|加练)' \
+               --include='*.kt' --include='*.ts' --include='*.tsx' device panel 2>/dev/null | grep -v 'AUTO-05'; then
+            echo '✗ 孩子端出现被禁句式或成就/连击类机制。见 spec/AUTONOMY.md#AUTO-05。'; exit 1
+          fi
