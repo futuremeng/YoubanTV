@@ -1,132 +1,198 @@
-# 选题管线与知识点夹具（M1.2 的一部分）；知识点词表与状态迁移以 contract.json 的 knowledgeState 为准。
+# 题目前置与出题夹具；键的词汇表见 vocab.yaml，取值域来自 contract/contract.json。
 
 ASK-01:
   spec: [spec/ASK.md#ASK-01]
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true }
   cases:
-    - name: 三层依次回落
-      given: { packHit: false, memberAuthoredHit: false, llmHit: true }
-      expect: { source: llm, badge: 未校验 }
-    - name: 三层都落空按大纲随机
-      given: { packHit: false, memberAuthoredHit: false, llmHit: false }
-      expect: { source: outlineRandom, badge: none }
-    - name: 取材范围只来自该身份的内容绑定
-      expect: { readsOtherProfilePacks: false }
+    - name: 包命中时不走 LLM
+      given: { packHit: true, llmHit: true, mode: ambient }
+      when: { mode: ambient }
+      expect: { source: pack, capability: { companionContext: off }, shown: [来源标记] }
+    - name: 成员自作的题优先于大纲随机
+      given: { packHit: false, memberAuthoredHit: true, mode: ambient }
+      when: { mode: ambient }
+      expect: { source: member, shown: [来源标记] }
+    - name: 未开启出题开关时大纲随机顶替 LLM
+      given: { packHit: false, memberAuthoredHit: false, llmHit: true, egress: { aiQuestions: off }, mode: ambient }
+      when: { mode: ambient }
+      expect: { source: outlineRandom, egress: { aiQuestions: off } }
+    - name: 开关开启时 LLM 题带来源标记
+      given: { packHit: false, memberAuthoredHit: false, llmHit: true, egress: { aiQuestions: on }, mode: ambient }
+      when: { mode: ambient }
+      expect: { source: llm, shown: [来源标记] }
 
 ASK-02:
   spec: [spec/ASK.md#ASK-02]
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true, kpState: shaky, prereqState: mastered }
   cases:
-    - name: 越界的题不出现也不提示
-      given: { outlineScope: { subjects: [math], levels: [3] } }
-      when: { candidateLevel: 5 }
-      expect: { shown: false, hintShown: false }
-    - name: 范围切换留痕
-      when: { outlineScopeChanged: true }
-      expect: { events: [PLAN_CHANGE] }
+    - name: 状态与依赖同时决定出题强度
+      when: { mode: ambient }
+      expect: { value: { candidateLevel: 3, effectiveGroups: 4 }, shown: [依赖状态] }
+    - name: 状态 unknown 时不判弱点
+      given: { kpState: unseen, prereqState: mastered }
+      when: { mode: ambient }
+      expect: { value: { candidateLevel: 1, effectiveGroups: 2 }, kpState: unseen }
 
 ASK-03:
-  spec: [spec/ASK.md#ASK-03, docs/PRODUCT.md#§5]
+  spec: [spec/ASK.md#ASK-03]
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true }
   cases:
-    - name: 同点连对 3 题入 mastered
-      when: { answers: [correct, correct, correct], sameKnowledgePoint: true }
-      expect: { state: mastered }
-    - name: 答错后确认题对入 shaky
-      when: { answers: [wrong, confirmationCorrect] }
-      expect: { state: shaky, confirmation: basic }
-    - name: 答错后确认题错入 weak 并沿硬先修向下找
-      when: { answers: [wrong, confirmationWrong] }
-      expect: { state: weak, confirmation: basic, prereqWalk: alongHardEdges }
-    - name: 状态迁移只由答题事件触发
-      when: { midnightPassed: true, manualSet: false }
-      expect: { stateChanged: false }
-    - name: ruleEditor 改动留痕且不改算法
-      when: { revision: { by: ruleEditor } }
-      expect: { events: [PLAN_CHANGE], visibleOn: [self, panel] }
-    - name: 前置未掌握不阻塞后续题
-      given: { prereqState: weak }
-      expect: { blocked: false, dependencyShownInPanel: true }
+    - name: 默认出题走固定模板
+      given: { mode: ambient, kpState: shaky, prereqState: mastered }
+      when: { mode: ambient }
+      expect: { value: { dynamicGeneration: 0, stemIdentical: true, optionsLines: 3, singleKey: true, estimatedSeconds: 60 }, shown: [选题理由] }
 
 ASK-04:
-  spec: [spec/ASK.md#ASK-04, spec/AUTONOMY.md#AUTO-14]
+  spec: [spec/ASK.md#ASK-04, spec/AUTONOMY.md#AUTO-05]
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true, kpState: shaky, prereqState: mastered, mode: ambient }
   cases:
-    - name: 错两次降 2 星
-      when: { answers: [wrong, wrong] }
-      expect: { starsDelta: -2, retroactiveOnPastQuestions: false }
-    - name: 连对三次升 1 星
-      when: { answers: [correct, correct, correct] }
-      expect: { starsDelta: 1, retroactiveOnPastQuestions: false }
-    - name: 补一补池容量 20，超容量出最旧的题
-      when: { wrongAnswers: 21 }
-      expect: { poolSize: 20, evicted: oldest }
-    - name: 是否先补完由本人设，他人只能提动议
-      given: { actor: "member:mom", strength: accompanied }
-      expect: { writePathExists: false, motionAllowed: true, forcedSwitch: absent }
+    - name: 答错只入掌握账与补一补池
+      when: { answers: [wrong], confirmation: correct }
+      expect: { events: [ANSWER], kpState: weak, delta: { backlogSize: 1 }, stars: credited, absent: [扣分机制] }
+    - name: 答对按掌握度入账
+      when: { answers: [correct], confirmation: correct }
+      expect: { events: [ANSWER], kpState: mastered, delta: { backlogSize: 0 } }
+    - name: 错两次优先重问一次
+      given: { kpState: weak, wrongAnswers: 2 }
+      when: { mode: ambient }
+      expect: { value: { priorityReask: 1 }, kpState: weak }
 
 ASK-05:
   spec: [spec/ASK.md#ASK-05]
+  given: { profile: "member:kid", watchedMs: 1200000, moveFromMs: 3600000, inSlot: true }
   cases:
-    - name: 主动放弃直接置 180 天
-      when: { abandoned: true }
-      expect: { cooldownDays: 180 }
-    - name: 答错 ≥3 次延长至 30 天
-      when: { wrongCount: 3 }
-      expect: { cooldownDays: 30 }
-    - name: 默认冷却 3 天
-      when: { wrongCount: 1 }
-      expect: { cooldownDays: 3 }
-    - name: 同知识点同任务内最多 2 题
-      when: { sameKnowledgePoint: true, confirmation: once }
-      expect: { maxQuestions: 2, confirmationsPerTask: 1 }
+    - name: 满组即止并写事件
+      given: { answeredInTask: 5, roundTarget: 5 }
+      when: { answers: [correct] }
+      expect: { events: [ROUND_DONE], value: { taskEnded: true, roundsDone: 1 }, noEvents: [ANSWER] }
+    - name: 满组后仍可自愿继续
+      given: { answeredInTask: 5, roundTarget: 5, taskDone: false }
+      when: { answers: [correct] }
+      expect: { events: [ANSWER], value: { roundsDone: 1 } }
 
 ASK-06:
-  spec: [spec/ASK.md#ASK-06, spec/LAYER.md#LAYER-07]
+  spec: [spec/ASK.md#ASK-06]
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true }
   cases:
-    - name: ambient 硬要求不满足即不能标 ambient
-      when: { stemChars: 34, modeRequested: ambient }
-      expect: { authoringGate: rejected, fallsBackTo: focused }
-    - name: 满足硬要求的 ambient 题落 L1.5 浮层
-      when: { stemChars: 28, optionsLines: 2, singleKey: true, estimatedSeconds: 5, class: prediction }
-      expect: { authoringGate: passed, tier: L1.5 }
-    - name: 未声明 supports 的题按 focused 处理
-      given: { supports: absent }
-      expect: { mode: focused }
+    - name: 计划内已答过的题不再问
+      given: { answeredInTask: 1, kpState: shaky, sameKp: true }
+      when: { mode: ambient }
+      expect: { allowed: false, value: { recomputed: false }, noEvents: [ANSWER] }
+    - name: 补一补不受当日限制
+      given: { kpState: weak, backlogSize: 1 }
+      when: { mode: ambient }
+      expect: { allowed: true, events: [ANSWER] }
 
 ASK-07:
-  spec: [spec/ASK.md#ASK-07, spec/AUTONOMY.md#AUTO-14]
+  spec: [spec/ASK.md#ASK-07, spec/LAYER.md#LAYER-12]
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true, dueAt: "20:00", mode: ambient }
   cases:
-    - name: 选题管线不为时机提前或压后
-      when: { dueAt: "20:00" }
-      expect: { questionPickedAt: dueAt, shownEvent: due_shown, reorderedForTiming: false }
-    - name: 每次任务题目数上限由本人调（默认 8）
-      given: { selfSetCap: 5 }
-      when: { answeredInTask: 5 }
-      expect: { taskEnded: true, capWritePath: /api/myPlan }
+    - name: 按到期问，不看进度百分比
+      when: { stillWatching: true }
+      expect: { value: { questionPickedAt: dueAt }, due: { kind: quiz, mode: ambient, window: present } }
+    - name: 时段外不提问
+      given: { inSlot: false }
+      when: { stillWatching: true }
+      expect: { allowed: false, noEvents: [ANSWER], due: null }
+    - name: 呈现写 due_shown
+      when: { questionShown: true }
+      expect: { events: [due_shown], answerable: 这道题是什么时候问的 }
+    - name: 补看也照问
+      given: { dayType: schoolday, carryOver: 1 }
+      when: { stillWatching: true }
+      expect: { allowed: true, events: [due_shown], noEvents: [ACHIEVED] }
 
 ASK-08:
   spec: [spec/ASK.md#ASK-08]
+  given: { profile: "member:kid", inSlot: true, mode: ambient, kpState: shaky, prereqState: mastered, egress: { companionContext: off } }
   cases:
-    - name: 机检不过不出不入库
-      when: { llmGenerated: true, verify: failed }
-      expect: { shown: false, stored: false, event: llm_generate_failed }
-    - name: 落草稿区必须带来源
-      when: { llmGenerated: true, verify: passed, saved: draft }
-      expect: { source: [model, at, promptSource, adopted] }
+    - name: 上下文只含片名与时间戳
+      given: { outlineScope: { subjects: [chinese] } }
+      when: { mode: ambient }
+      expect: { capability: { companionContext: off }, value: { extraSources: 0 } }
+    - name: 补一补的出题只用大纲
+      given: { kpId: outline-3, kpState: weak, backlogSize: 1 }
+      when: { mode: ambient }
+      expect: { sameSource: [core/topics], value: { dynamicGeneration: 0 } }
+    - name: LLM 生成失败退回固定题面不重试
+      given: { egress: { aiQuestions: on }, llmHit: true }
+      when: { verify: failed }
+      expect: { events: [llm_generate_failed], value: { retried: false, stemIdentical: true, fallbackApplied: true } }
 
 ASK-09:
-  spec: [spec/ASK.md#ASK-09, spec/PROFILE.md#PROFILE-02]
+  spec: [spec/ASK.md#ASK-09]
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true, mode: ambient, kpState: shaky, prereqState: mastered }
   cases:
-    - name: 同一道题对所有身份是同一道题
-      given: { audiences: [child, senior], knowledgePoint: kp-42 }
-      expect: { stemIdentical: true, verifyIdentical: true, branchOnAudience: false }
-    - name: 进度与冷却各自独立，大纲语义共享
-      expect: { cooldownIndependent: true, sharedOutlineId: true, masteryViewStackable: true }
+    - name: 题干不超过 80 字
+      when: { mode: ambient }
+      expect: { value: { stemChars: 78 }, shown: [选题理由] }
+    - name: 选项不超过三行且唯一键
+      when: { mode: ambient }
+      expect: { value: { optionsLines: 3, singleKey: true, estimatedSeconds: 60 } }
 
 ASK-10:
-  spec: [spec/ASK.md#ASK-10, spec/CONTEXT.md#CONTEXT-03]
+  spec: [spec/ASK.md#ASK-10]
   cases:
-    - name: 上下文只作提示词素材，不越大纲范围
-      given: { companionContext: titleOnly, aiQuestions: on }
-      expect: { scopeCrossed: false, egressHost: keyHolderConfigured, badge: 依据来源 }
-    - name: 不得取其它身份的数据与应用名
-      expect: { crossProfileContent: false, appNameList: absent, screenshotDescription: absent }
-    - name: 取材按包内 audience 与身份绑定取交集
-      expect: { intersection: true }
+    - name: 三种题类各 20 次判对率均 ≥95%
+      given: { questionClass: prediction, estimateAccuracy: 95, attempts: 20 }
+      when: { exerciseVerdict: counted }
+      expect: { value: { sensorModeAllowed: true, signalSource: sensor }, noEvents: [ANSWER] }
+    - name: 任一类低于阈值用手动确认顶替
+      given: { questionClass: observation, estimateAccuracy: 80, attempts: 20 }
+      when: { exerciseVerdict: ambiguous }
+      expect: { value: { manualConfirmation: true }, noEvents: [ANSWER], shown: [手动确认入口] }
+    - name: 样本不足 20 次不启用传感器
+      given: { questionClass: judgement, estimateAccuracy: 99, attempts: 12 }
+      when: { exerciseVerdict: counted }
+      expect: { value: { manualConfirmation: true }, noEvents: [ANSWER] }
+    - name: 传感器误判不扣分
+      given: { kpState: shaky, wrongAnswers: 1, signalSource: sensor }
+      when: { exerciseVerdict: rejected }
+      expect: { kpState: shaky, unchanged: [stars, backlogSize] }
+
+PACK-01:
+  spec: [spec/PACK.md#PACK-01]
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true, mode: ambient }
+  cases:
+    - name: 包命中优先，不依赖联网
+      given: { packHit: true }
+      when: { mode: ambient }
+      expect: { source: pack, capability: { offline: granted }, allowed: true }
+
+PACK-02:
+  spec: [spec/PACK.md#PACK-02]
+  given: { profile: "member:kid", inSlot: true, mode: ambient }
+  cases:
+    - name: 自题可标状态，不可设审批门
+      given: { member: "member:kid", memberAuthoredHit: true }
+      when: { get: "GET /api/topics" }
+      expect: { value: { approvalRequired: false, fieldsPerItem: [id, kpId, kp, owner, status, evidence, addedAt] }, absent: [先批完才入账] }
+    - name: 自题来源标注到人
+      given: { member: "member:mom", memberAuthoredHit: true }
+      when: { mode: ambient }
+      expect: { shown: [来源标记], value: { eventProfile: "member:kid" } }
+
+PACK-03:
+  spec: [spec/PACK.md#PACK-03, spec/COMMIT.md#COMMIT-01]
+  given: { profile: "member:kid", inSlot: true, mode: ambient, stemChars: 78, optionsLines: 3, singleKey: true, estimatedSeconds: 60 }
+  cases:
+    - name: 自题走同一校验
+      given: { member: "member:mom", memberAuthoredHit: true }
+      when: { mode: ambient }
+      expect: { authoring: passed, shown: [校验状态] }
+    - name: 不合规题面退回
+      given: { member: "member:mom", stemChars: 200, optionsLines: 5, singleKey: false, estimatedSeconds: 60 }
+      when: { mode: ambient }
+      expect: { authoring: rejected, value: { fallbackApplied: true }, notShown: [成就页] }
+    - name: 自题命中写事件
+      when: { memberAuthoredHit: true }
+      expect: { events: [ANSWER], value: { eventProfile: "member:mom" } }
+
+PACK-04:
+  spec: [spec/PACK.md#PACK-04]
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true, kpState: weak, prereqState: mastered }
+  cases:
+    - name: 补一补池超 20 题走选题器
+      given: { backlogSize: 24 }
+      when: { mode: ambient }
+      expect: { value: { poolSize: 20, evicted: oldest }, sameSource: [core/day] }

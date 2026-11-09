@@ -27,7 +27,7 @@
 条目写法：
 
 ```md
-### COMMIT-04 约定时长用尽仍在看
+### 示例：COMMIT-04 约定时长用尽仍在看
 - 条件：watchedMs[profile] ≥ allowance[profile]
 - 结论：status=overdue, ruleId=COMMIT-04, due=null
 - 文案（L1.5 状态句）：「超出约定 <X> 分钟。明天 <time> 重新计时。」

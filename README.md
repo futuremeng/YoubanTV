@@ -74,7 +74,9 @@
 | [`spec/`](spec/README.md) | 行为规格条目（代码里的 `SPEC:` 标签指向这里） |
 | [`contract/contract.json`](contract/contract.json) | 契约单一来源：主体与角色、scopes、端点、枚举、禁止字段与退役取值 |
 | [`fixtures/`](fixtures/) | 决策表与行为夹具：`COMMIT` / `DAY` / `PROFILE` / `ASK` / `ONBOARD` 每条至少一条断言 |
-| [`tools/check-contract-refs.sh`](tools/check-contract-refs.sh) | 契约与夹具的引用完整性门（数据侧） |
+| [`tools/check-contract-refs.sh`](tools/check-contract-refs.sh) | 契约与夹具的引用完整性门：规格 id、锚点、禁止字段、事件枚举（数据侧） |
+| [`tools/check-fixtures.sh`](tools/check-fixtures.sh) | 夹具词汇与结构门：断言键必须登记、取值必须落在契约枚举（数据侧） |
+| [`fixtures/FORMAT.md`](fixtures/FORMAT.md) | 夹具格式与断言词汇：一条断言只回答一个问题，词汇单一来源 [`fixtures/vocab.yaml`](fixtures/vocab.yaml) |
 
 ## 状态
 

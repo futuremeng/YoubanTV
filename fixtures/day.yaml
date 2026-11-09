@@ -1,129 +1,167 @@
-# 当日账与时间完整性夹具（M1.2 的一部分）；取值域以 contract/contract.json 为准。
-# 每条给出「输入（含身份与协商强度）→ 期望结论」；层一栏指落层后的呈现档。
+# 当日方案夹具；键的词汇表见 vocab.yaml，取值域来自 contract/contract.json。
 
 DAY-01:
-  spec: [spec/DAY.md#DAY-01]
+  spec: [spec/DAY.md#DAY-01, spec/PROFILE.md#PROFILE-04]
   cases:
-    - name: 超出约定线即 OVER + overdue
-      given: { profile: "member:kid", dayType: schoolday, allowanceMs: 3600000, strength: negotiated }
-      when: { watchedMs: 3900000 }
-      expect: { status: overdue, events: [OVER], overMs: 300000, tier: L1.5 }
-    - name: 未选身份只落账不判定
-      given: { profile: none }
-      when: { watchedMs: 1200000 }
-      expect: { status: honored, due: null, eventProfile: none, tier: L1.5 }
+    - name: 上学日的约定线按身份取默认
+      given: { profile: "member:kid", dayType: schoolday }
+      when: { stillWatching: true }
+      expect: { value: { allowanceMs: 3600000, graceMs: 1800000, moveFromMs: 3600000 } }
+    - name: 超出约定线记 OVER 并进 overdue
+      given: { profile: "member:kid", allowanceMs: 3600000, watchedMs: 3720000 }
+      when: { stillWatching: true }
+      expect: { status: overdue, events: [OVER], value: { overMs: 120000 }, blocked: false }
+    - name: 各身份时长各自记账
+      given: { profile: "member:kid", watchedMs: 2400000 }
+      when: { switch: { from: "member:kid", to: "member:mom" } }
+      expect: { events: [PROFILE_SWITCH], value: { inheritedWatchedMs: 0 }, unchanged: [watchedMs] }
 
 DAY-02:
   spec: [spec/DAY.md#DAY-02]
+  given: { profile: "member:kid", watchedMs: 2400000, roundsDone: 2, overMs: 300000, pauseMs: 600000 }
   cases:
-    - name: 四量只在 core/day 一处算出
-      expect:
-        computedIn: [core/day]
-        readersSee: sameProjection        # 其他模块读同一投影
-        derived: [watchedMs, roundsDone, overMs, pauseMs]
+    - name: 四量在 core/day 一处算出
+      when: { mode: ambient }
+      expect: { sameSource: [core/day], value: { statusFrom: events, uiComputesVerdict: false } }
+    - name: status 与 due 由 core/commit 据四量产出
+      when: { mode: ambient }
+      expect: { sameSource: [core/commit], due: { kind: quiz, mode: ambient, deficit: questions, window: present }, status: due }
 
 DAY-03:
-  spec: [spec/DAY.md#DAY-03, spec/LAYER.md#LAYER-07]
+  spec: [spec/DAY.md#DAY-03, spec/AUTONOMY.md#AUTO-07]
+  given: { profile: "member:kid" }
   cases:
-    - name: 上学日默认档（探测达标）
-      given: { audience: child, dayType: schoolday, pauseProbe: { responseRate: 0.97 } }
-      expect: { allowanceMs: 3600000, graceMs: 1800000, moveFromMs: 3600000, mode: focused, tier: L2 }
-    - name: 同一份默认档在探测未达标时落 ambient
-      given: { audience: child, dayType: schoolday, pauseProbe: { responseRate: 0.8 } }
-      expect: { mode: ambient, reasonShown: true, tier: L1.5 }
-    - name: 探测未知（首启尚未跑探针）
-      given: { audience: child, pauseProbe: unknown }
-      expect: { mode: ambient, probeScheduled: true, blockingDefaults: false }
-    - name: 大人行的 grace=allowance 即默认不出题
-      given: { audience: grown-up }
-      expect: { quizIssued: false, selfManagedMayLowerGrace: true }
+    - name: 孩子周末默认档
+      given: { dayType: weekend }
+      when: { stillWatching: true }
+      expect: { value: { allowanceMs: 10800000, graceMs: 3600000, moveFromMs: 5400000 } }
+    - name: 大人默认不出题即 grace 等于 allowance
+      given: { profile: "member:mom", audience: grown-up, allowanceMs: 7200000 }
+      when: { mode: ambient }
+      expect: { value: { graceMs: 7200000, quizIssued: false }, due: null }
+    - name: 老人免题段覆盖全天并走 quiet
+      given: { profile: "member:grandpa", audience: senior, graceMs: 28800000, quiet: allDay }
+      when: { mode: ambient }
+      expect: { due: null, value: { quizIssued: false }, shown: [免题段说明] }
+    - name: 暂停响应率不足则默认档落 ambient 并说明
+      given: { pauseProbe: { responseRate: 0.9, sampleCount: 20 } }
+      when: { modeRequested: focused }
+      expect: { mode: ambient, shown: [当前模式与原因] }
+    - name: 存过配置的设备沿用原有数字
+      given: { allowanceMs: 5400000, dayType: schoolday }
+      when: { stillWatching: true }
+      expect: { unchanged: [allowanceMs] }
 
 DAY-04:
-  spec: [spec/DAY.md#DAY-04]
+  spec: [spec/DAY.md#DAY-04, spec/COMMIT.md#COMMIT-05, spec/AUTONOMY.md#AUTO-04]
+  given: { profile: "member:kid", inSlot: true }
   cases:
-    - name: 完成只写事件，不写任何发放事件
-      when: { taskDone: true, exerciseRounds: 2 }
-      expect:
-        events: [DONE, ROUND_DONE]
-        grantLikeEvents: absent           # forbiddenFields 在契约里无定义
-        roundsDone: 2
-    - name: 白天调大约定线即时重算
-      given: { actor: ruleEditor, strength: accompanied }
-      when: { planChange: { allowanceMs: { from: 3600000, to: 5400000 } }, accepted: true }
-      expect: { recalculatedToday: true, event: PLAN_CHANGE }
+    - name: 时长与完成各写各的事件，不写发放事件
+      when: { taskDone: true }
+      expect: { events: [WATCHED, DONE, ROUND_DONE], absent: [grantMinutes, unspentMs, unlocked] }
+    - name: 未达成写 MISSED
+      when: { deadlinePassed: true }
+      expect: { events: [MISSED], delta: { backlogSize: 1 } }
+    - name: 白天调大约定线当日即时重算
+      given: { actor: "member:mom", roles: { ruleEditor: "member:mom" }, allowanceMs: 3600000, watchedMs: 3720000 }
+      when: { planChange: { allowanceMs: 5400000 } }
+      expect: { effective: now, status: due, events: [PLAN_CHANGE] }
     - name: 调小自次日生效
-      given: { actor: ruleEditor, strength: accompanied }
-      when: { planChange: { allowanceMs: { from: 5400000, to: 3600000 } }, accepted: true }
-      expect: { effectiveFrom: nextDay, event: PLAN_CHANGE }
+      given: { actor: "member:mom", roles: { ruleEditor: "member:mom" }, allowanceMs: 3600000 }
+      when: { planChange: { allowanceMs: 1800000 } }
+      expect: { effective: nextDay, events: [PLAN_CHANGE] }
+    - name: 调大调小都要一条已受理的动议或一次签署
+      given: { actor: "member:mom" }
+      when: { motion: { kind: planChange, target: "member:kid", accepted: false } }
+      expect: { allowed: false, applied: false, events: [MOTION] }
 
 DAY-04b:
-  spec: [spec/DAY.md#DAY-04b]
+  spec: [spec/DAY.md#DAY-04b, spec/PROFILE.md#PROFILE-04]
   cases:
-    - name: 切换身份不结转，各身份四量各自保持
+    - name: 切换身份后各身份四量保持原值
+      given: { profile: "member:kid", watchedMs: 2400000, roundsDone: 2 }
       when: { switch: { from: "member:kid", to: "member:mom" } }
-      expect:
-        events: [PROFILE_SWITCH]
-        kidWatchedMs: unchanged
-        momWatchedMs: unchanged
-        carriedOver: 0
-    - name: 零点刷新按身份逐行执行，宽紧同一套代码
-      expect: { rowsPerProfile: true, singleRefreshPath: true }
+      expect: { events: [PROFILE_SWITCH], value: { sessionsReconstructable: true }, unchanged: [roundsDone] }
+    - name: 零点刷新按身份逐条执行，代码同一份
+      given: { strengths: [accompanied, negotiated, selfManaged] }
+      when: { crossedMidnight: true }
+      expect: { sameSource: [core/day], value: { rowsPerProfile: true } }
 
 DAY-05:
   spec: [spec/DAY.md#DAY-05, spec/AUTONOMY.md#AUTO-14]
+  given: { profile: "member:kid", moveFromMs: 3600000, graceMs: 1200000, minutesPerGroup: 15, groupsPerTask: 2 }
   cases:
-    - name: 生效组数取本人自设与下限的较大者
-      given: { selfSetGroups: 2, moveFromMs: 5400000, graceMs: 1800000, minutesPerRound: 15 }
-      expect: { effectiveGroups: 4 }       # ceil((5400000-1800000)/900000)=4
-    - name: 组数是上限，不是时长发放
-      when: { roundsDone: 4 }
-      expect: { grantedMs: absent, progressShown: true }
-    - name: 跨零点自然归零
-      when: { crossedMidnight: true }
-      expect: { roundsDone: 0, backlogKept: true }
+    - name: 生效组数取两者的较大值
+      when: { mode: ambient }
+      expect: { value: { effectiveGroups: 4, maxQuestions: 8 } }
+    - name: 生效组数只是当日进度上限
+      when: { mode: ambient }
+      expect: { absent: [grantMinutes], value: { poolSame: false }, shown: [进度] }
+    - name: 当日完成组数由 ROUND_DONE 事件数得出
+      given: { roundsDone: 3 }
+      when: { exerciseDone: true }
+      expect: { events: [ROUND_DONE], delta: { roundsDone: 1 } }
 
 DAY-06:
-  spec: [spec/DAY.md#DAY-06]
+  spec: [spec/DAY.md#DAY-06, spec/AUTONOMY.md#AUTO-15]
+  given: { profile: "member:kid", watchedMs: 2400000, overMs: 300000, pauseMs: 600000, roundsDone: 3, graceMs: 1800000 }
   cases:
-    - name: 刷新清单与保留清单各自唯一
-      expect:
-        refreshed: [watchedMs, overMs, pauseMs, grace, groupsToday]
-        kept: [backlogPool, wrongAnswerCount, srsProgress, pendingReview, taskProgress, ledgerHistory]
+    - name: 零点刷新只刷当日量
+      when: { crossedMidnight: true }
+      expect: { applied: true, value: { watchedMs: 0, overMs: 0, pauseMs: 0, roundsDone: 0 } }
+    - name: 跨天跨重启的账保留
+      given: { backlogSize: 3, wrongAnswers: 5, srsProgress: 2, pendingReview: 1, planVersion: 6 }
+      when: { crossedMidnight: true }
+      expect: { unchanged: [backlogSize, wrongAnswers, srsProgress, pendingReview, planVersion] }
 
 DAY-07:
-  spec: [spec/DAY.md#DAY-07, spec/AUTONOMY.md#AUTO-04]
+  spec: [spec/DAY.md#DAY-07]
+  given: { profile: "member:kid", watchedMs: 2400000 }
   cases:
-    - name: 墙上时间往回跳不重放当日
-      when: { wallClockDelta: -3600000 }
-      expect: { replayed: false, dayTokenKept: true }
-    - name: 往前跳无单调佐证则不滚动
-      when: { wallClockDelta: 86400000, monotonicDeltaMs: 1000 }
-      expect: { rolledToNewDay: false }
-    - name: 往前跳有单调佐证才滚动到新一天
-      when: { wallClockDelta: 86400000, monotonicDeltaMs: 86400000 }
-      expect: { rolledToNewDay: true }
-    - name: 零点前 5 分钟内的收紧顺延（D37）
-      when: { tightenAt: "23:57", signed: true }
-      expect: { effectiveAt: nextDayMidnight }
-    - name: 已受理的当日偏移不算收紧
-      when: { motion: { kind: extend, accepted: true } }
-      expect: { effectiveImmediately: true, tighteningComparison: false }
+    - name: 墙钟回跳当日不重放
+      given: { probedAt: beforeLastReboot, wallClockDeltaMs: -7200000 }
+      when: { stillWatching: true }
+      expect: { value: { replayed: false, dayTokenKept: true }, unchanged: [watchedMs] }
+    - name: 往前跳需单调时钟差值佐证才滚新一天
+      given: { wallClockDeltaMs: 7200000, monotonicDeltaMs: 60000 }
+      when: { crossedMidnight: false }
+      expect: { applied: false, value: { dayRolled: false } }
+    - name: 重启不触发当日重放
+      when: { rebooted: true }
+      expect: { applied: false, value: { dayRolled: false } }
+    - name: 零点前五分钟内的收紧顺延零点后生效
+      given: { actor: "member:mom", target: "member:kid" }
+      when: { motion: { kind: planChange, tighten: true, target: "member:kid", accepted: true }, at: "23:58" }
+      expect: { applied: true, effective: nextDay }
+    - name: 已受理的加时不算收紧
+      given: { actor: "member:kid", target: "member:kid" }
+      when: { motion: { kind: extend, target: "member:kid", minutes: 15, accepted: true } }
+      expect: { value: { inTighteningComparison: false }, effective: now }
 
 DAY-08:
   spec: [spec/DAY.md#DAY-08]
+  given: { profile: "member:kid", allowanceMs: 3600000, watchedMs: 1200000 }
   cases:
+    - name: 仅时段内可用档，时段外显示下一个可用时刻
+      given: { slots: onlyWithinSlots, inSlot: false }
+      when: { stillWatching: true }
+      expect: { due: null, shown: [下一个可用时刻] }
+    - name: 仅时段内需要答题档，时段外时长照记
+      given: { slots: quizWithinSlots, inSlot: false }
+      when: { stillWatching: true }
+      expect: { events: [WATCHED], due: null, value: { watchedMs: 1200000 } }
     - name: 时段在约定线之前参与判定
-      given: { slots: { mode: onlyWithinSlots } }
-      when: { nowOutsideSlot: true, watchedMs: 600000 }
-      expect: { status: honored, shownInstead: nextAvailableTime }
-    - name: 仅时段内需要答题时，时段外照常计时
-      given: { slots: { mode: quizWithinSlots } }
-      when: { nowOutsideSlot: true, watchedMs: 600000 }
-      expect: { watchedRecorded: true, quizIssued: false }
+      given: { slots: onlyWithinSlots, inSlot: false, watchedMs: 3720000 }
+      when: { stillWatching: true }
+      expect: { due: null, value: { overMs: 120000 } }
 
 DAY-09:
-  spec: [spec/DAY.md#DAY-09]
+  spec: [spec/DAY.md#DAY-09, spec/PROFILE.md#PROFILE-07]
+  given: { profile: "member:kid", watchedMs: 1200000, inSlot: true }
   cases:
-    - name: 模拟器与设备执行同源
-      when: { simulate: sameInputAsDevice }
-      expect: { sameCodePath: true, contractTestRequired: true, divergence: none }
+    - name: 模拟器与设备执行同一份代码
+      when: { simulate: true }
+      expect: { sameSource: [core/day], value: { endpointsSameSemantics: true } }
+    - name: 面板走向与设备结果一致性由契约测试覆盖
+      when: { simulate: true }
+      expect: { identicalAcross: { dimension: profile, fields: [status, due] } }

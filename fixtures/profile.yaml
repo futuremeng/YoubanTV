@@ -1,147 +1,280 @@
-# 身份与角色夹具（M1.1 的一部分）；取值域以 contract/contract.json 为准。
-
-AUTO-14:
-  spec: [spec/AUTONOMY.md#AUTO-14, spec/PROFILE.md#PROFILE-01]
-  fields: [groupsPerTask, questionsPerGroup, questionsPerTaskCap, clearBacklogFirst]
-  cases:
-    - name: 三档强度下都只能由本人写入
-      given: { strength: [accompanied, negotiated, selfManaged], actor: "member:kid" }
-      when: { put: /api/myPlan, groupsPerTask: 4 }
-      expect:
-        accepted: true
-        event: PLAN_CHANGE
-        effectiveImmediately: true
-        inTighteningComparison: false
-    - name: 面板与其它成员没有写入口
-      given: { actor: panel, scope: [read, rules, content, grade, diagnostics] }
-      when: { put: /api/myPlan, groupsPerTask: 2 }
-      expect:
-        httpStatus: 403
-        writePathExists: false
-        readOnlyView: true            # 只显示当前值与改动记录
-    - name: 与 audience 无关
-      given: { audience: [child, grown-up, senior] }
-      expect: { sameWritePath: true, sameQuota: true, branchOnAudience: false }
-    - name: 事后可回答「当时按哪组参数出的题」
-      when: { askIssuedAfterChange: true }
-      expect: { planVersionTraceable: true, planChangeCount: 1 }
-
-PROFILE-10:
-  spec: [spec/PROFILE.md#PROFILE-10, spec/AUTONOMY.md#AUTO-09]
-  cases:
-    - name: 跨身份写入路径不存在
-      given: { activeMember: "member:kid" }
-      when: { anyWriteEndpoint: { profile: "member:dad" } }
-      expect: { rejected: true, profileDomain: ["member:kid", "none"] }
-    - name: 一次一个人：并发第二个主体被串行化为事件顺序
-      when: { concurrentActor: secondLocalSession }
-      expect: { allowed: false, ordering: eventSequence }
-    - name: 动议只能由被请求方本人受理
-      when: { motion: { kind: extend, target: "member:dad" }, acceptedBy: "member:kid" }
-      expect: { rejected: true, accepted: false, appliedTo: none }
-    - name: 角色交接是本机当前激活模式内的两次确认
-      when:
-        roleChange: { role: ruleEditor, from: "member:mom", to: "member:dad" }
-        proposedFrom: activeMode
-        acceptedIn: targetOwnMode
-      expect:
-        events: [MOTION, MOTION_SETTLED, ROLE_CHANGE]
-        crossDeviceSignalling: none
-        newEndpointNeeded: false
-    - name: 收回他人手里的编辑权属收紧，自下一份签署生效
-      when: { roleChange: { action: revoke }, signed: false }
-      expect: { effectiveNow: false, nextPlanVersion: true, visibleOn: [self, panel] }
-    - name: 监护人凭据的移交需本机当场确认
-      when: { roleChange: { role: keyHolder }, acceptedRemotely: true }
-      expect: { rejected: true, requiresLocalConfirm: true }
+# 成员、模式与角色夹具；键的词汇表见 vocab.yaml，取值域来自 contract/contract.json。
 
 PROFILE-01:
-  spec: [spec/PROFILE.md#PROFILE-01, contract/contract.json#profile]
+  spec: [spec/PROFILE.md#PROFILE-01]
   cases:
-    - name: Profile 字段集与契约一致
+    - name: 契约里不存在 audience 类权限字段与分支位点
+      when: { capability: { overlay: granted } }
       expect:
-        fields: [id, label, audience, content.packs, content.outlineScope, content.exerciseTasks, defaults.mode, defaults.schedulePrefs, defaults.presentation]
-        permissionFields: absent
-        featureToggleFields: absent
-        ceilingFields: absent
-    - name: roles 住在成员身上，不由 audience 推导
-      given: { audience: child }
-      expect: { rolesDerivable: false, anyAudienceMayHold: [ruleEditor, keyHolder] }
+        absent: [audienceAllowance, audienceGate, audienceLock, selfManagedCap, capabilityCeiling]
+        sameSource: [core/commit, core/day, core/enforcement, core/task]
+        value: { branchInForbiddenSites: 0 }
+    - name: 内容绑定与默认值可以按 audience 取值
+      when: { audience: child }
+      expect: { allowed: true, value: { allowedBranchSites: [内容绑定解析, 默认值挑选] } }
+    - name: 呈现按 audience 放大字号与提高对比度
+      given: { audience: child, presentation: standard }
+      when: { mode: ambient }
+      expect: { value: { bodyFontSp: 24, contrastRaised: true }, identicalAcross: { dimension: audience, fields: [status] } }
 
 PROFILE-02:
   spec: [spec/PROFILE.md#PROFILE-02]
+  given: { profile: "member:kid", roles: { keyHolder: "member:mom" } }
   cases:
-    - name: audience 分支只出现在两处
-      expect:
-        allowedBranchSites: [内容绑定解析, 默认值挑选]
-        forbiddenBranchModules: [commit, day, enforcement, task, srs, grade, net]
-        branchInForbiddenSites: 0
-    - name: 换一个 audience 不改变判定
-      given: { samePlan: true, audiences: [child, grown-up, senior] }
-      expect: { statusIdentical: true, dueIdentical: true, tierIdentical: true }
+    - name: 成员角色齐全时可改规则并签署
+      given: { actor: "member:kid", roles: { keyHolder: "member:kid", ruleEditor: "member:kid" } }
+      when: { put: "PUT /api/myPlan" }
+      expect: { allowed: true, writable: true }
+    - name: 无监护人凭据可改规则，但不可开启出网
+      given: { actor: "member:kid", roles: { ruleEditor: "member:kid" } }
+      when: { put: "PUT /api/myPlan" }
+      expect: { allowed: true }
+    - name: 开启出网须监护人凭据，他人成员不可
+      given: { actor: "member:kid", roles: { keyHolder: "member:kid" }, egress: { aiQuestions: off } }
+      when: { egress: { aiQuestions: on }, reauth: true }
+      expect: { allowed: true, egress: { aiQuestions: on }, shown: [host, whatLeaves, howToTurnOff] }
+    - name: 长期令牌不携带角色，越界只读
+      given: { actor: "member:kid", roles: { keyHolder: "member:mom" }, scopes: [read] }
+      when: { put: "PUT /api/myPlan" }
+      expect: { allowed: false, value: { httpStatus: 403, rolesDerivableFromToken: false } }
+    - name: 角色可由家庭约定授予任意成员
+      given: { actor: "member:kid", roles: { ruleEditor: "member:mom" } }
+      when: { roleChange: { role: ruleEditor, action: grant, to: "member:kid" } }
+      expect: { roles: { ruleEditor: "member:kid" }, events: [ROLE_CHANGE], value: { anyAudienceMayHold: true } }
 
 PROFILE-03:
   spec: [spec/PROFILE.md#PROFILE-03]
+  given: { profile: "member:kid", assembly: tv, capability: { overlay: denied, mediaSession: denied } }
   cases:
-    - name: 无额度硬顶、无年龄闸门、无按身份的功能开关
-      expect: { forbiddenFields: [allowanceCeiling, ageLimit, selfManageRequiresAge, featureToggleByAudience] }
-    - name: 切换强度不改变任何功能可见性，也不需要批准
-      when: { strengthChanged: [accompanied, negotiated, selfManaged] }
-      expect: { featuresVisible: same, approvalRequired: false, rolesUnchanged: true }
+    - name: 能力缺失不降身份，按装配回退并说明原因
+      when: { modeRequested: focused }
+      expect: { mode: ambient, notShown: [降级身份提示], shown: [当前模式与原因], capability: { pause: denied } }
+    - name: 手机传感器自检通过即可计次
+      given: { assembly: mobile, capability: { motionSensor: granted, proximitySensor: granted } }
+      when: { signalSource: sensor }
+      expect: { allowed: true, events: [ROUND_DONE], value: { counting: [accelerometer, proximity] } }
+    - name: 传感器自检未通过用手动确认顶替
+      given: { assembly: mobile, capability: { motionSensor: denied } }
+      when: { signalSource: manual }
+      expect: { allowed: true, events: [ROUND_DONE], value: { counting: [accelerometer, manual] }, shown: [自检状态] }
 
 PROFILE-04:
   spec: [spec/PROFILE.md#PROFILE-04]
   cases:
-    - name: 跨设备同一身份当日时长为事件并集，重叠去重
-      given: { profile: "member:kid", tv: { from: 0, to: 1200 }, mobile: { from: 900, to: 1500 } }
-      expect: { watchedMs: 1500, deviceFieldRequired: true }
-    - name: 跨身份不互扣时间也不互设上限
-      when: { otherProfileOverMs: 3000 }
-      expect: { ownStatusChanged: false, ceilingApplied: absent }
+    - name: 模式切换只影响后续时间归属
+      given: { sessions: [{ device: tv, from: 0, to: 1200000 }, { device: mobile, from: 0, to: 900000 }] }
+      when: { switch: { from: "member:kid", to: "member:mom" } }
+      expect: { events: [PROFILE_SWITCH], value: { eventProfile: "member:mom", inheritedWatchedMs: 0 } }
+    - name: 手机上的成员同样可发起动议
+      given: { profile: "member:kid", assembly: mobile, inSlot: true }
+      when: { motion: { kind: pause, target: self, accepted: true } }
+      expect: { events: [MOTION, MOTION_SETTLED], allowed: true }
+    - name: 切换瞬间未落账的段不丢
+      given: { profile: "member:kid", watchedMs: 600000, inSlot: true }
+      when: { switch: { from: "member:kid", to: none } }
+      expect: { value: { watchedRecorded: true }, events: [WATCHED] }
+    - name: 切换是事件不是状态字段
+      when: { switch: { from: "member:kid", to: "member:mom" } }
+      expect: { absent: [currentProfile], sameSource: [core/day], value: { profileDomain: [member, none] } }
+    - name: 电视与手机同时落账同一事件流
+      given: { sessions: [{ device: tv, from: 0, to: 1200000 }, { device: mobile, from: 0, to: 300000 }] }
+      when: { stillWatching: true }
+      expect: { value: { watchedMs: 1500000 }, sameSource: [core/day] }
 
 PROFILE-05:
-  spec: [spec/PROFILE.md#PROFILE-05]
+  spec: [spec/PROFILE.md#PROFILE-05, spec/AUTONOMY.md#AUTO-10]
+  given: { profile: "member:kid", strength: selfManaged, watchedMs: 2400000, inSlot: true }
   cases:
-    - name: 切换留痕、当前身份常驻可见
-      when: { switch: { from: "member:kid", to: "member:grandpa" } }
-      expect: { events: [PROFILE_SWITCH], badgeShowsCurrent: true, blocked: false }
-    - name: 想约束别人走时段 / 协议 / 动议，不走能力上限
-      when: { intent: reduceOthersWatching }
-      expect: { allowedPaths: [slotRule, familyAgreement, acceptedMotion], capabilityCeilingPath: absent }
+    - name: 自管成员调组数走同一条写入路径
+      when: { put: "PUT /api/myPlan" }
+      expect: { writable: true, sameSource: [core/day], value: { endpoint: "/api/myPlan" } }
+    - name: 面板只能查阅与修订
+      given: { actor: "member:mom", via: panel }
+      when: { put: "PUT /api/myPlan" }
+      expect: { writable: false, allowed: false, events: [REVISION] }
+    - name: 自管字段变动即时生效
+      given: { actor: "member:kid", groupsPerTask: 4 }
+      when: { put: "PUT /api/myPlan" }
+      expect: { effective: now, events: [PLAN_CHANGE] }
+    - name: 家庭约定字段仍按共同签署生效
+      given: { actor: "member:kid", allowanceMs: 3600000 }
+      when: { put: "PUT /api/myPlan" }
+      expect: { effective: nextPlanVersion, events: [PLAN_CHANGE] }
 
 PROFILE-06:
-  spec: [spec/PROFILE.md#PROFILE-06]
+  spec: [spec/PROFILE.md#PROFILE-06, spec/AUTONOMY.md#AUTO-11]
+  given: { profile: "member:kid", strength: selfManaged, watchedMs: 2400000, inSlot: true }
   cases:
-    - name: 内容按身份绑定，schema 不分身份
-      expect: { questionSchemaVersions: [v3], branchInSchema: false }
-    - name: 新增 audience 不改题意与 verify
-      when: { newAudience: exam-sprint }
-      expect: { verifySemanticsUnchanged: true, schemaUnchanged: true }
+    - name: 参数下调即时生效，题目数量随之减少
+      given: { actor: "member:kid", groupsPerTask: 2, questionsPerGroup: 2, questionsPerTaskCap: 4 }
+      when: { mode: ambient }
+      expect: { value: { effectiveGroups: 4, maxQuestions: 4 }, kpState: shaky }
+    - name: 补一补优先可关，关后池不清空
+      given: { actor: "member:kid", clearBacklogFirst: false, backlogSize: 12 }
+      when: { mode: ambient }
+      expect: { unchanged: [backlogSize], effective: now }
+    - name: 面板可改判但不撤销已入账
+      given: { actor: "member:mom" }
+      when: { revision: { by: "member:mom", verdict: fail, reason: 步骤缺第二步 } }
+      expect: { events: [REVISION], stars: recalculated, unchanged: [backlogSize] }
 
 PROFILE-07:
-  spec: [spec/PROFILE.md#PROFILE-07, spec/SENSE.md#SENSE-05]
+  spec: [spec/PROFILE.md#PROFILE-07]
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true }
   cases:
-    - name: 运动是通用机制，项目按档取
-      given: { audience: senior, item: 平衡练习 }
-      expect: { safetyFieldsRequired: true, missingSafetyField: invalidItem }
-    - name: 约定可以只含做题不含运动段
-      when: { exerciseTasks: [] }
-      expect: { statusReachable: honored, exerciseDue: never }
+    - name: 面板与设备端渲染同一份投影
+      when: { mode: ambient }
+      expect: { identicalAcross: { dimension: profile, fields: [status, due, nextAction] }, sameSource: [core/day] }
+    - name: 契约新增字段两侧同时生效
+      given: { via: panel }
+      when: { revision: { by: "member:mom", verdict: none, reason: 契约字段新增 } }
+      expect: { value: { schemaUnchanged: false, endpointsSameSemantics: true }, identicalAcross: { dimension: profile, fields: [due] } }
 
 PROFILE-08:
-  spec: [spec/PROFILE.md#PROFILE-08, spec/AUTONOMY.md#AUTO-10]
+  spec: [spec/PROFILE.md#PROFILE-08]
+  given: { profile: "member:kid", audience: child, egress: { aiQuestions: off, aiGrade: off } }
   cases:
-    - name: 主体一律 member:<id>，契约里不保留 parent
-      expect: { principals: [member], retiredPrincipals: [parent], endpointsSameSemantics: [/api/me, /api/myPlan, /api/me/purge, /api/motions] }
-    - name: 删除身份转归档，不静默删数据
-      when: { profileDeleted: "member:old" }
-      expect: { contentAndAgreement: archived, ledgerHistoryKept: true, statedInPanel: true }
+    - name: 孩子的包不含家长审批环节
+      given: { packHit: true }
+      when: { mode: ambient }
+      expect: { source: pack, value: { approvalRequired: false }, allowed: true }
+    - name: 成员自作的题对全家可用
+      given: { member: "member:kid", memberAuthoredHit: true }
+      when: { mode: ambient }
+      expect: { source: member, value: { approvalRequired: false } }
+    - name: LLM 题按出网开关，不按身份设卡
+      given: { llmHit: true }
+      when: { mode: ambient }
+      expect: { source: llm, egress: { aiQuestions: off }, allowed: false }
+    - name: 任何成员都可担任角色
+      when: { roleChange: { role: keyHolder, action: grant, to: "member:kid" } }
+      expect: { roles: { keyHolder: "member:kid" }, events: [ROLE_CHANGE] }
 
 PROFILE-09:
   spec: [spec/PROFILE.md#PROFILE-09]
-  given: { presentation: large }
+  given: { profile: "member:kid", dayType: schoolday, watchedMs: 1200000, inSlot: true }
   cases:
-    - name: 令牌只改字号档 / 对比度 / 键位收敛
-      expect: { fontStepUp: 1, contrastRaised: true, remoteKeys: 4, rulesUnchanged: true, wordingSetUnchanged: true }
-    - name: 仍满足字号门禁
-      expect: { bodyFontSp: 20, gate: 电视正文 ≥20f }
+    - name: 换内容绑定不改 status 算法
+      when: { contentBindingChanged: true }
+      expect: { identicalAcross: { dimension: audience, fields: [status, due] }, events: [PLAN_CHANGE] }
+    - name: 换默认模式不改判定顺序
+      given: { strength: accompanied }
+      when: { modeRequested: ambient }
+      expect: { mode: ambient, identicalAcross: { dimension: strength, fields: [status] }, events: [PLAN_CHANGE] }
+    - name: 换内容包不触发重置
+      given: { outlineScope: { subjects: [chinese, math], levels: 1 }, packHit: true }
+      when: { contentBindingChanged: true }
+      expect: { unchanged: [watchedMs, overMs, pauseMs, roundsDone], notShown: [成就页] }
+
+PROFILE-10:
+  spec: [spec/PROFILE.md#PROFILE-10, spec/AUTONOMY.md#AUTO-10]
+  given: { profile: "member:kid", activeMember: "member:kid" }
+  cases:
+    - name: 非当前成员的设备端写入被拒
+      when: { writeAttempt: { path: "/api/myPlan", profile: "member:mom" } }
+      expect: { allowed: false, value: { httpStatus: 403 }, unchanged: [watchedMs] }
+    - name: 动议可指向非当前成员，受理在他自己界面
+      given: { actor: "member:kid", target: "member:dad" }
+      when: { motion: { kind: pause, target: "member:dad", accepted: true } }
+      expect: { applied: true, events: [MOTION, MOTION_SETTLED], value: { whereAccepted: targetOwnSurface } }
+    - name: 切换用切换事件，不用会话并发
+      given: { activeMember: none }
+      when: { switch: { from: none, to: "member:kid" } }
+      expect: { events: [PROFILE_SWITCH], value: { eventProfile: "member:kid" } }
+    - name: 面板代提交他身份的写入被拒
+      given: { actor: "member:mom", via: panel }
+      when: { writeAttempt: { path: "/api/myPlan", profile: "member:kid" } }
+      expect: { allowed: false, value: { httpStatus: 403 } }
+
+AUTO-01:
+  spec: [spec/AUTONOMY.md#AUTO-01]
+  cases:
+    - name: 协商式的边界是默认值而非上限
+      given: { profile: "member:kid", strength: negotiated, watchedMs: 2400000, allowanceMs: 2700000, inSlot: true }
+      when: { stillWatching: true }
+      expect: { value: { ceilingApplied: 0 }, blocked: false, status: due, events: [OVER] }
+    - name: 自管式无能力上限
+      given: { profile: "member:kid", strength: selfManaged, groupsPerTask: 10 }
+      when: { mode: ambient }
+      expect: { value: { ceilingApplied: 0, effectiveGroups: 10 } }
+    - name: 装配差异按设备能力不按身份
+      given: { profile: "member:kid", audience: child, assembly: mobile, capability: { motionSensor: denied } }
+      when: { signalSource: manual }
+      expect: { allowed: true, value: { ceilingApplied: 0 } }
+
+AUTO-02:
+  spec: [spec/AUTONOMY.md#AUTO-02]
+  given: { profile: "member:kid", strength: selfManaged, inSlot: true }
+  cases:
+    - name: 自管四项都走同一条写入路径
+      given: { actor: "member:kid", groupsPerTask: 3, questionsPerGroup: 2, questionsPerTaskCap: 6, clearBacklogFirst: false }
+      when: { put: "PUT /api/myPlan" }
+      expect: { writable: true, sameSource: [core/day], value: { selfManagedFields: 4 } }
+    - name: 计划内题目与补一补同池选题
+      given: { answeredInTask: 1, kpState: weak, sameKp: true }
+      when: { mode: ambient }
+      expect: { value: { poolSame: true }, allowed: true }
+    - name: 共同字段由共同签署生效
+      given: { actor: "member:kid", allowanceMs: 3600000 }
+      when: { put: "PUT /api/myPlan" }
+      expect: { writable: false, effective: nextPlanVersion }
+
+AUTO-03:
+  spec: [spec/AUTONOMY.md#AUTO-03, spec/AUTONOMY.md#AUTO-16]
+  given: { profile: "member:kid", inSlot: true, paired: false }
+  cases:
+    - name: 发起动议不需要 scope
+      given: { actor: "member:kid", scopes: [read] }
+      when: { motion: { kind: slotChange, target: self } }
+      expect: { allowed: true, events: [MOTION] }
+    - name: 动议不是权限，未受理不生效
+      given: { actor: "member:kid", target: "member:dad" }
+      when: { motion: { kind: slotChange, target: "member:dad", accepted: false } }
+      expect: { applied: false, value: { httpStatus: 201 } }
+    - name: 动议不能命令外部设备断电
+      given: { paired: true }
+      when: { motion: { kind: slotChange, target: self, accepted: true }, l5: { by: motion, paired: true } }
+      expect: { allowed: false, absent: ["POST /api/l5"] }
+
+AUTO-04:
+  spec: [spec/AUTONOMY.md#AUTO-04, spec/COMMIT.md#COMMIT-08]
+  cases:
+    - name: 计划版本由双方签署建立
+      given: { actor: "member:kid", plan: { version: 7, signed: false }, roles: { ruleEditor: "member:mom" } }
+      when: { planChange: { version: 7 } }
+      expect: { effective: never, value: { runningVersion: 6 }, noEvents: [PLAN_SIGNED] }
+    - name: 修订不能改已签署的计划内容
+      given: { actor: "member:mom", plan: { version: 7, signed: true } }
+      when: { revision: { by: "member:mom", verdict: none, reason: 直接改账 } }
+      expect: { allowed: false, events: [REVISION], unchanged: [plan] }
+
+AUTO-05:
+  spec: [spec/AUTONOMY.md#AUTO-05]
+  given: { profile: "member:kid", inSlot: true, taskDone: false }
+  cases:
+    - name: 未达成不出现成就类界面
+      when: { deadlinePassed: true }
+      expect:
+        noEvents: [ACHIEVED]
+        absent: [streak, badge, checkIn, unlock, 红点递进催促]
+        value: { acknowledgementOnlyItems: 0 }
+        inReport: none
+        escalate: false
+        notify: none
+    - name: 清单不是成就页
+      given: { pendingItems: 12 }
+      when: { get: "GET /api/checklist" }
+      expect: { absent: [streak, badge, unlock], sameSource: [device/onboard, panel/checklist] }
+
+AUTO-14:
+  spec: [spec/AUTONOMY.md#AUTO-14, spec/DAY.md#DAY-05]
+  given: { profile: "member:kid", strength: selfManaged, inSlot: true }
+  cases:
+    - name: 组数与每组题量由该身份自己设定
+      given: { actor: "member:kid", groupsPerTask: 2, questionsPerGroup: 2 }
+      when: { put: "PUT /api/myPlan" }
+      expect: { writable: true, effective: now, value: { effectiveGroups: 4 } }
+    - name: 面板只显示不代设
+      given: { actor: "member:mom", via: panel }
+      when: { put: "PUT /api/myPlan" }
+      expect: { writable: false, shown: [现值] }

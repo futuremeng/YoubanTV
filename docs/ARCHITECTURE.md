@@ -19,15 +19,17 @@ YoubanTV/
 ├── sensor/                   # 传感器端（手机的传感器角色复用同一份代码）
 ├── packs/starter-cc0/        # 自创种子题库源，产出 .qpack，不打进 APK
 ├── tools/                    # 契约生成器、qpack 打包器、决策表夹具执行器、发版与可复现校验、adb 冒烟
+│   ├── check-contract-refs.sh # 数据侧引用门：规格 id / 锚点 / 禁止字段 / 事件枚举
+│   └── check-fixtures.sh      # 数据侧词汇门：断言键与取值必须落在契约与 vocab 里
 ├── docs/                     # 用户与运维文档 + 实机事实
 └── Makefile                  # make check = 契约（含 `tools/check-contract-refs.sh`）+ 决策表 + 棘轮 + 字号 + 包校验 + 血统扫描
 ```
 
-每个源文件头部一行 `// SPEC: COMMIT-04`。CI 已实现的静态检查五项：上游标识只出现在
+每个源文件头部一行 `// SPEC: COMMIT-04`。CI 已实现的静态检查六项：上游标识只出现在
 `PROVENANCE.md` / `NOTICE` / `NAMING.md §3` 登记的位置；`SPEC:` 引用的条目存在；新增出网地址先登记；
 内核不含执行手段与包名；跨身份写入路径不存在（写入口的 `profile` 只能取当前激活身份或 `none`，
 `PROFILE-10`；契约与夹具的引用完整性由 `tools/check-contract-refs.sh` 守（数据侧已实现：契约与夹具
-里引用的每个条目都必须存在，契约不得出现禁止字段与退役取值，事件枚举与 `PRODUCT.md §3` 一致）。
+里引用的每个条目都必须存在，契约不得出现禁止字段与退役取值，事件枚举与 `PRODUCT.md §3` 一致）；夹具的断言词汇由 `tools/check-fixtures.sh` 守（键必须在 `fixtures/vocab.yaml` 登记，枚举取值必须落在契约里，格式见 [`../fixtures/FORMAT.md`](../fixtures/FORMAT.md)）。
 **还差一道未实现**：契约级条目至少被一处实现与一处测试引用（需代码，M1 落地）。
 
 ## 2. 内核（core）

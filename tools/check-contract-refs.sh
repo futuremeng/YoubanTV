@@ -35,6 +35,30 @@ for f in "$root"/fixtures/*.yaml; do
   done
 done
 
+# 2b. 形如 spec/FILE.md#ID 的引用，该 ID 必须在被引用的文件里以标题或表行出现
+python3 - "$root" <<'PYANCHOR'
+import re, sys, pathlib
+root = pathlib.Path(sys.argv[1])
+files = [root / "contract" / "contract.json"] + sorted(root.glob("fixtures/*.yaml"))
+anchors, bad = {}, []
+for f in sorted((root / "spec").glob("*.md")):
+    text = f.read_text()
+    ids = set(re.findall(r"^#{2,3} ([A-Z]{3,7}-\d{2}[a-z]?)", text, re.M))
+    ids |= set(re.findall(r"^\|\s*([A-Z]{3,7}-\d{2}[a-z]?)\s*\|", text, re.M))
+    anchors[f.name] = ids
+for f in files:
+    for name, ident in re.findall(r"spec/([A-Za-z0-9._-]+\.md)#([A-Z]{3,7}-\d{2}[a-z]?)", f.read_text()):
+        if name not in anchors:
+            bad.append(f"{f.name}: 引用的规格文件不存在 {name}")
+        elif ident not in anchors[name]:
+            bad.append(f"{f.name}: {name}#{ident} 锚点不存在（该文件里没有此条目）")
+for b in bad:
+    print("FAIL " + b)
+if bad:
+    sys.exit(1)
+print("规格锚点引用检查通过")
+PYANCHOR
+
 # 3. forbiddenFields / retired 的取值不得在契约其它位置出现
 python3 - "$root/contract/contract.json" <<'PY'
 import json, sys

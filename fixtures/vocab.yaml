@@ -1,0 +1,279 @@
+# 夹具断言词汇表（单一来源）。FORMAT 见 FORMAT.md，机器校验见 tools/check-fixtures.sh。
+# 规则：given / when 的键必须出现在 fields 里；expect 的键必须出现在 predicates 里；
+#       凡 type 指向契约枚举的，取值必须存在于 contract/contract.json 的对应枚举。
+
+structure:
+  entry: {required: [spec, cases], optional: [given]}
+  case: {required: [name, when, expect], optional: [given]}
+  bannedKeys: [then, when2, when3, expect2, expect3, expectAlso, thenExpect]
+
+types:
+  ms: 毫秒整数
+  number: 整数或小数
+  boolean: 布尔
+  string: 字符串
+  symbol: 见 symbols
+  profile: "member:<id> | none"
+  kv: 任意键值映射（键必须是本表内已声明的名字）
+
+symbols:
+  # 界面与位置
+  surface: [self, panel, devicePage, guidePage, studyPage, panelPage]
+  wording: [statusSentence, nextStep, none]
+  notify: [none, once]
+  effective: [now, nextDay, nextPlanVersion, never]
+  report: [none, ownWeekly]
+  gate: [required, passed]
+  # 状态与来源
+  evidence: [events, capability, roles]
+  dimension: [audience, assembly, strength, profile]
+  egressState: [on, off]
+  probeState: [granted, denied, unknown]
+  authoring: [passed, rejected]
+  source: [pack, member, llm, outlineRandom]
+  stars: [credited, recalculated, unchanged]
+  mastery: [updated, unchanged]
+  verify: [passed, failed]
+  answer: [correct, wrong]
+  confirmation: [correct, wrong]
+  signalSource: [manual, sensor]
+  exerciseVerdict: [counted, ambiguous, rejected]
+  presentIn: [core, device, contract, code]
+
+fields:
+  # —— 身份与主体
+  profile: {type: profile}
+  member: {type: profile}
+  actor: {type: "member:<id> | role:ruleEditor | role:keyHolder | system"}
+  target: {type: "member:<id> | self"}
+  activeMember: {type: profile}
+  acceptedBy: {type: profile}
+  audience: {type: enum, enum: audience}
+  audiences: {type: list, enum: audience}
+  strength: {type: enum, enum: strength}
+  strengths: {type: list, enum: strength}
+  assembly: {type: symbol, values: [tv, mobile]}
+  presentation: {type: enum, enum: presentation}
+  roles: {type: kv, note: "role → member:<id>"}
+  rolesField: {type: symbol, values: [present, absent]}
+
+  # —— 当日账与约定
+  dayType: {type: symbol, values: [schoolday, weekend]}
+  watchedMs: {type: ms}
+  allowanceMs: {type: ms}
+  graceMs: {type: ms}
+  moveFromMs: {type: ms}
+  pauseMs: {type: ms}
+  overMs: {type: ms}
+  roundsDone: {type: number}
+  roundTarget: {type: number}
+  inSlot: {type: boolean}
+  slots: {type: symbol, values: [onlyWithinSlots, quizWithinSlots]}
+  planVersion: {type: number}
+  signed: {type: boolean}
+  stillWatching: {type: boolean}
+  exerciseTasks: {type: list}
+  taskDone: {type: boolean}
+  quizDone: {type: boolean}
+  exerciseDone: {type: boolean}
+
+  # —— 自管字段四项（与 contract.selfManagedFields.values 同名）
+  groupsPerTask: {type: number}
+  questionsPerGroup: {type: number}
+  questionsPerTaskCap: {type: number}
+  clearBacklogFirst: {type: boolean}
+
+  # —— 题目与选题
+  answeredInTask: {type: number}
+  answers: {type: list, values: [correct, wrong]}
+  confirmation: {type: symbol, values: [correct, wrong]}
+  selfGrade: {type: symbol, values: [pass, fail]}
+  wrongCount: {type: number}
+  wrongAnswers: {type: number}
+  abandoned: {type: boolean}
+  kp: {type: string}
+  kpId: {type: string}
+  estimateAccuracy: {type: number}
+  attempts: {type: number}
+  dayType: {type: symbol, values: [schoolday, weekend]}
+  backlogSize: {type: number}
+  stars: {type: number}
+  movedToday: {type: boolean}
+  carryOver: {type: number}
+  kpState: {type: enum, enum: knowledgeState}
+  prereqState: {type: enum, enum: knowledgeState}
+  stemChars: {type: number}
+  optionsLines: {type: number}
+  singleKey: {type: boolean}
+  estimatedSeconds: {type: number}
+  questionClass: {type: symbol, values: [prediction, observation, judgement]}
+  supports: {type: enum, enum: mode}
+  modeRequested: {type: enum, enum: mode}
+  packHit: {type: boolean}
+  memberAuthoredHit: {type: boolean}
+  llmHit: {type: boolean}
+  llmGenerated: {type: boolean}
+  verify: {type: symbol, values: [passed, failed]}
+  saved: {type: symbol, values: [draft]}
+  outlineScope: {type: kv}
+  candidateLevel: {type: number}
+  dueAt: {type: string}
+
+  # —— 能力与设备
+  capability: {type: kv, note: "capability id → probeState | on | off | number"}
+  pauseProbe: {type: kv, note: "{responseRate: 0..1, sampleCount: n} 或 unknown"}
+  paired: {type: boolean}
+  rebooted: {type: boolean}
+  probedAt: {type: symbol, values: [beforeLastReboot, afterLastReboot]}
+  monotonicDeltaMs: {type: ms}
+  wallClockDeltaMs: {type: ms}
+  egress: {type: kv, note: "出网开关名 → on | off"}
+  aiQuestions: {type: symbol, values: [on, off]}
+  aiGrading: {type: symbol, values: [on, off]}
+  companionContext: {type: symbol, values: [off, titleOnly]}
+
+  # —— 动议、角色、清单
+  motion: {type: kv, note: "{kind: motionKind, target, minutes, accepted}"}
+  kind: {type: enum, enum: motionKind}
+  accepted: {type: boolean}
+  declined: {type: boolean}
+  unansweredFor: {type: symbol, values: [ttl]}
+  retryAfterMs: {type: ms}
+  roleChange: {type: kv, note: "{role, from, to, action: grant | revoke}"}
+  reauth: {type: boolean}
+  item: {type: string, note: "清单条目 id，形如 <assembly>.<category>.<item>"}
+  checklistStatus: {type: enum, enum: checklistStatus}
+  pendingItems: {type: number}
+  owner: {type: "member:<id> | role:ruleEditor | role:keyHolder | system"}
+
+  # —— 运动与传感器
+  signalSource: {type: symbol, values: [manual, sensor]}
+  exerciseVerdict: {type: symbol, values: [counted, ambiguous, rejected]}
+
+  # —— 其它状态与动作
+  mode: {type: enum, enum: mode}
+  status: {type: enum, enum: status}
+  plan: {type: kv, note: "{version, signed}"}
+  deadlinePassed: {type: boolean}
+  questionShown: {type: boolean}
+  updateAvailable: {type: boolean}
+  crossedMidnight: {type: boolean}
+  manualConfirmation: {type: boolean}
+  sameKp: {type: boolean}
+  minutesPerRound: {type: number}
+  minutesPerGroup: {type: number}
+  quiet: {type: symbol, values: [allDay]}
+  srsProgress: {type: number}
+  pendingReview: {type: number}
+  goal: {type: symbol, values: [reduceOthersWatching, lowerGrace]}
+  l5: {type: kv, note: "{by: signedSlotRule | motion, paired}"}
+  sessions: {type: list, note: "[{device, fromMs, toMs}]"}
+  scopes: {type: list, values: [read, rules, content, grade, diagnostics, egress]}
+  via: {type: symbol, values: [panel, device]}
+  simulate: {type: boolean}
+  secondSession: {type: boolean}
+
+  # —— 外部动作与调用
+  put: {type: string, note: "PUT /api/…"}
+  get: {type: string, note: "GET /api/…"}
+  writeAttempt: {type: kv, note: "{path, profile}"}
+  switch: {type: kv, note: "{from, to}"}
+  planChange: {type: kv}
+  revision: {type: kv, note: "{by, verdict, reason}"}
+  export: {type: symbol, values: [mine]}
+  memberAdded: {type: profile}
+  deviceAdded: {type: symbol, values: [tv, mobile]}
+  profileDeleted: {type: profile}
+  contentBindingChanged: {type: boolean}
+  at: {type: string}
+
+predicates:
+  status: {enum: status}
+  checklistStatus: {enum: checklistStatus}
+  due: {oneOf: [null, kv]}
+  mode: {enum: mode}
+  nextAction: {enum: nextAction}
+  tier: {enum: tier}
+  tierCeiling: {enum: tier}
+  surface: {listOf: surface}
+  wording: {values: [statusSentence, nextStep, none]}
+  events: {listOf: event}
+  noEvents: {listOf: event}
+  absent: {listOf: name, note: "契约字段 / 端点 / API / 事件：不存在"}
+  presentIn: {listOf: name, note: "出现在代码或契约中的位置"}
+  value: {map: metric}
+  delta: {map: metric}
+  unchanged: {listOf: metric}
+  identicalAcross: {map: dimensionFields}
+  sameSource: {listOf: codePath}
+  shown: {listOf: name}
+  notShown: {listOf: name}
+  visibleOn: {listOf: surface}
+  effective: {values: [now, nextDay, nextPlanVersion, never]}
+  applied: {type: boolean}
+  accepted: {type: boolean}
+  allowed: {type: boolean}
+  writable: {type: boolean}
+  blocked: {type: boolean}
+  egress: {map: egressState}
+  capability: {map: capability}
+  checklist: {map: checklistShape}
+  roles: {map: roleHolder}
+  plan: {map: planShape}
+  kpState: {enum: knowledgeState}
+  stars: {values: [credited, recalculated, unchanged]}
+  mastery: {values: [updated, unchanged]}
+  gradedBy: {enum: gradedBy}
+  source: {values: [pack, member, llm, outlineRandom]}
+  authoring: {values: [passed, rejected]}
+  cooldown: {map: dayCount}
+  pool: {map: poolShape}
+  notify: {values: [none, once]}
+  escalate: {type: boolean}
+  evidenceFrom: {listOf: evidence}
+  gate: {values: [required, passed]}
+  inReport: {values: [none, ownWeekly]}
+  answerable: {type: string, note: "这条断言回答的那个问题"}
+
+kvKeys: [from, to, by, role, action, kind, target, minutes, accepted, verdict, reason, path,
+  profile, device, subjects, levels, mode, deficit, window, size, evicted, days, version, signed,
+  added, notAdded, status, owner, ownerForms, dimension, fields, paired, trigger, responseRate,
+  sampleCount, fieldsPerItem, fields, slots, tighten, moveFrom, audience]
+
+# 度量名：出现在 value / delta / unchanged 里的字段
+metricNames: [watchedMs, allowanceMs, graceMs, moveFromMs, pauseMs, overMs, roundsDone,
+  candidateLevel, effectiveGroups, questionsPerTaskCap, groupsPerTask, questionsPerGroup,
+  clearBacklogFirst, backlogSize, carryOver, stars, kp, kpId, kpState, remainingMs, dayOffsetMs,
+  dayRolled, dayTokenKept, replayed, recomputed, inTighteningComparison, prereqWalk, priorityReask,
+  stemChars, stemIdentical, optionsLines, singleKey, estimatedSeconds, questionPickedAt,
+  dynamicGeneration, fallbackApplied, source, gradeMethod, verify, verifySemanticsUnchanged,
+  sensorModeAllowed, manualConfirmation, signalSource, counting, exerciseVerdict,
+  ceilingApplied, poolSame, poolSize, evicted, httpStatus, endpoint, apiExists, writePathExists,
+  newEndpointNeeded, allowed, writable, allowedBranchSites, branchInForbiddenSites,
+  selfManagedFields, selfManagedMayLowerGrace, acknowledgementOnlyItems, humanAction,
+  profileDomain, activeMemberProfile, eventProfile, eventSequenceOrder, inheritedWatchedMs,
+  watchedRecorded, sessionsReconstructable, whereAccepted, motionRequired, playerPaused,
+  resumedAfterAnswer, retried, runningVersion, versionInEveryEvent, uiComputesVerdict,
+  uiComputesVerdictText, quizIssued, exerciseInvite, coWatchInvite, remoteInstall, installedBy,
+  cooldownMs, crossDeviceSignalling, endpointsSameSemantics, schemaUnchanged, featuresVisible,
+  rolesDerivableFromToken, anyAudienceMayHold, approvalRequired, identityNeutralBranches,
+  extraSources, bodyFontSp, fontStepUp, contrastRaised, appSwitchRestoreMs, sameL15DelayMs,
+  dayTypeAwareness, tierL4, l5Invoked, l5Allowed, egressHost, maxQuestions, inWeeklyReport,
+starsDelta, masteryDelta, perDevice, otherItemsUnaffected, statusFrom, guideIsFirstFiveItems,
+rowsPerProfile, taskEnded, resumedFrom, ruleId, srsProgress, pendingReview, minutesPerGroup, recalculatedToday, fallbackRules, storedFields, derived, itemSources, agreementRetainedDays, logRetentionDays, telemetry]
+
+apiNames: [LockTask, DeviceAdmin, performGlobalAction, FLAG_SECURE, fullScreenIntent,
+  mediaSessionHijack, ACCESS_FINE_LOCATION, CameraX]
+
+# 概念级否定：这些机制在产品里不存在，用 absent 引用
+conceptNames: [先批完才入账, 扣分机制, 阻断观看, 红点递进催促, 时长兑换, 按身份的功能开关,
+  成就系统, 连击, 徽章, 签到, 排行, 称号, 代为受理, 第二本账]
+
+# 能力登记表的能力 id（docs/facts/DEVICES.md §3）
+capabilityIds: [paired, cameraChannel, pause, overlay, notifications, bootReceiver, crossDevice,
+  companionContext, mediaSession, voice, autoLaunchAtBoot, homeAssistant, motionSensor,
+  proximitySensor, screenOn, screenOff, ambientLight, volume, speakerOutput, screenCapture,
+  systemPresentation, timeSource, remoteInput, offline]
+
+# 出网开关名（contract.enums.egressSwitch + 外部端点开关）
+egressNames: [aiQuestions, aiGrade, diagnostics, companionContext, homeAssistant]

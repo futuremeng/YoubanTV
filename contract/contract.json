@@ -1,139 +1,290 @@
 {
   "protocolVersion": 1,
   "x-note": "契约单一来源（D1、M1.1）。面板客户端与设备端 DTO 由本文件生成；本文件之外的字段即「契约里无定义」，代码不得凭直觉补。每条都带 spec 指向规格条目，CI 用它做引用完整性检查。",
-
   "principal": {
     "kind": "member",
     "form": "member:<id>",
-    "spec": ["PROFILE-08", "AUTO-10"],
+    "spec": [
+      "PROFILE-08",
+      "AUTO-10"
+    ],
     "x-note": "全体成员同一主体；契约里不存在 parent 主体，也不存在按 audience 的权限字段（PROFILE-01/02）。"
   },
-
   "roles": {
-    "values": ["ruleEditor", "keyHolder"],
+    "values": [
+      "ruleEditor",
+      "keyHolder"
+    ],
     "cardinality": "每类角色同一时刻各一人，可轮值",
     "grantPath": "本机当前激活模式内的两次确认：持有人提 roleChange 动议，对方在自己的界面受理",
     "keyHolderTransfer": "必须在被控设备本机由现任当场确认，不接受远程受理",
     "derivedFrom": [],
-    "spec": ["AUTO-07", "AUTO-09", "AUTO-10", "PROFILE-01", "PROFILE-10"]
+    "spec": [
+      "AUTO-07",
+      "AUTO-09",
+      "AUTO-10",
+      "PROFILE-01",
+      "PROFILE-10"
+    ]
   },
-
   "scopes": {
-    "values": ["read", "rules", "content", "grade", "diagnostics", "egress"],
+    "values": [
+      "read",
+      "rules",
+      "content",
+      "grade",
+      "diagnostics",
+      "egress"
+    ],
     "grants": {
-      "ruleEditor": ["read", "rules", "content", "grade", "diagnostics"],
-      "keyHolder": ["egress"]
+      "ruleEditor": [
+        "read",
+        "rules",
+        "content",
+        "grade",
+        "diagnostics"
+      ],
+      "keyHolder": [
+        "egress"
+      ]
     },
     "x-note": "发起动议不需要 scope；受理不是权限，它只发生在被请求方自己的界面。grade 为查阅与修订，不含「先批完才入账」这类开关。",
-    "spec": ["AUTO-10", "AUTO-15", "ARCHITECTURE-§5"]
+    "spec": [
+      "AUTO-10",
+      "AUTO-15",
+      "ARCHITECTURE-§5"
+    ]
   },
-
   "pairing": {
     "keyBinding": "设备 / 面板凭据（不随角色轮值转移）",
     "token": "短时令牌（scope + TTL）；改密码或重启令全部失效；配对后密码只用于签发",
-    "unauthenticatedEndpoints": ["/api/hello"],
-    "spec": ["ARCHITECTURE-§5", "D11", "D38"]
+    "unauthenticatedEndpoints": [
+      "/api/hello"
+    ],
+    "spec": [
+      "ARCHITECTURE-§5",
+      "D11",
+      "D38"
+    ]
   },
-
   "endpoints": [
     {
       "method": "GET",
       "path": "/api/hello",
       "auth": "none",
-      "response": ["model", "protocolVersion", "paired", "capabilities"],
-      "spec": ["ARCHITECTURE-§5"]
+      "response": [
+        "model",
+        "protocolVersion",
+        "paired",
+        "capabilities"
+      ],
+      "spec": [
+        "ARCHITECTURE-§5"
+      ]
     },
     {
       "method": "GET",
       "path": "/api/me",
       "auth": "member",
-      "reads": ["账本视图（与面板同源）", "生效约定", "待受理动议", "当前协商强度", "当前层", "伴看上下文开关状态"],
-      "spec": ["AUTO-06", "AUTO-10"]
+      "reads": [
+        "账本视图（与面板同源）",
+        "生效约定",
+        "待受理动议",
+        "当前协商强度",
+        "当前层",
+        "伴看上下文开关状态"
+      ],
+      "spec": [
+        "AUTO-06",
+        "AUTO-10"
+      ]
     },
     {
       "method": "PUT",
       "path": "/api/myPlan",
       "auth": "member",
-      "writes": ["selfManagedFields（任何强度下）", "dayPlan（仅自管强度下的本人）"],
-      "readOnlyForOthers": ["selfManagedFields"],
-      "spec": ["AUTO-14", "AUTO-07", "PROFILE-08"]
+      "writes": [
+        "selfManagedFields（任何强度下）",
+        "dayPlan（仅自管强度下的本人）"
+      ],
+      "readOnlyForOthers": [
+        "selfManagedFields"
+      ],
+      "spec": [
+        "AUTO-14",
+        "AUTO-07",
+        "PROFILE-08"
+      ]
     },
     {
       "method": "POST",
       "path": "/api/me/purge",
       "auth": "member",
       "effect": "清除自己的记录；家庭协议与他人账本各自独立；写一条审计事件",
-      "spec": ["AUTO-06"]
+      "spec": [
+        "AUTO-06"
+      ]
     },
     {
       "method": "POST",
       "path": "/api/motions",
       "auth": "member",
-      "body": ["kind", "target", "terms", "reason"],
+      "body": [
+        "kind",
+        "target",
+        "terms",
+        "reason"
+      ],
       "ttlMs": 86400000,
       "cooldownMs": 1800000,
       "x-note": "申诉、即时控制、角色交接、共看邀请共用这一条端点；受理由被请求方在自己的界面完成。",
-      "spec": ["AUTO-03", "AUTO-16", "D34"]
+      "spec": [
+        "AUTO-03",
+        "AUTO-16",
+        "D34"
+      ]
     },
     {
       "method": "GET",
       "path": "/api/checklist",
       "auth": "read",
       "x-note": "设备待确认清单：从事件 + 能力登记表 + roles 现值派生，自身不落账；设备端与面板同一份。",
-      "spec": ["ONBOARD-01", "ONBOARD-04"]
+      "spec": [
+        "ONBOARD-01",
+        "ONBOARD-04"
+      ]
     },
     {
       "method": "GET",
       "path": "/api/simulate",
       "auth": "read",
       "x-note": "计划模拟器，调用内核同一份决策代码（M4）。",
-      "spec": ["ROADMAP-M4"]
+      "spec": [
+        "ROADMAP-M4"
+      ]
     },
     {
       "method": "GET",
       "path": "/api/topics",
       "auth": "read",
-      "spec": ["ASK-02", "ROADMAP-M5"]
+      "spec": [
+        "ASK-02",
+        "ROADMAP-M5"
+      ]
     },
     {
       "method": "POST",
       "path": "/api/exercise",
       "auth": "member",
-      "body": ["taskId", "signalSource"],
-      "spec": ["COMMIT-03"]
+      "body": [
+        "taskId",
+        "signalSource"
+      ],
+      "spec": [
+        "COMMIT-03"
+      ]
     },
     {
       "method": "POST",
       "path": "/api/cowatch",
       "auth": "member",
       "x-note": "共看时段与邀请；邀请即 kind=coWatch 的动议。",
-      "spec": ["AUTO-03", "MOBILE-§2"]
+      "spec": [
+        "AUTO-03",
+        "MOBILE-§2"
+      ]
     },
     {
       "method": "POST",
       "path": "/api/messages",
       "auth": "member",
-      "body": ["text", "at", "author"],
+      "body": [
+        "text",
+        "at",
+        "author"
+      ],
       "x-note": "家人原话原样送达，来源标注到人。",
-      "spec": ["MOBILE-§2", "LAYER-09"]
+      "spec": [
+        "MOBILE-§2",
+        "LAYER-09"
+      ]
     }
   ],
-
   "enums": {
     "tier": {
-      "values": ["L0", "L1", "L1.5", "L2", "L3", "L5"],
-      "reserved": ["L4"],
-      "spec": ["LAYER-01", "D15", "D23"]
+      "values": [
+        "L0",
+        "L1",
+        "L1.5",
+        "L2",
+        "L3",
+        "L5"
+      ],
+      "reserved": [
+        "L4"
+      ],
+      "spec": [
+        "LAYER-01",
+        "D15",
+        "D23"
+      ]
     },
-    "status": { "values": ["honored", "due", "overdue"], "spec": ["COMMIT-09"] },
-    "mode": { "values": ["focused", "ambient"], "spec": ["COMMIT-02", "COMMIT-03"] },
+    "status": {
+      "values": [
+        "honored",
+        "due",
+        "overdue"
+      ],
+      "spec": [
+        "COMMIT-09"
+      ]
+    },
+    "mode": {
+      "values": [
+        "focused",
+        "ambient"
+      ],
+      "spec": [
+        "COMMIT-02",
+        "COMMIT-03"
+      ]
+    },
     "nextAction": {
-      "values": ["quiz", "exercise", "free", "motion", "none"],
-      "spec": ["GATE-别名退役"]
+      "values": [
+        "quiz",
+        "exercise",
+        "free",
+        "motion",
+        "none"
+      ],
+      "spec": [
+        "GATE-别名退役"
+      ]
     },
-    "dueKind": { "values": ["quiz", "exercise", "free"], "spec": ["COMMIT-02", "COMMIT-03"] },
+    "dueKind": {
+      "values": [
+        "quiz",
+        "exercise",
+        "free"
+      ],
+      "spec": [
+        "COMMIT-02",
+        "COMMIT-03"
+      ]
+    },
     "motionKind": {
-      "values": ["pause", "extend", "stopHint", "cancelTask", "changeTask", "slotChange", "planChange", "dataExport", "roleChange", "coWatch"],
+      "values": [
+        "pause",
+        "extend",
+        "stopHint",
+        "cancelTask",
+        "changeTask",
+        "slotChange",
+        "planChange",
+        "dataExport",
+        "roleChange",
+        "coWatch"
+      ],
       "quotaPerMemberPerDay": {
         "pause": 3,
         "extend": 2,
@@ -147,64 +298,240 @@
         "coWatch": null
       },
       "extendMaxMinutes": 15,
-      "spec": ["AUTO-03"]
+      "spec": [
+        "AUTO-03"
+      ]
     },
     "event": {
       "values": [
-        "WATCHED", "DONE", "ANSWER", "ROUND_DONE", "OVER", "MISSED",
-        "PLAN_SIGNED", "PLAN_CHANGE", "PROFILE_SWITCH",
-        "MOTION", "MOTION_SETTLED", "MOTION_UNANSWERED",
-        "REVISION", "ROLE_CHANGE", "REMOTE"
+        "WATCHED",
+        "DONE",
+        "ANSWER",
+        "ROUND_DONE",
+        "OVER",
+        "MISSED",
+        "PLAN_SIGNED",
+        "PLAN_CHANGE",
+        "PROFILE_SWITCH",
+        "MOTION",
+        "MOTION_SETTLED",
+        "MOTION_UNANSWERED",
+        "REVISION",
+        "ROLE_CHANGE",
+        "REMOTE"
       ],
-      "requiredFields": { "all": ["at", "profile", "device"] },
-      "profileDomain": ["member:<id>", "none"],
-      "spec": ["PRODUCT-§3", "PROFILE-04", "COMMIT-11"]
+      "auxValues": [
+        "due_shown",
+        "llm_generate_failed",
+        "audit"
+      ],
+      "x-note": "event 是判定与账本用的事件；auxValues 是度量与审计事件（`ASK-07` 的 `due_shown`、`ASK-08` 的`llm_generate_failed`、清除与开关的审计记录），不进账本投影。",
+      "requiredFields": {
+        "all": [
+          "at",
+          "profile",
+          "device"
+        ]
+      },
+      "profileDomain": [
+        "member:<id>",
+        "none"
+      ],
+      "spec": [
+        "PRODUCT-§3",
+        "PROFILE-04",
+        "COMMIT-11",
+        "ASK-07",
+        "ASK-08"
+      ]
     },
     "knowledgeState": {
-      "values": ["unseen", "learning", "shaky", "weak", "mastered"],
-      "spec": ["ASK-03", "PRODUCT-§5"]
+      "values": [
+        "unseen",
+        "learning",
+        "shaky",
+        "weak",
+        "mastered"
+      ],
+      "spec": [
+        "ASK-03",
+        "PRODUCT-§5"
+      ]
     },
-    "gradedBy": { "values": ["self", "ai"], "spec": ["AUTO-15"] },
-    "signalSource": { "values": ["manual", "sensor"], "spec": ["COMMIT-03", "SENSE-02"] },
-    "exerciseVerdict": { "values": ["counted", "ambiguous", "rejected"], "spec": ["COMMIT-03", "SENSE-04"] },
-    "audience": { "values": ["child", "grown-up", "senior"], "spec": ["PACK-01", "PROFILE-01"] },
+    "gradedBy": {
+      "values": [
+        "self",
+        "ai"
+      ],
+      "spec": [
+        "AUTO-15"
+      ]
+    },
+    "signalSource": {
+      "values": [
+        "manual",
+        "sensor"
+      ],
+      "spec": [
+        "COMMIT-03",
+        "SENSE-02"
+      ]
+    },
+    "exerciseVerdict": {
+      "values": [
+        "counted",
+        "ambiguous",
+        "rejected"
+      ],
+      "spec": [
+        "COMMIT-03",
+        "SENSE-04"
+      ]
+    },
+    "audience": {
+      "values": [
+        "child",
+        "grown-up",
+        "senior"
+      ],
+      "spec": [
+        "PACK-01",
+        "PROFILE-01"
+      ]
+    },
     "presentation": {
-      "values": ["standard", "large"],
-      "uiWords": { "standard": "标准", "large": "大字" },
-      "spec": ["PROFILE-09", "NAMING-§5"]
+      "values": [
+        "standard",
+        "large"
+      ],
+      "uiWords": {
+        "standard": "标准",
+        "large": "大字"
+      },
+      "spec": [
+        "PROFILE-09",
+        "NAMING-§5"
+      ]
     },
     "strength": {
-      "values": ["accompanied", "negotiated", "selfManaged"],
-      "uiWords": { "accompanied": "陪伴式", "negotiated": "协商式", "selfManaged": "自管式" },
-      "defaultTierOnDue": { "accompanied": "L3", "negotiated": "L2", "selfManaged": "L1" },
-      "spec": ["AUTO-07", "LAYER-07"]
+      "values": [
+        "accompanied",
+        "negotiated",
+        "selfManaged"
+      ],
+      "uiWords": {
+        "accompanied": "陪伴式",
+        "negotiated": "协商式",
+        "selfManaged": "自管式"
+      },
+      "defaultTierOnDue": {
+        "accompanied": "L3",
+        "negotiated": "L2",
+        "selfManaged": "L1"
+      },
+      "spec": [
+        "AUTO-07",
+        "LAYER-07"
+      ]
     },
     "checklistStatus": {
-      "values": ["pending", "done", "unknown", "notApplicable"],
-      "spec": ["ONBOARD-01", "ONBOARD-06"]
+      "values": [
+        "pending",
+        "done",
+        "unknown",
+        "notApplicable"
+      ],
+      "spec": [
+        "ONBOARD-01",
+        "ONBOARD-06"
+      ]
     },
     "checklistCategory": {
-      "values": ["auth", "probe", "agree", "egress", "role", "pack", "time", "device"],
+      "values": [
+        "auth",
+        "probe",
+        "agree",
+        "egress",
+        "role",
+        "pack",
+        "time",
+        "device"
+      ],
       "idForm": "<assembly>.<category>.<item>",
-      "assembly": ["tv", "mobile"],
-      "spec": ["ONBOARD-02", "ONBOARD-03"]
+      "assembly": [
+        "tv",
+        "mobile"
+      ],
+      "spec": [
+        "ONBOARD-02",
+        "ONBOARD-03"
+      ]
     },
     "checklistOwner": {
-      "forms": ["member:<id>", "role:ruleEditor", "role:keyHolder", "system"],
+      "forms": [
+        "member:<id>",
+        "role:ruleEditor",
+        "role:keyHolder",
+        "system"
+      ],
       "x-note": "system 条目由后台探针自动完成，没有人需要勾选；成员与角色条目的受理只在对方自己的界面。",
-      "spec": ["ONBOARD-04"]
+      "spec": [
+        "ONBOARD-04"
+      ]
     },
-    "presence": { "values": ["alone", "co-present", "co-watch"], "spec": ["SENSE-07", "COMMITMENTS-§4b"] }
+    "presence": {
+      "values": [
+        "alone",
+        "co-present",
+        "co-watch"
+      ],
+      "spec": [
+        "SENSE-07",
+        "COMMITMENTS-§4b"
+      ]
+    },
+    "egressSwitch": {
+      "values": [
+        "aiQuestions",
+        "aiGrade",
+        "diagnostics",
+        "companionContext",
+        "homeAssistant"
+      ],
+      "default": "off",
+      "holder": "role:keyHolder",
+      "x-note": "出网开关是对联网功能的总关闭（D13、D28），只有持有监护人凭据者能开；companionContext 默认且仅可为 off，要开等同启用外部端点（ONBOARD-08）。",
+      "spec": [
+        "docs/PRIVIACY.md#§2",
+        "spec/COMMIT.md#COMMIT-09",
+        "spec/ONBOARD.md#ONBOARD-08"
+      ]
+    }
   },
-
   "profile": {
-    "fields": ["id", "label", "audience", "content.packs", "content.outlineScope", "content.exerciseTasks", "defaults.mode", "defaults.schedulePrefs", "defaults.presentation"],
+    "fields": [
+      "id",
+      "label",
+      "audience",
+      "content.packs",
+      "content.outlineScope",
+      "content.exerciseTasks",
+      "defaults.mode",
+      "defaults.schedulePrefs",
+      "defaults.presentation"
+    ],
     "rolesField": "roles 住在成员身上，不在 Profile 里（PROFILE-01）",
-    "spec": ["PROFILE-01"]
+    "spec": [
+      "PROFILE-01"
+    ]
   },
-
   "selfManagedFields": {
-    "values": ["groupsPerTask", "questionsPerGroup", "questionsPerTaskCap", "clearBacklogFirst"],
+    "values": [
+      "groupsPerTask",
+      "questionsPerGroup",
+      "questionsPerTaskCap",
+      "clearBacklogFirst"
+    ],
     "writePath": "PUT /api/myPlan（仅本人）",
     "writePathsForOthers": [],
     "inTighteningComparison": false,
@@ -214,9 +541,13 @@
       "questionsPerTaskCap": "每次任务的题目数上限",
       "clearBacklogFirst": "补一补是否先补完"
     },
-    "spec": ["AUTO-14", "DAY-05", "ASK-04", "ASK-07"]
+    "spec": [
+      "AUTO-14",
+      "DAY-05",
+      "ASK-04",
+      "ASK-07"
+    ]
   },
-
   "forbiddenFields": {
     "values": [
       "allowanceCeiling",
@@ -228,26 +559,74 @@
       "unspentMs",
       "verdict",
       "phase",
-      "doneMs"
+      "doneMs",
+      "audienceAllowance",
+      "audienceGate",
+      "audienceLock",
+      "selfManagedCap",
+      "capabilityCeiling",
+      "currentProfile",
+      "streak",
+      "badge",
+      "checkIn",
+      "unlock",
+      "achievement",
+      "checklistTable"
     ],
-    "x-note": "这些字段在契约里无定义：完成只写事件，不发放也不兑换时长；能力对所有成员相同；按 audience 的开关与上限不存在。",
-    "spec": ["AUTO-13", "COMMIT-05", "PROFILE-03", "D24", "GATE-别名退役"]
+    "x-note": "这些字段与事件在契约里无定义：完成只写事件，不发放也不兑换时长；能力对所有成员相同；按 audience 的开关与上限不存在；成就类机制（连击、徽章、签到、解锁）不存在。",
+    "spec": [
+      "spec/COMMIT.md#COMMIT-11",
+      "spec/AUTONOMY.md#AUTO-05",
+      "spec/PROFILE.md#PROFILE-01",
+      "spec/ONBOARD.md#ONBOARD-05"
+    ],
+    "forbiddenEvents": [
+      "GRANT",
+      "EXCHANGE",
+      "TIME_GRANT",
+      "ACHIEVED",
+      "STREAK",
+      "CHECKIN"
+    ]
   },
-
   "writeGuards": {
     "profileParameter": "写入口的 profile 参数只能取当前激活身份或 none",
     "noCrossMemberWrite": true,
-    "enforcementSurface": ["present()"],
-    "spec": ["PROFILE-10", "COMMIT-10", "AUTO-16"]
+    "enforcementSurface": [
+      "present()"
+    ],
+    "spec": [
+      "PROFILE-10",
+      "COMMIT-10",
+      "AUTO-16"
+    ]
   },
-
   "retired": {
-    "principals": ["parent"],
-    "scopes": ["control"],
-    "endpoints": ["POST /api/requests"],
-    "events": ["REQUEST", "REQUEST_SETTLED"],
-    "nextAction": ["request"],
-    "aliases": { "parent": "member:<id> + roles", "REQUEST": "MOTION", "REQUEST_SETTLED": "MOTION_SETTLED", "request": "motion", "control": "已受理的动议 + roles" },
-    "spec": ["GATE-别名退役"]
+    "principals": [
+      "parent"
+    ],
+    "scopes": [
+      "control"
+    ],
+    "endpoints": [
+      "POST /api/requests"
+    ],
+    "events": [
+      "REQUEST",
+      "REQUEST_SETTLED"
+    ],
+    "nextAction": [
+      "request"
+    ],
+    "aliases": {
+      "parent": "member:<id> + roles",
+      "REQUEST": "MOTION",
+      "REQUEST_SETTLED": "MOTION_SETTLED",
+      "request": "motion",
+      "control": "已受理的动议 + roles"
+    },
+    "spec": [
+      "GATE-别名退役"
+    ]
   }
 }

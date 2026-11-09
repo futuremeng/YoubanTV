@@ -1,123 +1,139 @@
-# 设备待确认清单夹具（M1.2 的一部分）；条目与状态取值以 contract.json 的 checklist* 枚举为准。
+# 待确认清单夹具；键的词汇表见 vocab.yaml，取值域来自 contract/contract.json。
 
 ONBOARD-01:
-  spec: [spec/ONBOARD.md#ONBOARD-01]
+  spec: [spec/ONBOARD.md#ONBOARD-01, docs/ONBOARDING.md#§1]
+  given: { profile: "member:kid", pendingItems: 12 }
   cases:
-    - name: 清单是派生视图，没有清单项表
-      when: { get: /api/checklist }
-      expect:
-        derivedFrom: [events, capabilityRegistry, roles]
-        ownTable: absent
-        fieldsPerItem: [id, owner, where, status, evidence]
-        sameProjectionOn: [device, panel]
-    - name: 状态取值封闭
-      expect: { statuses: [pending, done, unknown, notApplicable] }
+    - name: 清单不阻断任何功能
+      when: { get: "GET /api/checklist" }
+      expect: { blocked: false, unchanged: [status], inReport: none, absent: [streak, badge, checkIn, unlock], value: { acknowledgementOnlyItems: 0 } }
+    - name: 清单不参与判定与激励
+      given: { pendingItems: 0 }
+      when: { get: "GET /api/checklist" }
+      expect: { identicalAcross: { dimension: profile, fields: [status] }, value: { starsDelta: 0, masteryDelta: 0, inWeeklyReport: false } }
 
 ONBOARD-02:
-  spec: [spec/ONBOARD.md#ONBOARD-02, docs/ONBOARDING.md#§2]
+  spec: [spec/ONBOARD.md#ONBOARD-02]
+  given: { assembly: tv }
   cases:
-    - name: 装配决定固定项集合
-      given: { assembly: tv }
-      expect: { includes: [tv.auth.overlay, tv.probe.pause, tv.agree.plan, tv.egress.aiGrade], excludes: [mobile.device.calibrate] }
-      when: { assembly: mobile }
-      expect: { includes: [mobile.probe.crossDevice, mobile.agree.plan], excludes: [tv.auth.overlay] }
-    - name: 固定项之外的来源不存在，判定也不随装配变
-      expect: { extraSources: none, statusAlgorithmSame: true }
+    - name: 电视固定项全集
+      when: { get: "GET /api/checklist" }
+      expect: { checklist: { added: [tv.auth.overlay, tv.probe.pause, tv.probe.bootReceiver, tv.agree.plan, tv.agree.slots, tv.egress.aiQuestions, tv.role.keyHolder, tv.pack.license, tv.probe.clock, tv.device.l5Paired] }, value: { perDevice: true } }
+    - name: 手机固定项与电视不同装配
+      given: { assembly: mobile }
+      when: { get: "GET /api/checklist" }
+      expect: { checklist: { added: [mobile.probe.motionSensor, mobile.probe.calibration, mobile.agree.plan, mobile.probe.crossDevice, mobile.probe.notifications, mobile.egress.state] } }
 
 ONBOARD-03:
-  spec: [spec/ONBOARD.md#ONBOARD-03, docs/ONBOARDING.md#§4]
+  spec: [spec/ONBOARD.md#ONBOARD-03, spec/ONBOARD.md#ONBOARD-04]
+  given: { profile: "member:kid", item: tv.agree.plan, checklistStatus: done }
   cases:
-    - name: 新成员加入
-      when: { memberAdded: "member:newkid" }
-      expect:
-        addedItems: ["*.agree.plan", "*.agree.slots", 命名与内容绑定]
-        perDevice: true
-    - name: 新设备加入
+    - name: 新成员加入追加条目
+      when: { memberAdded: "member:dad" }
+      expect: { checklist: { added: ["*.agree.plan", "*.agree.slots"] }, unchanged: [item] }
+    - name: 新设备接入追加条目
       when: { deviceAdded: tv }
-      expect: { addedItems: tv固定项全集, guideIsFirstFiveItems: true }
-    - name: 角色移交
-      when: { roleChange: { role: keyHolder } }
-      expect: { addedItems: [tv.role.holder, mobile.egress.state], requiresBothSides: true }
-    - name: 代码不得凭空生成条目
-      expect: { itemSources: [触发表], dynamicGeneration: false }
+      expect: { checklist: { added: ["*.probe.overlay", "*.probe.pause"] } }
+    - name: 角色交接追加条目并指向新持有者
+      given: { roles: { keyHolder: "member:mom" } }
+      when: { roleChange: { role: keyHolder, action: grant, to: "member:kid" } }
+      expect: { checklist: { added: ["*.role.keyHolder"] }, roles: { keyHolder: "member:kid" }, events: [ROLE_CHANGE] }
+    - name: 内容包变更追加许可条目
+      when: { contentBindingChanged: true }
+      expect: { checklist: { added: ["*.pack.license"] } }
+    - name: 外部端点配对追加条目
+      given: { paired: false }
+      when: { paired: true }
+      expect: { checklist: { added: ["*.device.l5Paired"] }, value: { installedBy: activeMember } }
+    - name: 已存在同 id 的条目时幂等
+      given: { item: "member:dad.tv.agree.plan", checklistStatus: pending }
+      when: { memberAdded: "member:dad" }
+      expect: { checklist: { added: [] }, value: { otherItemsUnaffected: true } }
 
 ONBOARD-04:
-  spec: [spec/ONBOARD.md#ONBOARD-04, spec/PROFILE.md#PROFILE-10]
+  spec: [spec/ONBOARD.md#ONBOARD-04]
+  given: { item: tv.auth.overlay, checklistStatus: pending }
   cases:
-    - name: owner 取值封闭
-      expect: { ownerForms: [member, "role:ruleEditor", "role:keyHolder", system] }
-    - name: 后台探针条目没有人需要勾选
-      given: { item: tv.probe.pause, owner: system }
-      expect: { humanAction: none, statusFrom: probeEvidence }
-    - name: 替别人勾掉的路径不存在
-      when: { confirmAttempt: { item: "member:mom 的 agree.plan", by: "member:kid" } }
-      expect: { accepted: false, whereAccepted: targetOwnSurface }
+    - name: 后台探针的证据直接完成条目
+      given: { owner: system, capability: { overlay: denied } }
+      when: { capability: { overlay: granted } }
+      expect: { checklistStatus: done, value: { statusFrom: probeEvidence, humanAction: none }, noEvents: [REVISION] }
 
 ONBOARD-05:
-  spec: [spec/ONBOARD.md#ONBOARD-05]
+  spec: [spec/ONBOARD.md#ONBOARD-05, spec/AUTONOMY.md#AUTO-05]
+  given: { profile: "member:kid", pendingItems: 12 }
   cases:
-    - name: 清单不阻断、不改判定、不参与激励
-      given: { pendingItems: 6 }
-      expect: { blockingAction: none, statusChanged: false, starsDelta: 0, inWeeklyReport: false }
-    - name: 无递进催促与成就机制
-      expect: { streak: absent, badge: absent, checkIn: absent, nudgeEscalation: false, surface: L1 }
+    - name: 首启引导只讲固定项前五项
+      when: { get: "GET /api/checklist" }
+      expect: { shown: [前五项], notShown: [其余待确认项], value: { guideIsFirstFiveItems: true } }
+    - name: 清单不是成就页
+      when: { get: "GET /api/checklist" }
+      expect: { absent: [streak, badge, unlock], surface: [devicePage], value: { acknowledgementOnlyItems: 0 } }
 
 ONBOARD-06:
-  spec: [spec/ONBOARD.md#ONBOARD-06, spec/LAYER.md#LAYER-07]
+  spec: [spec/ONBOARD.md#ONBOARD-06]
+  given: { item: mobile.probe.calibration, checklistStatus: unknown }
   cases:
-    - name: 暂停响应未探到
-      given: { item: tv.probe.pause, status: unknown }
-      expect: { mode: ambient, reasonShown: true, otherItemsUnaffected: true }
-    - name: 悬浮窗未授权
-      given: { item: tv.auth.overlay, status: pending }
-      expect: { tierCeiling: L2, blocked: false }
-    - name: 伴看上下文未确认
-      given: { item: tv.egress.companionContext, status: pending }
-      expect: { capability: off }
-    - name: 摄像头未标定
-      given: { item: mobile.device.calibrate, status: pending }
-      expect: { channel: off, counting: [accelerometer, manual] }
+    - name: unknown 与 pending 不驱动功能
+      when: { signalSource: sensor }
+      expect: { allowed: false, capability: { motionSensor: unknown }, sameSource: [device/sensor] }
+    - name: 探测结果回来即自动补做
+      when: { capability: { motionSensor: granted } }
+      expect: { applied: true, effective: now, events: [REVISION], checklistStatus: done, value: { recalculatedToday: true } }
 
 ONBOARD-07:
-  spec: [spec/ONBOARD.md#ONBOARD-07, docs/facts/DEVICES.md#F1]
+  spec: [spec/ONBOARD.md#ONBOARD-07]
+  given: { profile: "member:kid", item: tv.role.keyHolder, owner: "member:mom", checklistStatus: pending }
   cases:
-    - name: 重启后授权探针重跑，旧证据失效
-      when: { rebooted: true, probedAt: beforeLastReboot, overlayGranted: false }
-      expect: { status: pending, eventWritten: none, notification: none }
-    - name: 探针探不到时保持 unknown 而不是 done
-      when: { probeResult: unknown }
-      expect: { status: unknown, fallbackApplied: true }
+    - name: 成员条目由成员自己受理
+      given: { member: "member:kid", owner: member }
+      when: { accepted: true }
+      expect: { applied: true, checklistStatus: done, value: { whereAccepted: targetOwnSurface } }
+    - name: 无人受理时保持 pending，不阻断
+      given: { member: "member:kid", owner: member }
+      when: { motion: { kind: roleChange, target: "member:kid", accepted: false }, unansweredFor: ttl }
+      expect: { checklistStatus: pending, blocked: false, events: [MOTION_UNANSWERED] }
+    - name: 不生成只需勾选即完成的条目
+      when: { get: "GET /api/checklist" }
+      expect: { value: { acknowledgementOnlyItems: 0 }, absent: [checklistTable] }
 
 ONBOARD-08:
-  spec: [spec/ONBOARD.md#ONBOARD-08, docs/PRIVACY.md#§6]
-  given: { item: tv.egress.aiGrade }
+  spec: [spec/ONBOARD.md#ONBOARD-08, spec/ONBOARD.md#ONBOARD-09]
+  given: { assembly: mobile, item: mobile.egress.state }
   cases:
-    - name: 未确认即默认关
-      when: { confirmed: false }
-      expect: { egress: off, shownInChecklist: pending }
-    - name: 开关变更未经再认证则不生效
-      when: { actor: keyHolder, reauth: false }
-      expect: { applied: false }
-    - name: 再认证后生效并显示去向与关掉方法
-      when: { actor: keyHolder, reauth: true }
-      expect: { applied: true, shown: [host, whatLeaves, howToTurnOff] }
-    - name: 其它成员只读到状态与确认人
-      given: { actor: "member:kid" }
-      expect: { writable: false, shows: [status, confirmedBy] }
+    - name: 手机端只呈现只读状态
+      when: { get: "GET /api/checklist" }
+      expect: { value: { writable: false }, shown: [host, whatLeaves, howToTurnOff] }
+    - name: companionContext 开启时追加条目
+      given: { egress: { companionContext: off } }
+      when: { egress: { companionContext: on } }
+      expect: { checklist: { added: ["*.device.companionContext"] }, egress: { companionContext: on } }
 
 ONBOARD-09:
   spec: [spec/ONBOARD.md#ONBOARD-09]
+  given: { profile: "member:kid", capability: { cameraChannel: unknown } }
   cases:
-    - name: 完成证据只来自三处
-      expect: { evidenceSources: [events, capabilityRegistry, rolesAndBindings] }
-    - name: 不设「我知道了」型条目
-      expect: { acknowledgementOnlyItems: 0, insteadIn: 常驻说明页 }
+    - name: unknown 用保守档并在清单里说明
+      when: { export: mine }
+      expect: { mode: ambient, capability: { cameraChannel: unknown }, value: { fallbackApplied: true }, shown: [原因], events: [] }
+    - name: 唯一一条回退规则，无逐能力特判
+      when: { get: "GET /api/checklist" }
+      expect: { sameSource: [core/capability], value: { fallbackRules: 1 } }
+    - name: 探测通过只抬默认档
+      given: { pauseProbe: { responseRate: 0.96, sampleCount: 20 } }
+      when: { modeRequested: focused }
+      expect: { mode: focused, effective: nextDay, unchanged: [status] }
 
 ONBOARD-10:
-  spec: [spec/ONBOARD.md#ONBOARD-10, docs/PRIVACY.md#§1]
+  spec: [spec/ONBOARD.md#ONBOARD-10, docs/PRIVIACY.md#§4]
+  given: { profile: "member:kid", pendingItems: 12 }
   cases:
-    - name: 存储里只有 id、owner、状态、证据指针与时刻
-      expect: { storedFields: [id, owner, status, evidence, at], contentData: absent, screenshots: absent }
-    - name: 导出时列一节，不进成长记录
+    - name: 清单状态可导出
       when: { export: mine }
-      expect: { checklistSection: present, inGrowthReport: false, usedAsEvaluation: false }
+      expect: { value: { storedFields: [id, owner, where, status, evidence, addedAt], derived: [owner, where, addedAt] }, noEvents: [REVISION] }
+    - name: 清单条目不落新表
+      when: { get: "GET /api/checklist" }
+      expect: { absent: [checklistTable], sameSource: [core/onboard] }
+    - name: 派生来源可追溯到事件、能力与角色
+      when: { get: "GET /api/checklist" }
+      expect: { sameSource: [core/onboard], value: { itemSources: 1 } }
