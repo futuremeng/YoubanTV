@@ -171,6 +171,17 @@ fields:
   scopes: {type: list, values: [read, rules, content, grade, diagnostics, egress]}
   via: {type: symbol, values: [panel, device]}
   simulate: {type: boolean}
+  presence: {type: enum, enum: presence}
+  inviteTier: {type: enum, enum: inviteTier}
+  tier: {type: enum, enum: tier}
+  offline: {type: boolean}
+  invitationsToday: {type: number}
+  inviteDeclined: {type: boolean}
+  projectSafety: {type: symbol, values: [present, missing]}
+  sessionMs: {type: ms}
+  calibration: {type: kv, note: "{attempts, falseCountRate}"}
+  rhythm: {type: kv, note: "{kind, periodMs, amplitude}"}
+  tierRevert: {type: kv, note: "{to: tier}"}
   secondSession: {type: boolean}
 
   # —— 外部动作与调用
@@ -238,7 +249,8 @@ predicates:
 kvKeys: [from, to, by, role, action, kind, target, minutes, accepted, verdict, reason, path,
   profile, device, subjects, levels, mode, deficit, window, size, evicted, days, version, signed,
   added, notAdded, status, owner, ownerForms, dimension, fields, paired, trigger, responseRate,
-  sampleCount, fieldsPerItem, fields, slots, tighten, moveFrom, audience]
+  sampleCount, fieldsPerItem, fields, slots, tighten, moveFrom, audience,
+  attempts, falseCountRate, periodMs, amplitude, capability]
 
 # 度量名：出现在 value / delta / unchanged 里的字段
 metricNames: [watchedMs, allowanceMs, graceMs, moveFromMs, pauseMs, overMs, roundsDone,
@@ -257,7 +269,11 @@ metricNames: [watchedMs, allowanceMs, graceMs, moveFromMs, pauseMs, overMs, roun
   uiComputesVerdictText, quizIssued, exerciseInvite, coWatchInvite, remoteInstall, installedBy,
   cooldownMs, crossDeviceSignalling, endpointsSameSemantics, schemaUnchanged, featuresVisible,
   rolesDerivableFromToken, anyAudienceMayHold, approvalRequired, identityNeutralBranches,
-  extraSources, bodyFontSp, fontStepUp, contrastRaised, appSwitchRestoreMs, sameL15DelayMs,
+  extraSources, bodyFontSp, fontStepUp, contrastRaised, tierValues, tierSourceFields,
+  tierCeilingLifted, clicks, revertPath, probeScheduled, probeOnMainThread, inAppFallback,
+  accessibilitySurface, bootReceiver, sceneRows, counterInputFields, frameRetentionMs, diskWrites,
+  probeSampleCount, falseCountMax, usedAsHealthDiagnosis, projectValid, sessionCapMs, dailyCapMs,
+  dailyInviteCap, promptCount, inviteIntervalMinMs, inviteIntervalMaxMs, presence, inviteTier, appSwitchRestoreMs, sameL15DelayMs,
   dayTypeAwareness, tierL4, l5Invoked, l5Allowed, egressHost, maxQuestions, inWeeklyReport,
 starsDelta, masteryDelta, perDevice, otherItemsUnaffected, statusFrom, guideIsFirstFiveItems,
 rowsPerProfile, taskEnded, resumedFrom, ruleId, srsProgress, pendingReview, minutesPerGroup, recalculatedToday, fallbackRules, storedFields, derived, itemSources, agreementRetainedDays, logRetentionDays, telemetry]
@@ -267,7 +283,7 @@ apiNames: [LockTask, DeviceAdmin, performGlobalAction, FLAG_SECURE, fullScreenIn
 
 # 概念级否定：这些机制在产品里不存在，用 absent 引用
 conceptNames: [先批完才入账, 扣分机制, 阻断观看, 红点递进催促, 时长兑换, 按身份的功能开关,
-  成就系统, 连击, 徽章, 签到, 排行, 称号, 代为受理, 第二本账]
+  成就系统, 连击, 徽章, 签到, 排行, 称号, 代为受理, 第二本账, 仅写日志, 录制通路, 拍照通路]
 
 # 能力登记表的能力 id（docs/facts/DEVICES.md §3）
 capabilityIds: [paired, cameraChannel, pause, overlay, notifications, bootReceiver, crossDevice,

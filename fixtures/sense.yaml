@@ -1,0 +1,135 @@
+# 体感与计次夹具；键的词汇表见 vocab.yaml，取值域来自 contract/contract.json。
+
+SENSE-01:
+  spec: [spec/SENSE.md#SENSE-01, spec/COMMIT.md#COMMIT-03]
+  given: { profile: "member:kid", inSlot: true, roundTarget: 3 }
+  cases:
+    - name: 三条信号源归一到同一节律结构
+      given: { capability: { motionSensor: granted, cameraChannel: granted } }
+      when: { signalSource: sensor, rhythm: { kind: jump, periodMs: 800, amplitude: 12 } }
+      expect: { sameSource: [device/counter], events: [ROUND_DONE], value: { counterInputFields: 3 } }
+    - name: 手动确认走同一条计次实现
+      when: { signalSource: manual }
+      expect: { sameSource: [device/counter], delta: { roundsDone: 1 }, absent: [grantMinutes] }
+    - name: ambiguous 不满足目标，给一次手动确认
+      when: { exerciseVerdict: ambiguous }
+      expect: { applied: false, unchanged: [roundsDone], value: { manualConfirmation: true }, noEvents: [ROUND_DONE] }
+
+SENSE-02:
+  spec: [spec/SENSE.md#SENSE-02, docs/facts/DEVICES.md#F13, docs/DECISIONS.md#D36]
+  given: { profile: "member:kid", assembly: mobile, inSlot: true }
+  cases:
+    - name: 帧只在内存内逐帧处理，落盘只有计次事件
+      given: { capability: { cameraChannel: on } }
+      when: { signalSource: sensor }
+      expect: { events: [ROUND_DONE], value: { frameRetentionMs: 0, diskWrites: 1 }, absent: [录制通路, 拍照通路] }
+    - name: 摄像头通道默认关，开启界面写明用途与画面不出本机
+      given: { capability: { cameraChannel: off } }
+      when: { get: "GET /api/checklist" }
+      expect: { capability: { cameraChannel: off }, shown: [画面不出本机, 用途说明] }
+    - name: 开启前先标定，连续 20 次误计率须 ≤5%
+      given: { calibration: { attempts: 20, falseCountRate: 0.04 } }
+      when: { capability: { cameraChannel: on } }
+      expect: { allowed: true, checklistStatus: done }
+    - name: 未标定或未达标时停在加速度计节律加手动确认
+      given: { calibration: { attempts: 12, falseCountRate: 0.09 } }
+      when: { signalSource: sensor }
+      expect: { capability: { cameraChannel: unknown }, value: { counting: [accelerometer, manual], manualConfirmation: true }, blocked: false }
+
+SENSE-03:
+  spec: [spec/SENSE.md#SENSE-03, docs/COMMITMENTS.md#§4]
+  given: { profile: "member:grandpa", assembly: mobile, inSlot: true, signalSource: sensor }
+  cases:
+    - name: 计次结果只用于约定入账与时长展示
+      when: { exerciseVerdict: counted }
+      expect: { events: [ROUND_DONE], absent: [grantMinutes], value: { usedAsHealthDiagnosis: false } }
+    - name: 界面不出现健康结论类话术
+      when: { mode: ambient }
+      expect: { notShown: [姿态矫正, 康复, 治疗], shown: [即时身体效果的说法] }
+
+SENSE-04:
+  spec: [spec/SENSE.md#SENSE-04, docs/facts/DEVICES.md#F13]
+  given: { profile: "member:kid", assembly: mobile, inSlot: true }
+  cases:
+    - name: 自检不通过时指出具体一项
+      given: { capability: { ambientLight: denied } }
+      when: { calibration: { attempts: 1, falseCountRate: 1.0 } }
+      expect: { shown: [光照], notShown: [泛泛的失败提示], checklistStatus: pending }
+    - name: 误计率按区间描述并始终保留手动确认
+      given: { calibration: { attempts: 20, falseCountRate: 0.04 }, signalSource: sensor }
+      when: { exerciseVerdict: counted }
+      expect: { shown: [计次误差区间], value: { manualConfirmation: true }, events: [ROUND_DONE] }
+    - name: F13 数据未回填前摄像头通道默认关
+      given: { calibration: { attempts: 0, falseCountRate: unknown } }
+      when: { get: "GET /api/checklist" }
+      expect: { capability: { cameraChannel: off }, value: { probeSampleCount: 20, falseCountMax: 0.05 } }
+
+SENSE-05:
+  spec: [spec/SENSE.md#SENSE-05]
+  given: { profile: "member:grandpa", audience: senior, assembly: mobile, inSlot: true }
+  cases:
+    - name: 项目缺 safety 字段即无效
+      given: { projectSafety: missing }
+      when: { mode: ambient }
+      expect: { allowed: false, value: { projectValid: false, fallbackApplied: true } }
+    - name: 单次与当日累计上限硬性生效
+      given: { projectSafety: present, exerciseTasks: [{ name: 单腿站立, safety: seatedStart }], sessionMs: 300000 }
+      when: { stillWatching: true }
+      expect: { value: { sessionCapMs: 300000, dailyCapMs: 900000 }, allowed: true }
+    - name: 达当日轮数上限后不再邀请
+      given: { projectSafety: present, roundsDone: 6 }
+      when: { mode: ambient }
+      expect: { notify: none, allowed: false, value: { dailyInviteCap: 6 } }
+    - name: 坐位起始与支撑物提示只说一次
+      given: { projectSafety: present, signalSource: sensor }
+      when: { exerciseVerdict: counted }
+      expect: { shown: [支撑物提示], value: { promptCount: 1 } }
+
+SENSE-06:
+  spec: [spec/SENSE.md#SENSE-06, spec/PROFILE.md#PROFILE-07]
+  given: { profile: "member:kid", assembly: mobile, paired: true, inSlot: true }
+  cases:
+    - name: 传感器端上报按激活身份入账
+      when: { signalSource: sensor, exerciseVerdict: counted }
+      expect: { events: [ROUND_DONE], value: { eventProfile: "member:kid" }, absent: [grantMinutes] }
+    - name: 计次不增减时长
+      given: { watchedMs: 2400000, roundsDone: 2 }
+      when: { exerciseVerdict: counted }
+      expect: { unchanged: [watchedMs], delta: { roundsDone: 1 } }
+    - name: 上报通道不可用时显示待同步，不显示已完成
+      given: { offline: true }
+      when: { signalSource: sensor, exerciseVerdict: counted }
+      expect: { shown: [本次待同步], applied: false, noEvents: [DONE], value: { dayTokenKept: true } }
+    - name: 传感器端的 scopes 与面板同一套
+      given: { scopes: [read] }
+      when: { writeAttempt: { path: "/api/myPlan", profile: "member:kid" } }
+      expect: { allowed: false, value: { httpStatus: 403 } }
+
+SENSE-07:
+  spec: [spec/SENSE.md#SENSE-07]
+  given: { profile: "member:kid", inSlot: true }
+  cases:
+    - name: quiet 档不主动邀请
+      given: { inviteTier: quiet }
+      when: { mode: ambient }
+      expect: { notify: none, value: { inviteTier: quiet } }
+    - name: light 档每 30 至 50 分钟最多一条
+      given: { inviteTier: light }
+      when: { mode: ambient }
+      expect: { notify: once, value: { inviteIntervalMinMs: 1800000, inviteIntervalMaxMs: 3000000 } }
+    - name: 拒绝后本档内不再邀请
+      given: { inviteTier: light, inviteDeclined: true }
+      when: { mode: ambient }
+      expect: { notify: none, applied: false }
+    - name: engaged 档每 20 至 30 分钟最多一条
+      given: { inviteTier: engaged }
+      when: { mode: ambient }
+      expect: { notify: once, value: { inviteIntervalMinMs: 1200000, inviteIntervalMaxMs: 1800000 } }
+    - name: 单日上限 6 条
+      given: { inviteTier: engaged, invitationsToday: 6 }
+      when: { mode: ambient }
+      expect: { notify: none, value: { dailyInviteCap: 6 } }
+    - name: 改这些数字要留变更条目
+      given: { actor: "member:mom" }
+      when: { planChange: { inviteIntervalMinMs: 900000 } }
+      expect: { gate: required, effective: nextPlanVersion }

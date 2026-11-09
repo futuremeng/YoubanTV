@@ -32,7 +32,7 @@ L1 / L1.5 / L2（`LAYERING.md §1` 规矩 4）。
 | 在场提示 | 该身份 `aloneMs` 进入 `engaged` 档时，向其他家庭成员的设备发一条事实提示：「他独自看了 1 小时 10 分」 | 时长与身份名 |
 | 远程共看 | 跨城市的同步观看需要一条信令路径。当前实现范围：家庭局域网内直接建立；跨城需家庭自架可选信令端点 | 见 §5 |
 
-`presence` 三档与邀请规则见 [`COMMITMENTS.md §4b`](COMMITMENTS.md) 与 `SENSE-07`；显示给使用者的对偶量是
+`presence` 形态与 `inviteTier` 邀请规则见 [`COMMITMENTS.md §4b`](COMMITMENTS.md) 与 `SENSE-07`；显示给使用者的对偶量是
 `withMs`（今天一起看了多久）。
 
 ## 3. 身体面

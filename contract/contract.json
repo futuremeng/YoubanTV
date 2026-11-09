@@ -488,7 +488,8 @@
       "spec": [
         "SENSE-07",
         "COMMITMENTS-§4b"
-      ]
+      ],
+      "x-note": "在场形态；邀请频率见 inviteTier，两者不得混用。"
     },
     "egressSwitch": {
       "values": [
@@ -505,6 +506,31 @@
         "docs/PRIVIACY.md#§2",
         "spec/COMMIT.md#COMMIT-09",
         "spec/ONBOARD.md#ONBOARD-08"
+      ]
+    },
+    "inviteTier": {
+      "values": [
+        "quiet",
+        "light",
+        "engaged"
+      ],
+      "default": "light",
+      "intervals": {
+        "quiet": null,
+        "light": [
+          1800000,
+          3000000
+        ],
+        "engaged": [
+          1200000,
+          1800000
+        ]
+      },
+      "dailyCap": 6,
+      "x-note": "打扰档位：决定邀请频率，与 presence（在场形态：独自 / 共在 / 共看）是两件事，不得合并成一个字段。数字改动要留变更条目（SENSE-07）。",
+      "spec": [
+        "spec/SENSE.md#SENSE-07",
+        "docs/COMMITMENTS.md#§4b"
       ]
     }
   },

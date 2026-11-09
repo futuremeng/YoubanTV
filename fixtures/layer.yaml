@@ -1,0 +1,192 @@
+# 分层策略夹具；键的词汇表见 vocab.yaml，取值域来自 contract/contract.json。
+
+LAYER-01:
+  spec: [spec/LAYER.md#LAYER-01, docs/LAYERING.md#§1]
+  given: { profile: "member:kid", inSlot: true }
+  cases:
+    - name: 层级取值只有六个，L4 是空位
+      when: { mode: ambient }
+      expect: { tier: L1, absent: [L4], value: { tierValues: 6, tierSourceFields: 1 }, sameSource: [core/capability] }
+    - name: 每项能力的当前层由登记表登记，措辞只读它
+      given: { capability: { pause: granted } }
+      when: { mode: focused }
+      expect: { evidenceFrom: [capability], tier: L2, capability: { pause: granted } }
+
+LAYER-02:
+  spec: [spec/LAYER.md#LAYER-02, docs/ARCHITECTURE.md#§9]
+  given: { profile: "member:kid", inSlot: true }
+  cases:
+    - name: 无到期项时状态层为 L1
+      given: { watchedMs: 1200000, graceMs: 1800000 }
+      when: { stillWatching: true }
+      expect: { status: honored, due: null, tier: L1 }
+    - name: 无到期项但 overdue 时状态层升到 L1.5
+      given: { watchedMs: 3720000, allowanceMs: 3600000 }
+      when: { stillWatching: true }
+      expect: { status: overdue, due: null, tier: L1.5 }
+    - name: 已受理的暂停也让状态层停在 L1.5
+      given: { actor: "member:kid", target: self, watchedMs: 2400000 }
+      when: { motion: { kind: pause, target: self, accepted: true } }
+      expect: { due: null, tier: L1.5, accepted: true }
+    - name: 协商式到期项落 L2 即形态首选层
+      given: { strength: negotiated, watchedMs: 2400000, graceMs: 1800000, modeRequested: focused }
+      when: { mode: focused }
+      expect: { status: due, mode: focused, tier: L2 }
+    - name: 陪伴式强度默认档高于形态首选层时不上抬，转为默认开启应用外通道
+      given: { strength: accompanied, watchedMs: 2400000, graceMs: 1800000 }
+      when: { mode: ambient }
+      expect: { status: due, tier: L1.5, capability: { systemPresentation: on }, value: { tierCeilingLifted: false } }
+    - name: 首启引导只请求达成当前层必需的最小权限集
+      when: { get: "GET /api/checklist" }
+      expect: { shown: [悬浮窗授权, 使用情况访问], notShown: [相机开关, 出网开关], value: { guideIsFirstFiveItems: true } }
+
+LAYER-03:
+  spec: [spec/LAYER.md#LAYER-03]
+  given: { profile: "member:kid", strength: accompanied, watchedMs: 2400000, inSlot: true, mode: ambient }
+  cases:
+    - name: 升层入口是一次点击加三句说明
+      when: { modeRequested: focused }
+      expect: { shown: [这一层会做什么, 代价, 怎么退回], value: { clicks: 1, revertPath: present }, effective: now }
+    - name: 缺退回路径的升层入口不得出现
+      when: { modeRequested: focused }
+      expect: { value: { revertPath: present }, allowed: true }
+
+LAYER-04:
+  spec: [spec/LAYER.md#LAYER-04, docs/LAYERING.md#§1]
+  given: { profile: "member:kid", watchedMs: 2400000, backlogSize: 3, kpState: shaky, planVersion: 6, inSlot: true }
+  cases:
+    - name: 退层只撤呈现，账本与题库不动
+      given: { tier: L2 }
+      when: { tierRevert: { to: L1 } }
+      expect: { unchanged: [watchedMs, backlogSize, kpState, planVersion], applied: true, mode: ambient }
+    - name: L5 每次开关写一条审计
+      given: { paired: true, egress: { homeAssistant: off } }
+      when: { egress: { homeAssistant: on }, reauth: true }
+      expect: { events: [audit], egress: { homeAssistant: on } }
+    - name: 能力被系统静默收回时除审计外还要在画面内说明
+      given: { capability: { overlay: granted } }
+      when: { rebooted: true, capability: { overlay: denied } }
+      expect: { events: [audit], shown: [当前模式与原因], mode: ambient }
+
+LAYER-05:
+  spec: [spec/LAYER.md#LAYER-05, docs/facts/DEVICES.md#F1]
+  cases:
+    - name: 探针取不到值时报 unknown，措辞不得凭猜
+      given: { capability: { pause: unknown } }
+      when: { modeRequested: focused }
+      expect: { capability: { pause: unknown }, mode: ambient, evidenceFrom: [capability], shown: [当前模式与原因] }
+    - name: ttl 过期与重启后重探一遍
+      when: { rebooted: true }
+      expect: { value: { probeScheduled: true }, sameSource: [core/capability] }
+    - name: 探针在后台，不阻塞判定
+      given: { profile: "member:kid", watchedMs: 2400000, graceMs: 1800000, inSlot: true }
+      when: { mode: ambient }
+      expect: { status: due, blocked: false, value: { probeOnMainThread: false } }
+
+LAYER-06:
+  spec: [spec/LAYER.md#LAYER-06, spec/COMMIT.md#COMMIT-10, docs/PRODUCT.md#§2]
+  cases:
+    - name: 阻断类手段不在取值范围内
+      when: { capability: { overlay: granted } }
+      expect:
+        absent: [LockTask, DeviceAdmin, performGlobalAction, FLAG_SECURE, L4]
+        sameSource: [device/enforcement]
+        value: { accessibilitySurface: verdictOnly, bootReceiver: L3Trigger }
+    - name: L5 需已配对并写明由外部设备执行
+      given: { paired: true }
+      when: { l5: { by: signedSlotRule, paired: true } }
+      expect: { allowed: true, tier: L5, shown: [由外部设备执行] }
+    - name: 未配对时 L5 不生效
+      given: { paired: false }
+      when: { l5: { by: signedSlotRule, paired: false } }
+      expect: { allowed: false, blocked: false }
+
+LAYER-07:
+  spec: [spec/LAYER.md#LAYER-07, docs/facts/DEVICES.md#F12, docs/DECISIONS.md#D36]
+  given: { profile: "member:kid", watchedMs: 2400000, graceMs: 1800000, inSlot: true }
+  cases:
+    - name: 陪伴式的天花板是 L3
+      given: { strength: accompanied, modeRequested: focused }
+      when: { capability: { pause: granted } }
+      expect: { tierCeiling: L3, mode: focused, tier: L2 }
+    - name: 自管式的 L1 低于请求暂停的下限，该题按 ambient 呈现
+      given: { strength: selfManaged, modeRequested: focused }
+      when: { mode: focused }
+      expect: { tier: L1, mode: ambient, tierCeiling: L1, shown: [当前模式与原因] }
+    - name: 响应率未达 95% 时默认档落 ambient
+      given: { strength: negotiated, pauseProbe: { responseRate: 0.93, sampleCount: 20 } }
+      when: { modeRequested: focused }
+      expect: { mode: ambient, shown: [当前模式与原因] }
+    - name: 矩阵对所有身份同一张
+      given: { strengths: [accompanied, negotiated, selfManaged], audiences: [child, grown-up, senior] }
+      when: { mode: ambient }
+      expect: { identicalAcross: { dimension: audience, fields: [tier] } }
+
+LAYER-08:
+  spec: [spec/LAYER.md#LAYER-08, docs/facts/DEVICES.md#F2]
+  given: { profile: "member:kid", capability: { overlay: denied }, inSlot: true }
+  cases:
+    - name: 降级提示落在应用画面内，不得只写日志
+      when: { modeRequested: focused }
+      expect: { mode: ambient, shown: [当前模式与原因], absent: [仅写日志], presentIn: [device] }
+    - name: 系统通知不可靠时应用内仍有替代
+      given: { capability: { notifications: denied } }
+      when: { mode: ambient }
+      expect: { value: { inAppFallback: true }, blocked: false }
+
+LAYER-09:
+  spec: [spec/LAYER.md#LAYER-09, spec/AUTONOMY.md#AUTO-05]
+  given: { profile: "member:kid", inSlot: true }
+  cases:
+    - name: L1.5 用状态句给出当前状态与恢复时刻
+      given: { watchedMs: 2400000, pauseMs: 600000, actor: "member:kid", target: self }
+      when: { motion: { kind: pause, target: self, accepted: true } }
+      expect: { tier: L1.5, wording: statusSentence, shown: [恢复时刻] }
+    - name: overdue 的措辞也是状态句
+      given: { watchedMs: 3720000, allowanceMs: 3600000 }
+      when: { stillWatching: true }
+      expect: { status: overdue, wording: statusSentence, tier: L1.5 }
+    - name: L2 给出约定、该做的事与窗口期
+      given: { strength: negotiated, modeRequested: focused, graceMs: 1800000 }
+      when: { mode: focused }
+      expect: { tier: L2, wording: nextStep, shown: [约定, 该做的事, 窗口期] }
+    - name: 文案取值范围排除成就类与内部术语
+      when: { mode: ambient }
+      expect: { absent: [streak, badge, checkIn, unlock], notShown: [成就, 连击, 排行, 签到, 称号, 内部术语] }
+
+LAYER-10:
+  spec: [spec/LAYER.md#LAYER-10, docs/facts/DEVICES.md#F2]
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true }
+  cases:
+    - name: 每一层的提示都有应用内替代
+      when: { mode: ambient }
+      expect: { value: { inAppFallback: true }, presentIn: [device], shown: [角标剩余] }
+    - name: 切回应用时状态可恢复
+      given: { capability: { systemPresentation: on } }
+      when: { mode: ambient }
+      expect: { value: { appSwitchRestoreMs: 5000 }, unchanged: [watchedMs] }
+
+LAYER-11:
+  spec: [spec/LAYER.md#LAYER-11, spec/LAYER.md#LAYER-06]
+  given: { profile: "member:kid", paired: true, inSlot: true }
+  cases:
+    - name: 外部设备不可达时该条失效并显示
+      given: { capability: { homeAssistant: denied }, slots: onlyWithinSlots }
+      when: { l5: { by: signedSlotRule, paired: true } }
+      expect: { allowed: false, applied: false, blocked: false, shown: [外部设备不可达，本条失效] }
+    - name: 本机不冒充执行
+      given: { capability: { homeAssistant: denied } }
+      when: { motion: { kind: slotChange, target: "member:kid", accepted: true } }
+      expect: { applied: true, allowed: false, absent: ["POST /api/l5"], notShown: [已为你关闭] }
+
+LAYER-12:
+  spec: [spec/LAYER.md#LAYER-12, docs/LAYERING.md#§2]
+  cases:
+    - name: 未占场景行的新能力不得进代码
+      given: { capability: { ambientLight: granted } }
+      when: { planChange: { capability: { ambientLight: on } } }
+      expect: { gate: required, allowed: false }
+    - name: 已占行的能力按登记的默认层生效
+      given: { capability: { motionSensor: granted } }
+      when: { mode: ambient }
+      expect: { gate: passed, allowed: true, value: { sceneRows: 20 } }
