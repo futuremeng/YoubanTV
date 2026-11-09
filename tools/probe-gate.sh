@@ -8,6 +8,7 @@ cd "$root" || exit 1
 
 ruby -ryaml -e '
 bad = []
+notes = []
 rows = []
 f12 = YAML.load_file("docs/facts/probes/f12.yaml")
 f13 = YAML.load_file("docs/facts/probes/f13.yaml")
@@ -23,6 +24,9 @@ bad << "F13 误计率门槛与 DECISIONS 不一致（#{t13["falseCountMax"]}）"
 
 OK_SOURCE = %w[adb manual]
 
+f12sec = dev[/^## F12.*?(?=^## )/m].to_s
+f13sec = dev[/^## F13.*?(?=^## |\z)/m].to_s
+
 # 2. F12 逐机型判定
 measured12 = false
 f12["devices"].to_a.each do |d|
@@ -34,9 +38,17 @@ f12["devices"].to_a.each do |d|
   bad << "#{d["model"]}/#{d["player"]} 有样本但来源登记为 #{src.inspect}" if n.positive? && !OK_SOURCE.include?(src)
   raise_ok = src != "pending" && OK_SOURCE.include?(src) && n >= t12["sampleMin"] && rate >= t12["responseRate"]
   bad << "#{d["model"]}/#{d["player"]} 用 #{src} 来源的样本抬了默认档" if raise_ok && !OK_SOURCE.include?(src)
+  # 有样本就必须在这份文档里点名到机型，否则数据与措辞各说各话。
+  if n >= t12["sampleMin"] && OK_SOURCE.include?(src)
+    bad << "F12 #{d["model"]} 有样本但 DEVICES.md §F12 没提到它" unless f12sec.include?(d["model"])
+    bad << "F12 #{d["model"]} 达标但 §F12 没写 focused 可作默认档" if raise_ok && !f12sec.include?("focused")
+  end
   measured12 ||= n.positive? && OK_SOURCE.include?(src)
-  rows << format("F12 %-22s %-11s n=%-3s 响应率 %5s%%  %s", d["model"], d["player"], n,
-                 (rate * 100).round(1), raise_ok ? "focused 可作默认档" : (n >= t12["sampleMin"] ? "停 ambient" : "样本不足"))
+  rows << format("F12 %-22s %-11s %-9s n=%-3s 响应率 %5s%%  %s", d["model"], d["player"],
+                 d["channel"].to_s, n, (rate * 100).round(1),
+                 raise_ok ? "focused 可作默认档" : (n >= t12["sampleMin"] ? "停 ambient" : "样本不足"))
+  sp = d["sessionPaused"]
+  rows.last << format(" 旁证：会话报暂停 %s/%s", sp, n) if sp && sp != n && sp.positive?
 end
 
 # 3. F13 逐项目判定
@@ -56,9 +68,15 @@ f13["projects"].to_a.each do |p|
                  ref["trials"].to_i >= t13["referenceTrials"] ? "" : "（对照 #{ref["trials"].to_i}/#{t13["referenceTrials"]}）")
 end
 
+# 通路完整性：两条通路都要测（PROBES.md §F12）。缺一条只提注意，不算假陈述。
+by = {}
+f12["devices"].to_a.each { |d| (by[[d["model"], d["player"]]] ||= []) << d["channel"].to_s }
+by.each do |(m, p), chs|
+  miss = %w[keyevent dispatch] - chs
+  notes << "注：#{m}/#{p} 缺通路 #{miss.join("+")} 的样本（两条都要测，见 PROBES.md）" unless miss.empty?
+end
+
 # 4. DEVICES.md 的措辞必须跟着数据走
-f12sec = dev[/^## F12.*?(?=^## )/m].to_s
-f13sec = dev[/^## F13.*?(?=^## |\z)/m].to_s
 if measured12
   bad << "F12 已有实测样本，但 DEVICES.md 仍写「待实测」" if f12sec.include?("待实测")
 else
@@ -71,6 +89,7 @@ else
 end
 
 puts rows.empty? ? "F12/F13：尚无样本 —— 默认值按最保守档（focused 不作默认、摄像头通道关）" : rows.join("\n")
+notes.each { |n| puts n }
 bad.each { |b| puts "FAIL #{b}" }
 exit(bad.empty? ? 0 : 1)
 '

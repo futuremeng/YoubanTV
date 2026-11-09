@@ -24,7 +24,8 @@ YoubanTV/
 │   ├── check-fixtures.sh      # 数据侧词汇门：断言键与取值必须落在契约与 vocab 里
 │   ├── run-fixtures.rb        # 夹具执行器：跑 model/，逐条判真假；不认识的键记「未支持」
 │   ├── probe-gate.sh          # 实测数据一致性门：样本 ↔ 门槛 ↔ facts 措辞（D43）
-│   └── f12-adb-probe.sh       # F12 现场跑：连着 adb 的设备上循环请求暂停并落样本
+│   ├── probe-record.rb        # 实测样本录入器：只登记事实并当场算出结论，不做推断
+│   └── f12-adb-probe.sh       # F12 现场跑：以画面时间码判定暂停是否真生效，带两道控制（D44）
 ├── docs/                     # 用户与运维文档 + 实机事实
 └── Makefile                  # make check = 契约（含 `tools/check-contract-refs.sh`）+ 决策表 + 棘轮 + 字号 + 包校验 + 血统扫描
 ```

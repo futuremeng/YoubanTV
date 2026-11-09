@@ -14,6 +14,9 @@ OptionParser.new do |o|
   o.on('--android=A') { |v| opts['android'] = v }
   o.on('--player=P') { |v| opts['player'] = v }
   o.on('--source=S') { |v| opts['source'] = v }
+  o.on('--channel=C') { |v| opts['channel'] = v }
+  o.on('--method=M') { |v| opts['method'] = v }
+  o.on('--session-paused=N', Integer) { |v| opts['sessionPaused'] = v }
   o.on('--trials=1,0,1') { |v| opts['trials'] = v.to_s.split(/[, ]+/).map(&:to_i) }
   o.on('--name=N') { |v| opts['name'] = v }
   o.on('--attempts=N', Integer) { |v| opts['attempts'] = v }
@@ -39,11 +42,22 @@ if opts['fact'] == 'f12'
   bad = opts['trials'].reject { |t| [0, 1].include?(t) }
   abort "trials 只能是 0/1，收到 #{bad.uniq.join(",")}" unless bad.empty?
 
-  row = (doc['devices'] ||= []).find { |d| d['model'] == opts['device'] && d['player'] == (opts['player'] || 'stock') }
+  # 一行 = 一台设备 × 一个通路。F12 要的就是「两条通路分开记」，
+  # 合并键少了 channel 会让后跑的通路把前一条顶掉（踩过）。
+  player = opts['player'] || 'stock'
+  channel = opts['channel'] || 'keyevent'
+  row = (doc['devices'] ||= []).find do |d|
+    d['model'] == opts['device'] && d['player'] == player &&
+      d['channel'] == channel && d['android'].to_s == opts['android'].to_s
+  end
   row ||= (doc['devices'] << { 'model' => opts['device'], 'android' => opts['android'],
-                               'player' => opts['player'] || 'stock', 'trials' => [] }).last
+                               'player' => player, 'channel' => channel, 'trials' => [] }).last
   row['android'] = opts['android'] if opts['android']
   row['source'] = opts['source'] || 'manual'
+  row['method'] = opts['method'] || 'frameStall'
+  row['sessionPaused'] = opts['sessionPaused'] if opts['sessionPaused']
+  row['method'] = opts['method'] || 'frameStall'
+  row['sessionPaused'] = opts['sessionPaused'] if opts['sessionPaused']
   row['trials'] = opts['trials']
   n = row['trials'].size
   rate = n.zero? ? 0.0 : row['trials'].sum.to_f / n
@@ -54,7 +68,7 @@ if opts['fact'] == 'f12'
             else
               '停在 ambient 并写明原因'
             end
-  puts "F12 #{row['model']} · #{row['player']} · n=#{n} 响应率=#{(rate * 100).round(1)}% → #{verdict}"
+  puts "F12 #{row['model']} · #{row['player']} · #{channel} · n=#{n} 响应率=#{(rate * 100).round(1)}% → #{verdict}"
 else
   abort 'F13 需要 --name 与 --attempts/--false-counts' unless opts['name'] && opts['attempts']
   row = (doc['projects'] ||= []).find { |p| p['name'] == opts['name'] && p['device'] == opts['device'] }
