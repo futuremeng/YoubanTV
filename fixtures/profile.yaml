@@ -30,9 +30,9 @@ PROFILE-02:
       when: { put: "PUT /api/myPlan" }
       expect: { allowed: true }
     - name: 开启出网须监护人凭据，他人成员不可
-      given: { actor: "member:kid", roles: { keyHolder: "member:kid" }, egress: { aiQuestions: off } }
-      when: { egress: { aiQuestions: on }, reauth: true }
-      expect: { allowed: true, egress: { aiQuestions: on }, shown: [host, whatLeaves, howToTurnOff] }
+      given: { actor: "member:kid", roles: { keyHolder: "member:kid" }, egress: { aiQuestions: "off" } }
+      when: { egress: { aiQuestions: "on" }, reauth: true }
+      expect: { allowed: true, egress: { aiQuestions: "on" }, shown: [host, whatLeaves, howToTurnOff] }
     - name: 长期令牌不携带角色，越界只读
       given: { actor: "member:kid", roles: { keyHolder: "member:mom" }, scopes: [read] }
       when: { put: "PUT /api/myPlan" }
@@ -44,7 +44,7 @@ PROFILE-02:
 
 PROFILE-03:
   spec: [spec/PROFILE.md#PROFILE-03]
-  given: { profile: "member:kid", assembly: tv, capability: { overlay: denied, mediaSession: denied } }
+  given: { profile: "member:kid", assembly: tv, capability: { overlay: denied, mediaSession: denied, pause: denied } }
   cases:
     - name: 能力缺失不降身份，按装配回退并说明原因
       when: { modeRequested: focused }
@@ -132,7 +132,7 @@ PROFILE-07:
 
 PROFILE-08:
   spec: [spec/PROFILE.md#PROFILE-08]
-  given: { profile: "member:kid", audience: child, egress: { aiQuestions: off, aiGrade: off } }
+  given: { profile: "member:kid", audience: child, egress: { aiQuestions: "off", aiGrade: "off" } }
   cases:
     - name: 孩子的包不含家长审批环节
       given: { packHit: true }
@@ -145,7 +145,7 @@ PROFILE-08:
     - name: LLM 题按出网开关，不按身份设卡
       given: { llmHit: true }
       when: { mode: ambient }
-      expect: { source: llm, egress: { aiQuestions: off }, allowed: false }
+      expect: { source: llm, egress: { aiQuestions: "off" }, allowed: false }
     - name: 任何成员都可担任角色
       when: { roleChange: { role: keyHolder, action: grant, to: "member:kid" } }
       expect: { roles: { keyHolder: "member:kid" }, events: [ROLE_CHANGE] }

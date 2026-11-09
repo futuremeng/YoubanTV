@@ -7,17 +7,17 @@ ASK-01:
     - name: 包命中时不走 LLM
       given: { packHit: true, llmHit: true, mode: ambient }
       when: { mode: ambient }
-      expect: { source: pack, capability: { companionContext: off }, shown: [来源标记] }
+      expect: { source: pack, capability: { companionContext: "off" }, shown: [来源标记] }
     - name: 成员自作的题优先于大纲随机
       given: { packHit: false, memberAuthoredHit: true, mode: ambient }
       when: { mode: ambient }
       expect: { source: member, shown: [来源标记] }
     - name: 未开启出题开关时大纲随机顶替 LLM
-      given: { packHit: false, memberAuthoredHit: false, llmHit: true, egress: { aiQuestions: off }, mode: ambient }
+      given: { packHit: false, memberAuthoredHit: false, llmHit: true, egress: { aiQuestions: "off" }, mode: ambient }
       when: { mode: ambient }
-      expect: { source: outlineRandom, egress: { aiQuestions: off } }
+      expect: { source: outlineRandom, egress: { aiQuestions: "off" } }
     - name: 开关开启时 LLM 题带来源标记
-      given: { packHit: false, memberAuthoredHit: false, llmHit: true, egress: { aiQuestions: on }, mode: ambient }
+      given: { packHit: false, memberAuthoredHit: false, llmHit: true, egress: { aiQuestions: "on" }, mode: ambient }
       when: { mode: ambient }
       expect: { source: llm, shown: [来源标记] }
 
@@ -64,7 +64,8 @@ ASK-05:
     - name: 满组即止并写事件
       given: { answeredInTask: 5, roundTarget: 5 }
       when: { answers: [correct] }
-      expect: { events: [ROUND_DONE], value: { taskEnded: true, roundsDone: 1 }, noEvents: [ANSWER] }
+      # 满组即止：这一笔作答没有落（作答数不涨），只把这一组收成一条 ROUND_DONE。
+      expect: { events: [ROUND_DONE], value: { taskEnded: true, roundsDone: 1 }, delta: { answeredInTask: 0 } }
     - name: 满组后仍可自愿继续
       given: { answeredInTask: 5, roundTarget: 5, taskDone: false }
       when: { answers: [correct] }
@@ -76,11 +77,14 @@ ASK-06:
   cases:
     - name: 计划内已答过的题不再问
       given: { answeredInTask: 1, kpState: shaky, sameKp: true }
-      when: { mode: ambient }
-      expect: { allowed: false, value: { recomputed: false }, noEvents: [ANSWER] }
+      # 这条题在计划内已经答过：不再问，也就没有作答这一笔（ASK-06）。
+      when: { mode: ambient, answers: [correct] }
+      # 已答过的题不再问：不重算，作答数也不涨（ASK-06）。
+      expect: { allowed: false, value: { recomputed: false }, delta: { answeredInTask: 0 } }
     - name: 补一补不受当日限制
       given: { kpState: weak, backlogSize: 1 }
-      when: { mode: ambient }
+      # 补一补不受当日题目数限制，这条作答照样入账（ASK-06）。
+      when: { mode: ambient, answers: [correct] }
       expect: { allowed: true, events: [ANSWER] }
 
 ASK-07:
@@ -104,18 +108,18 @@ ASK-07:
 
 ASK-08:
   spec: [spec/ASK.md#ASK-08]
-  given: { profile: "member:kid", inSlot: true, mode: ambient, kpState: shaky, prereqState: mastered, egress: { companionContext: off } }
+  given: { profile: "member:kid", inSlot: true, mode: ambient, kpState: shaky, prereqState: mastered, egress: { companionContext: "off" } }
   cases:
     - name: 上下文只含片名与时间戳
       given: { outlineScope: { subjects: [chinese] } }
       when: { mode: ambient }
-      expect: { capability: { companionContext: off }, value: { extraSources: 0 } }
+      expect: { capability: { companionContext: "off" }, value: { extraSources: 0 } }
     - name: 补一补的出题只用大纲
       given: { kpId: outline-3, kpState: weak, backlogSize: 1 }
       when: { mode: ambient }
       expect: { sameSource: [core/topics], value: { dynamicGeneration: 0 } }
     - name: LLM 生成失败退回固定题面不重试
-      given: { egress: { aiQuestions: on }, llmHit: true }
+      given: { egress: { aiQuestions: "on" }, llmHit: true }
       when: { verify: failed }
       expect: { events: [llm_generate_failed], value: { retried: false, stemIdentical: true, fallbackApplied: true } }
 

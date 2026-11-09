@@ -23,6 +23,11 @@ COMMIT-04:                     # 顶层键必须是已定义的规格 id
 规则：条目级键只有 `spec` / `cases` / `given`；case 级键只有 `name` / `given` / `when` / `expect`。
 `when2`、`expect2`、`then` 这类补丁键在 `vocab.yaml` 的 `bannedKeys` 里，出现即红。
 
+`given` 是**这一轮之前的事实**，`when` 是**这一轮做的动作**：`given` 里的数量与已落事件由执行器
+物化成台账里的旧账，`events: [...]` 问的是「这件事在台账里发生过」，`delta: {x: n}` 问的是
+「这一轮让 x 涨了几」——要表达「这一笔没落」，用 `delta`，不要用 `noEvents`（后者问的是台账里
+从来没写过这类事件）。
+
 ## 2. 三类键
 
 | 位置 | 词汇 | 数量 | 校验 |

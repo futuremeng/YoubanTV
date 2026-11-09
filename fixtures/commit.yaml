@@ -203,7 +203,7 @@ AUTO-15:
   spec: [spec/AUTONOMY.md#AUTO-15]
   cases:
     - name: 主观题自评先入账，不依赖他人参与
-      given: { actor: "member:kid", egress: { aiGrade: off } }
+      given: { actor: "member:kid", egress: { aiGrade: "off" } }
       when: { selfGrade: pass }
       expect: { stars: credited, mastery: updated, gradedBy: self, absent: [先批完才入账] }
     - name: 改判只改账目判定，不改 status 算法
@@ -215,7 +215,7 @@ AUTO-15:
         unchanged: [status]
         visibleOn: [self, panel]
     - name: 「先批完才入账」这类开关不存在
-      when: { capability: { aiGrade: off } }
+      when: { capability: { aiGrade: "off" } }
       expect: { absent: [先批完才入账] }
     - name: 设备更新由激活身份触发，他人只能查阅与回退
       given: { actor: "member:mom", updateAvailable: true }

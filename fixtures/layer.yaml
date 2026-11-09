@@ -10,7 +10,8 @@ LAYER-01:
     - name: 每项能力的当前层由登记表登记，措辞只读它
       given: { capability: { pause: granted } }
       when: { mode: focused }
-      expect: { evidenceFrom: [capability], tier: L2, capability: { pause: granted } }
+      # 这里问的是「登记表里 pause 在哪一层」，不是本轮落层：没有到期项时落层仍是状态层 L1。
+      expect: { evidenceFrom: [capability], tier: L1, capability: { pause: granted }, value: { registryTier: L2 } }
 
 LAYER-02:
   spec: [spec/LAYER.md#LAYER-02, docs/ARCHITECTURE.md#§9]
@@ -35,7 +36,7 @@ LAYER-02:
     - name: 陪伴式强度默认档高于形态首选层时不上抬，转为默认开启应用外通道
       given: { strength: accompanied, watchedMs: 2400000, graceMs: 1800000 }
       when: { mode: ambient }
-      expect: { status: due, tier: L1.5, capability: { systemPresentation: on }, value: { tierCeilingLifted: false } }
+      expect: { status: due, tier: L1.5, capability: { systemPresentation: "on" }, value: { tierCeilingLifted: false } }
     - name: 首启引导只请求达成当前层必需的最小权限集
       when: { get: "GET /api/checklist" }
       expect: { shown: [悬浮窗授权, 使用情况访问], notShown: [相机开关, 出网开关], value: { guideIsFirstFiveItems: true } }
@@ -60,9 +61,9 @@ LAYER-04:
       when: { tierRevert: { to: L1 } }
       expect: { unchanged: [watchedMs, backlogSize, kpState, planVersion], applied: true, mode: ambient }
     - name: L5 每次开关写一条审计
-      given: { paired: true, egress: { homeAssistant: off } }
-      when: { egress: { homeAssistant: on }, reauth: true }
-      expect: { events: [audit], egress: { homeAssistant: on } }
+      given: { paired: true, egress: { homeAssistant: "off" } }
+      when: { egress: { homeAssistant: "on" }, reauth: true }
+      expect: { events: [audit], egress: { homeAssistant: "on" } }
     - name: 能力被系统静默收回时除审计外还要在画面内说明
       given: { capability: { overlay: granted } }
       when: { rebooted: true, capability: { overlay: denied } }
@@ -124,7 +125,7 @@ LAYER-07:
 
 LAYER-08:
   spec: [spec/LAYER.md#LAYER-08, docs/facts/DEVICES.md#F2]
-  given: { profile: "member:kid", capability: { overlay: denied }, inSlot: true }
+  given: { profile: "member:kid", capability: { pause: denied }, inSlot: true }
   cases:
     - name: 降级提示落在应用画面内，不得只写日志
       when: { modeRequested: focused }
@@ -136,7 +137,8 @@ LAYER-08:
 
 LAYER-09:
   spec: [spec/LAYER.md#LAYER-09, spec/AUTONOMY.md#AUTO-05]
-  given: { profile: "member:kid", inSlot: true }
+  # 本轮已过宽限期：以下各例都在「该做的事」这条分支上比措辞与层。
+  given: { profile: "member:kid", inSlot: true, watchedMs: 2400000 }
   cases:
     - name: L1.5 用状态句给出当前状态与恢复时刻
       given: { watchedMs: 2400000, pauseMs: 600000, actor: "member:kid", target: self }
@@ -162,7 +164,7 @@ LAYER-10:
       when: { mode: ambient }
       expect: { value: { inAppFallback: true }, presentIn: [device], shown: [角标剩余] }
     - name: 切回应用时状态可恢复
-      given: { capability: { systemPresentation: on } }
+      given: { capability: { systemPresentation: "on" } }
       when: { mode: ambient }
       expect: { value: { appSwitchRestoreMs: 5000 }, unchanged: [watchedMs] }
 
@@ -184,7 +186,7 @@ LAYER-12:
   cases:
     - name: 未占场景行的新能力不得进代码
       given: { capability: { ambientLight: granted } }
-      when: { planChange: { capability: { ambientLight: on } } }
+      when: { planChange: { capability: { ambientLight: "on" } } }
       expect: { gate: required, allowed: false }
     - name: 已占行的能力按登记的默认层生效
       given: { capability: { motionSensor: granted } }

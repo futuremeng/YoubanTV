@@ -18,7 +18,9 @@ DAY-01:
 
 DAY-02:
   spec: [spec/DAY.md#DAY-02]
-  given: { profile: "member:kid", watchedMs: 2400000, roundsDone: 2, overMs: 300000, pauseMs: 600000 }
+  # 已受理的暂停会把状态冻在 honored（COMMIT-07），这里要考的是四量怎么产出 status / due，
+  # 所以不带 pauseMs。
+  given: { profile: "member:kid", watchedMs: 2400000, roundsDone: 2, overMs: 300000 }
   cases:
     - name: 四量在 core/day 一处算出
       when: { mode: ambient }

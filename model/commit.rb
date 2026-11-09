@@ -1,6 +1,7 @@
 # SPEC: COMMIT-01, COMMIT-02, COMMIT-03, COMMIT-04, COMMIT-05, COMMIT-09, COMMIT-11, LAYER-02, LAYER-07, PROFILE-10
 # 约定引擎：status / due / 落层的单点实现。界面与设备端只读这里的结论（COMMIT-09）。
 require_relative 'day'
+require_relative 'capability'
 
 module Core
   module Commit
@@ -16,9 +17,11 @@ module Core
     end
 
     # 单一入口：给当日方案 + 四量 + 强度与形态，产出判定与要写的事件。
-    def decide(profile:, plan:, q:, strength: 'negotiated', mode: nil, motion_state: {}, capability: {})
+    def decide(profile:, plan:, q:, strength: 'negotiated', mode: nil, motion_state: {}, capability: {},
+               probe: nil, requested: false)
       watched = q['watchedMs'].to_i
-      out = base
+      # 天花板由强度定，与身份无关（LAYER-07）；结论里一并给出，界面只读这一个值。
+      out = base.merge(tierCeiling: Day.tier_ceiling(strength))
       return unselected(out) if profile.to_s == 'none'
 
       if motion_state['pause']
@@ -46,13 +49,14 @@ module Core
         out.merge(status: 'honored', due: nil, tier: 'L1', shown: %w[角标剩余],
                   value: { 'remainingMs' => grace - watched, 'watchedMs' => watched })
       else
-        due_of(out, plan, q, strength, mode, watched, capability)
+        due_of(out, plan, q, strength, mode, watched, capability, probe, requested)
       end
     end
 
     def base
       { status: 'honored', due: nil, tier: 'L1', next_action: nil, wording: nil,
-        surface: %w[self], events: [], shown: [], value: {}, blocked: false }
+        surface: %w[self], events: [], shown: [], value: {}, blocked: false,
+        tierCeiling: 'L2', fallbackReason: nil }
     end
 
     # 未选身份：只落账不判定，也不发任何邀请（COMMIT-11）。
@@ -62,7 +66,24 @@ module Core
                          'exerciseInvite' => false, 'coWatchInvite' => false })
     end
 
-    def due_of(out, plan, q, strength, mode, watched, capability = {})
+    # focused 站不站得住，判据只有这三条，别处不要再各写一遍（D42、D45、LAYER-07、LAYER-08）：
+    # 一、强度的天花板低于 focused 的下限 L2；二、实测样本没过 95% 这条线（D36）；
+    # 三、走的是默认档、而本机有权能拿不到——显式请求时不看第三条，
+    # 因为那时该由使用者负责，而不是让一条无关的能力把他的选择抹掉。
+    def focused_holds?(form:, capability:, probe: nil, requested: false, strength: 'negotiated')
+      return false unless form.to_s == 'focused'
+
+      ceiling = STRENGTH_DEFAULT_TIER.fetch(strength.to_s, 'L2')
+      return false if TIER_ORDER.index(ceiling) < TIER_ORDER.index('L2')
+      return false if probe && !Capability.focused_default_ok?(probe)
+      form_caps = Capability.enforcement_only(capability)
+      return false unless Capability.missing_for(FORM_TIER['focused'], form_caps).empty?
+      return true if requested
+
+      !form_caps.values.any? { |v| Capability.fallback_for(v) == :fallback }
+    end
+
+    def due_of(out, plan, q, strength, mode, watched, capability = {}, probe = nil, requested = false)
       round_target = plan.fetch('roundTarget', 5).to_i
       move_from = plan['moveFromMs'].to_i
       quiz_open = watched < move_from && q['answeredInTask'].to_i < round_target
@@ -73,26 +94,26 @@ module Core
       kind = watched >= move_from && exercise_open ? 'exercise' : 'quiz'
       want = (mode || plan['form'] || 'ambient').to_s
       ceiling = STRENGTH_DEFAULT_TIER.fetch(strength.to_s, 'L2')
-      # focused 请求暂停的下限是 L2：强度默认档低于它则转 ambient 并写明原因（LAYER-07、F12）
-      want = 'ambient' if want == 'focused' && TIER_ORDER.index(ceiling) < TIER_ORDER.index('L2')
-      # 请求暂停能不能成，由本机能力登记表说了算；不成就直接 ambient，不重试（COMMIT-02、F12）
-      extra = {}
-      if want == 'focused'
-        if capability.fetch('pause', 'granted').to_s == 'granted'
-          extra = { 'playerPaused' => true, 'resumedAfterAnswer' => true, 'retried' => false }
-        else
-          want = 'ambient'
-          extra = { 'playerPaused' => false, 'retried' => false }
-        end
-      end
+      want = 'ambient' unless focused_holds?(form: want, capability: capability, probe: probe,
+                                             requested: requested, strength: strength)
       tier = tier_min(FORM_TIER.fetch(want, 'L1.5'), ceiling)
+      # 回退规则只有一条：该层必需的能力拿不到，就落到最保守的可用档并在画面里写明原因（LAYER-08）。
+      missing = Capability.missing_for(tier, capability)
+      fallback = nil
+      unless missing.empty?
+        want = 'ambient'
+        tier = tier_min(FORM_TIER.fetch(want, 'L1.5'), ceiling)
+        fallback = '当前模式与原因'
+      end
+      extra = { 'playerPaused' => missing.empty?, 'resumedAfterAnswer' => missing.empty?, 'retried' => false }
+      extra['tierCeilingLifted'] = false if want == 'ambient' && ceiling == 'L3'
       shown = want == 'focused' ? %w[约定 该做的事 窗口期] : %w[角标剩余 当前模式与原因]
-      out.merge(status: 'due', tier: tier, mode: want, next_action: kind,
+      out.merge(status: 'due', tier: tier, mode: want, next_action: kind, tierCeiling: ceiling,
                 wording: want == 'focused' ? 'nextStep' : 'statusSentence',
                 due: { 'kind' => kind, 'mode' => want,
                        'deficit' => kind == 'quiz' ? 'questions' : 'reps',
                        'window' => 'present' },
-                events: [], shown: shown,
+                events: [], shown: shown, fallbackReason: fallback,
                 value: { 'ruleId' => 'present', 'watchedMs' => watched }.merge(extra))
     end
 

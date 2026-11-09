@@ -48,6 +48,7 @@
 | D42 | 内核先以**可执行规范模型**落地（`model/`，Ruby，零依赖）：夹具执行器直接跑它，Kotlin 生产内核由同一批夹具对齐；执行器对不认识的键一律记「未支持」，目标条目里有未支持即红——**不允许静默跳过或默认判绿** | ✅ 助手决定（已实现，7 条目 78 断言绿） | `ARCHITECTURE.md §1`、`fixtures/FORMAT.md`、M1.2、M2、D41 |
 | D43 | F12/F13 这类**机型事实只能实测**：样本登记在 `docs/facts/probes/`，来源必须是 `adb` 或 `manual`；仿真、公开评测与估计值一律不得用来抬默认档，`tools/probe-gate.sh` 校验「样本 ↔ 门槛 ↔ DEVICES.md 措辞」三者一致 | ✅ 助手决定（反造假门已实现） | `facts/PROBES.md`、`facts/DEVICES.md#F12`、`#F13`、D36、`LAYER-07`、`SENSE-02` |
 | D44 | F12 的**判据是画面而不是状态字段**：实测见过 `dumpsys media_session` 报 `state=2`（Paused）而画面里的时间码照走，所以「收到了暂停」只能当旁证；实测必须带两道控制（时间码在走、静止区均值恒定）与每轮恢复控制，**任一不过就不写样本**，也不得拿估计值补。首实测（2026-11-09，Konka Android TV 9652 / Smartisan OD103，两机×两通路均 0/20）→ 这两台停在 `ambient`，`focused` 不作默认档 | ✅ 实测得出（`probes/f12.yaml`，`probe-gate.sh` 绿） | `facts/PROBES.md`、`facts/DEVICES.md#F12`、`LAYER-07`、D43、D36 |
+| D45 | 把 `ONBOARD` / `LAYER` / `SENSE` / `ASK` 落成可执行模型时，**同一类规则在 `model/` 里只留一处**：准入（`gate`）只有一个含义（这条能力没在 `LAYERING §2` 占行，或这次改动属于共同约定而不是 D39 那三项个人量），出网开关不参与分层准入；待确认清单是**算出来的视图**（事件 + 能力登记表 + `roles` 现值），不建清单表也不建第二条台账（ONBOARD-01）；形态回退是 D42 那一条规则，只有三处入口；成组与作答集中在 `core/task`。夹具侧同时定死边界：`given` 是本轮之前的事实（物化成台账旧账），`when` 是本轮动作，「这一笔没落」用 `delta` 表达而不是 `noEvents` | ✅ 助手决定（四条反例注入均变红） | `LAYERING.md §5`、`ONBOARDING.md`、`fixtures/FORMAT.md §1`、D42、D41、D39 |
 
 ## 转为公开前要补齐的事（D30 触发时）
 

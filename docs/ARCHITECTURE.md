@@ -13,6 +13,9 @@ YoubanTV/
 ├── contract/                 # 契约单一来源：端点 + schema + 枚举 + protocolVersion（已入库：contract.json v1）
 ├── fixtures/                 # 决策表与行为夹具（已入库：commit、day、profile、ask、onboard、layer、sense + vocab 断言词汇）
 ├── model/                    # 决策表的可执行规范模型（Ruby，零依赖）：夹具执行器跑它；core 的 Kotlin 实现须与之逐条对齐
+│   # ledger（账本与四量）/ day（当日方案与四量默认值）/ commit（判定与 due）/ enforcement（层→呈现）
+│   # capability（能力登记表：层与场景行的唯一来源）/ checklist（待确认清单：算出来的视图，不建表）
+│   # sense（计次信号源）/ task（成组与作答）——一处规则只写一次，见 D42、D45
 ├── core/                     # 纯 Kotlin JVM，零 android 依赖
 ├── device/                   # Android 应用（同一套代码，tv / mobile 两种装配）
 │   └── src/main/java/com/youban/device/{enforcement,capability,ui,store,net,pack,grade,sense,presence,log}/

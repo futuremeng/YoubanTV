@@ -29,6 +29,8 @@ symbols:
   dimension: [audience, assembly, strength, profile]
   egressState: [on, off]
   probeState: [granted, denied, unknown]
+  # 开关现值是另一套取值：不是探针结论，是用户/持有者拨到位没有。
+  switchState: [on, off]
   authoring: [passed, rejected]
   source: [pack, member, llm, outlineRandom]
   stars: [credited, recalculated, unchanged]
@@ -251,10 +253,16 @@ kvKeys: [from, to, by, role, action, kind, target, minutes, accepted, verdict, r
   profile, device, subjects, levels, mode, deficit, window, size, evicted, days, version, signed,
   added, notAdded, status, owner, ownerForms, dimension, fields, paired, trigger, responseRate,
   sampleCount, fieldsPerItem, fields, slots, tighten, moveFrom, audience,
-  attempts, falseCountRate, periodMs, amplitude, capability]
+  attempts, falseCountRate, periodMs, amplitude, capability,
+  # 清单与登记表新用上的嵌套键（D41：接口先登记，再用）。
+  ids, reopened, registryTier, checklistStatusFrom]
 
 # 度量名：出现在 value / delta / unchanged 里的字段
 metricNames: [watchedMs, allowanceMs, graceMs, moveFromMs, pauseMs, overMs, roundsDone,
+  answeredInTask, statusFrom, frameRetentionMs, diskWrites, probeSampleCount, falseCountMax,
+  recalculatedToday, taskEnded, tierValues, tierSourceFields, perDevice, fallbackRules,
+  itemSources, guideIsFirstFiveItems, otherItemsUnaffected, starsDelta, masteryDelta,
+  clicks, revertPath, endpointRead, rowsPerProfile,
   candidateLevel, effectiveGroups, questionsPerTaskCap, groupsPerTask, questionsPerGroup,
   clearBacklogFirst, backlogSize, carryOver, stars, kp, kpId, kpState, remainingMs, dayOffsetMs,
   dayRolled, dayTokenKept, replayed, recomputed, inTighteningComparison, prereqWalk, priorityReask,

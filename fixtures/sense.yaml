@@ -20,16 +20,16 @@ SENSE-02:
   given: { profile: "member:kid", assembly: mobile, inSlot: true }
   cases:
     - name: 帧只在内存内逐帧处理，落盘只有计次事件
-      given: { capability: { cameraChannel: on } }
+      given: { capability: { cameraChannel: "on" } }
       when: { signalSource: sensor }
       expect: { events: [ROUND_DONE], value: { frameRetentionMs: 0, diskWrites: 1 }, absent: [录制通路, 拍照通路] }
     - name: 摄像头通道默认关，开启界面写明用途与画面不出本机
-      given: { capability: { cameraChannel: off } }
+      given: { capability: { cameraChannel: "off" } }
       when: { get: "GET /api/checklist" }
-      expect: { capability: { cameraChannel: off }, shown: [画面不出本机, 用途说明] }
+      expect: { capability: { cameraChannel: "off" }, shown: [画面不出本机, 用途说明] }
     - name: 开启前先标定，连续 20 次误计率须 ≤5%
-      given: { calibration: { attempts: 20, falseCountRate: 0.04 } }
-      when: { capability: { cameraChannel: on } }
+      given: { calibration: { attempts: 20, falseCountRate: 0.04 }, item: mobile.device.calibrate }
+      when: { capability: { cameraChannel: "on" } }
       expect: { allowed: true, checklistStatus: done }
     - name: 未标定或未达标时停在加速度计节律加手动确认
       given: { calibration: { attempts: 12, falseCountRate: 0.09 } }
@@ -62,7 +62,7 @@ SENSE-04:
     - name: F13 数据未回填前摄像头通道默认关
       given: { calibration: { attempts: 0, falseCountRate: unknown } }
       when: { get: "GET /api/checklist" }
-      expect: { capability: { cameraChannel: off }, value: { probeSampleCount: 20, falseCountMax: 0.05 } }
+      expect: { capability: { cameraChannel: "off" }, value: { probeSampleCount: 20, falseCountMax: 0.05 } }
 
 SENSE-05:
   spec: [spec/SENSE.md#SENSE-05]
