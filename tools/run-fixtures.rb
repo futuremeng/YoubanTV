@@ -17,8 +17,19 @@ class Unsupported < StandardError; end
 
 CONTRACT = JSON.parse(File.read(File.join(root, 'contract/contract.json')))
 EVENTS = CONTRACT['enums']['event']['values'] + CONTRACT['enums']['event']['auxValues']
-CORE_SOURCE = Dir[File.join(root, 'model/*.rb')].map { |f| File.read(f) }.join
-CONTRACT_TEXT = JSON.generate(CONTRACT)
+CODE_SOURCE = Dir[File.join(root, 'model/*.rb')].map { |f| File.read(f) }
+              .map { |src| src.gsub(/#[^\n]*/, '').gsub(/'[^']*'|"[^"]*"/, '""') }.join
+# 「定义面」：真正定义了字段、取值与端点的地方。
+# 说明文字（x-note / note / spec）、退役与禁止清单、枚举空位都只是登记处，不算定义。
+NOTES = Set.new(%w[x-note note spec description reserved forbiddenFields retired])
+def definition_text(node)
+  case node
+  when Hash then node.reject { |k, _| NOTES.include?(k) }.map { |_, v| definition_text(v) }.join('|')
+  when Array then node.map { |v| definition_text(v) }.join('|')
+  else node.to_s
+  end
+end
+CONTRACT_DEF = definition_text(CONTRACT)
 
 # 一个用例的世界：当日方案 + 账本 + 判定结论。
 class World
@@ -26,19 +37,30 @@ class World
   attr_accessor :strength, :audience, :day_type, :motion_accepted, :applied, :before
 
   def initialize(given)
-    @day = given["dayToken"] || "d1"
+    @given = given
+    @used = Set.new
+    @extras = {}
+    @day = given['dayToken'] || 'd1'
+    @used << 'dayToken' if given.key?('dayToken')
     @ledger = Core::Ledger.new(allowed_kinds: EVENTS, day: @day)
     @profile = given['profile'] || 'member:kid'
+    @used << 'profile' if given.key?('profile')
     @strength = given['strength'] || 'negotiated'
+    @used << 'strength' if given.key?('strength')
     @audience = given['audience'] || default_audience(@profile)
+    @used << 'audience' if given.key?('audience')
     @day_type = given['dayType'] || 'schoolday'
-    @extras = {}
+    @used << 'dayType' if given.key?('dayType')
+    @actor = given['actor'] || @profile
+    @used << 'actor' if given.key?('actor')
     @capability = given['capability'] || {}
+    @used << 'capability' if given.key?('capability')
     @written = []
     @verdict_stale = false
     @effective = nil
     @applied = false
     @motion_accepted = nil
+    @action_allowed = true
     @plan = Core::Day.plan(audience: @audience, day_type: @day_type, overrides: plan_overrides(given))
     seed(given)
     @verdict = decide
@@ -47,7 +69,7 @@ class World
 
   def snapshot
     @subject = @profile
-    @before = @extras.merge(@ledger.project(@profile))
+    @before = @extras.merge(@plan).merge(@ledger.project(@profile))
   end
 
   # 跳日保留项的比较基准：用例开始时那个身份账上的量（切换不串账）。
@@ -78,8 +100,16 @@ class World
     raise Unsupported, "#{key} 在判定、投影、保留项与当日方案里都无定义"
   end
 
+  def action_allowed
+    @action_allowed
+  end
+
   def value_for(key)
     lookup(key)
+  end
+
+  def unconsumed
+    @given.keys - @used.to_a - %w[spec]
   end
 
   def apply(when_)
@@ -108,7 +138,16 @@ class World
     if when_.key?('signalSource')
       src = when_.delete('signalSource')
       @signal_source = src
-      append('ROUND_DONE', @profile, reps: 1, signalSource: src) if src.to_s == 'manual'
+      # 计次确认只能由本人发起（AUTO-14）：actor 不是激活身份时这条不生效
+      if src.to_s == 'manual'
+        if @actor == @profile
+          append('ROUND_DONE', @actor, reps: 1, signalSource: src)
+          @applied = true
+        else
+          @action_allowed = false
+          @applied = false
+        end
+      end
       @verdict = decide
       write_events(@verdict)
     end
@@ -143,28 +182,50 @@ class World
       'member:grandpa' => 'senior' }[profile.to_s] || 'grown-up'
   end
 
+  # 当日方案里模型会真正用到的字段。其余状态键一律记为「未消费」，由调用方判未支持。
   def plan_overrides(given)
     o = {}
     %w[allowanceMs graceMs moveFromMs inSlot groupsPerTask minutesPerGroup roundTarget].each do |k|
-      o[k] = given[k] if given.key?(k)
+      next unless given.key?(k)
+
+      o[k] = given[k]
+      @used << k
     end
-    o['slots'] = given['slots'] if given.key?('slots')
+    if given.key?('slots')
+      o['slots'] = given['slots']
+      @used << 'slots'
+    end
     o
   end
 
   def seed(given)
-    append('WATCHED', @profile, ms: given['watchedMs'].to_i) if given['watchedMs']
-    append('OVER', @profile, ms: given['overMs'].to_i) if given['overMs']
+    if given['watchedMs']
+      @used << 'watchedMs'
+      append('WATCHED', @profile, ms: given['watchedMs'].to_i)
+    end
+    if given['overMs']
+      @used << 'overMs'
+      append('OVER', @profile, ms: given['overMs'].to_i)
+    end
     if given['pauseMs']
+      @used << 'pauseMs'
       append('MOTION', @profile, kind: 'pause', target: @profile)
       append('MOTION_SETTLED', @profile, kind: 'pause', pauseMs: given['pauseMs'].to_i)
       @motion_state = { 'pause' => true, 'pauseMs' => given['pauseMs'].to_i }
     end
-    given['roundsDone'].to_i.times { append('ROUND_DONE', @profile, reps: 1) } if given['roundsDone']
-    given['answeredInTask'].to_i.times { append('ANSWER', @profile, verdict: 'correct') } if given['answeredInTask']
-    given['backlogSize'].to_i.times { append('MISSED', @profile) } if given['backlogSize']
-    %w[wrongAnswers srsProgress pendingReview planVersion kpId carryOver].each { |k| @extras[k] = given[k] if given[k] }
-    @extras['backlogSize'] ||= given['backlogSize'].to_i if given['backlogSize']
+    %w[roundsDone answeredInTask backlogSize].each do |k|
+      next unless given[k]
+
+      @used << k
+      kind = { 'roundsDone' => 'ROUND_DONE', 'answeredInTask' => 'ANSWER', 'backlogSize' => 'MISSED' }[k]
+      given[k].to_i.times { append(kind, @profile) }
+    end
+    %w[wrongAnswers srsProgress pendingReview planVersion kpId carryOver].each do |k|
+      next unless given[k]
+
+      @used << k
+      @extras[k] = given[k]
+    end
   end
 
   # 零点刷新：同一个 dayToken 只滚一次；重启与同日重复调用不滚（DAY-06、DAY-07）。
@@ -248,6 +309,7 @@ def check(key, want, world, before)
   when 'mode' then cmp(want, world.verdict.fetch(:mode, 'ambient'))
   when 'nextAction' then cmp(want, world.verdict[:next_action])
   when 'blocked' then cmp(want, world.verdict[:blocked])
+  when 'allowed' then cmp(want, world.action_allowed)
   when 'wording' then cmp(want, world.verdict[:wording])
   when 'due' then cmp_due(want, world.verdict[:due])
   when 'surface' then Array(want).all? { |s| Array(world.verdict[:surface]).include?(s) } ? :pass : :fail
@@ -284,11 +346,10 @@ end
 
 def absent?(name)
   return true if name.to_s =~ %r{\A(GET|POST|PUT|DELETE) /} # 路径不存在由契约门校验形状
-  return false if CORE_SOURCE.include?(name.to_s)
+  return false if CODE_SOURCE.include?(name.to_s)
 
-  # 登记在禁止清单里的名字正是「契约里无定义」的写法；除此之外不得出现在契约其余部分。
-  rest = CONTRACT.reject { |k, _| %w[forbiddenFields retired].include?(k) }
-  !JSON.generate(rest).include?(name.to_s)
+  # 契约的定义面里不能出现；登记处（禁止清单、空位、说明文字）里出现是正当的。
+  !CONTRACT_DEF.include?(name.to_s)
 end
 
 def run(entries_filter, files)
@@ -305,6 +366,7 @@ def run(entries_filter, files)
         given = (entry['given'] || {}).merge(cs['given'] || {})
         begin
           world = World.new(given)
+          raise Unsupported, "状态键 #{world.unconsumed.join(", ")} 模型尚未消费" unless world.unconsumed.empty?
           before = world.before
           world.apply(cs['when'] || {})
           cs['expect'].each do |k, v|

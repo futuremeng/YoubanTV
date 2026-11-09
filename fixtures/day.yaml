@@ -73,7 +73,7 @@ DAY-04:
     - name: 调大调小都要一条已受理的动议或一次签署
       given: { actor: "member:mom" }
       when: { motion: { kind: planChange, target: "member:kid", accepted: false } }
-      expect: { allowed: false, applied: false, events: [MOTION] }
+      expect: { accepted: false, applied: false, effective: never, events: [MOTION] }
 
 DAY-04b:
   spec: [spec/DAY.md#DAY-04b, spec/PROFILE.md#PROFILE-04]
@@ -158,10 +158,10 @@ DAY-08:
       given: { slots: quizWithinSlots, inSlot: false }
       when: { stillWatching: true }
       expect: { events: [WATCHED], due: null, value: { watchedMs: 1200000 } }
-    - name: 时段在约定线之前参与判定
+    - name: 时段判定在约定线之前：时段外不判超时，也不写 OVER
       given: { slots: onlyWithinSlots, inSlot: false, watchedMs: 3720000 }
       when: { stillWatching: true }
-      expect: { due: null, value: { overMs: 120000 } }
+      expect: { due: null, noEvents: [OVER], value: { overMs: 0, watchedMs: 3720000 } }
 
 DAY-09:
   spec: [spec/DAY.md#DAY-09, spec/PROFILE.md#PROFILE-07]

@@ -43,6 +43,10 @@ COMMIT-03:
       given: { actor: "member:kid" }
       when: { mode: focused, signalSource: manual }
       expect: { value: { endpoint: "/api/exercise" }, delta: { roundsDone: 1 }, absent: [grantMinutes] }
+    - name: 他人代本人确认计次不生效
+      given: { actor: "member:mom", roundsDone: 0 }
+      when: { mode: focused, signalSource: manual }
+      expect: { allowed: false, applied: false, noEvents: [ROUND_DONE] }
     - name: 满一组只入账
       given: { roundTarget: 3, roundsDone: 3 }
       when: { exerciseDone: true }
@@ -50,7 +54,7 @@ COMMIT-03:
 
 COMMIT-04:
   spec: [spec/COMMIT.md#COMMIT-04, docs/PRODUCT.md#§3]
-  given: { profile: "member:kid", allowanceMs: 3600000, status: due }
+  given: { profile: "member:kid", allowanceMs: 3600000 }
   cases:
     - name: 超时只记 overdue，不阻断观看
       given: { watchedMs: 3720000 }
