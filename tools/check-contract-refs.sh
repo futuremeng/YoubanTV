@@ -89,5 +89,50 @@ if doc_events != mine:
 print("事件枚举与 PRODUCT §3 一致")
 PY
 
+# 5. 内核输出形状四处一致（M1.4）：契约 commitState ↔ ARCHITECTURE §9 ↔ model/commit.rb ↔ 工具出口
+python3 - "$root" <<'PYSTATE'
+import json, re, subprocess, sys, pathlib
+root = pathlib.Path(sys.argv[1])
+c = json.load(open(root / "contract" / "contract.json"))
+cs = c.get("commitState")
+if not cs:
+    print("FAIL 契约缺 commitState：M1.4 的内核输出形状未定稿"); sys.exit(1)
+bad = []
+# 5a. tierFor 里用到的每一个层，都要在分层文档里出现过（层表只有一处）
+lay = (root / "docs" / "LAYERING.md").read_text()
+for row in cs["tierFor"]:
+    if row["tier"] not in lay:
+        bad.append(f'commitState.tierFor 用到的 {row["tier"]} 在 LAYERING.md 里找不到')
+# 5b. 结构文档里写的字段名必须是契约声明的那一组
+arch = (root / "docs" / "ARCHITECTURE.md").read_text()
+for field in re.findall(r"\b(status|activeProfile|planVersion|due|tier|tierCeiling|nextAction|wording|surface|fallbackReason|kind|mode|deficit|window|howToAsk|ruleId)\b", arch):
+    if field not in cs["fields"] + cs["dueFields"]:
+        bad.append(f"ARCHITECTURE §9 出现的 {field} 不在契约 commitState 的字段表里")
+# 5c. 模型产出的键必须与契约声明的字段一模一样（跑一次真的产出，不比对注释）
+out = subprocess.run(["ruby", "-I", str(root / "model"), "-e",
+                      "require 'commit'; "
+                      "puts Core::Commit.state(profile: 'member:kid', "
+                      "plan: {'allowanceMs' => 1, 'graceMs' => 2, 'moveFromMs' => 1}, "
+                      "q: {'watchedMs' => 0, 'answeredInTask' => 0, 'roundsDone' => 0}).keys.join(',')"],
+                     capture_output=True, text=True, cwd=str(root))
+if out.returncode != 0:
+    tail = out.stderr.strip().splitlines()
+    bad.append("跑 model/commit.rb 取 CommitState 失败：" + (tail[-1] if tail else "无输出"))
+else:
+    got = out.stdout.strip().split(",")
+    if got != cs["fields"]:
+        bad.append(f"模型产出的字段与契约不一致：多出 {sorted(set(got) - set(cs['fields']))} "
+                   f"缺少 {sorted(set(cs['fields']) - set(got))}")
+# 5d. 强度默认档只有一处：契约这张表，模型读它
+model = (root / "model" / "commit.rb").read_text()
+if re.search(r"STRENGTH_DEFAULT_TIER = \{", model):
+    bad.append("model/commit.rb 里又写了一份强度默认档，应读契约 commitState.strengthDefaultTier")
+for b in bad:
+    print("FAIL " + b)
+if bad:
+    sys.exit(1)
+print("内核输出形状四处一致（契约 ↔ 结构文档 ↔ 模型）：通过")
+PYSTATE
+
 [ "$fail" -eq 0 ] && echo "契约与夹具引用完整性：通过"
 exit "$fail"

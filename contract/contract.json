@@ -654,5 +654,85 @@
     "spec": [
       "GATE-别名退役"
     ]
+  },
+  "commitState": {
+    "x-note": "内核输出的结论结构。规则本身仍只有一处：落层表在 LAYERING §2 与 §3，形态首选层由这里唯一一张 tierFor 表给出，模型读这张表，别处不再各写一遍（D42、D45）。",
+    "fields": [
+      "status",
+      "activeProfile",
+      "planVersion",
+      "due",
+      "tier",
+      "tierCeiling",
+      "nextAction",
+      "wording",
+      "surface",
+      "fallbackReason"
+    ],
+    "dueFields": [
+      "kind",
+      "mode",
+      "deficit",
+      "window",
+      "howToAsk",
+      "ruleId",
+      "nextAction"
+    ],
+    "enums": {
+      "status": [
+        "honored",
+        "due",
+        "overdue"
+      ],
+      "kind": [
+        "quiz",
+        "exercise",
+        "free"
+      ],
+      "mode": [
+        "focused",
+        "ambient"
+      ]
+    },
+    "tierFor": [
+      {
+        "when": "due == null 且非持续状态",
+        "tier": "L1",
+        "note": "角标剩余；待受理动议也只是一条提示（LAYER-02）"
+      },
+      {
+        "when": "due == null 且持续状态（overdue / 已受理的暂停 / 未选身份）",
+        "tier": "L1.5",
+        "note": "状态类信息走常驻提示条 + 顶栏角标（LAYERING §3）"
+      },
+      {
+        "when": "kind == free 或 nextAction == motion",
+        "tier": "L1.5"
+      },
+      {
+        "when": "mode == ambient",
+        "tier": "L1.5"
+      },
+      {
+        "when": "mode == focused",
+        "tier": "L2",
+        "note": "请求播放器暂停不得低于 L2（LAYER-07）"
+      }
+    ],
+    "tierFormula": "落层 = min(tierFor(due), 该身份协商强度的默认档)；手机端不取 L3，上限 L2",
+    "strengthDefaultTier": {
+      "accompanied": "L3",
+      "negotiated": "L2",
+      "selfManaged": "L1"
+    },
+    "producedBy": "model/commit.rb（core 的 Kotlin 实现须与之逐条对齐，D42）",
+    "spec": [
+      "ARCHITECTURE-§9",
+      "LAYERING-§2",
+      "LAYER-02",
+      "LAYER-07",
+      "COMMIT-01",
+      "COMMIT-11"
+    ]
   }
 }

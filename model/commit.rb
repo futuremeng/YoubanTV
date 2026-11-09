@@ -1,16 +1,78 @@
 # SPEC: COMMIT-01, COMMIT-02, COMMIT-03, COMMIT-04, COMMIT-05, COMMIT-09, COMMIT-11, LAYER-02, LAYER-07, PROFILE-10
 # 约定引擎：status / due / 落层的单点实现。界面与设备端只读这里的结论（COMMIT-09）。
+require 'json'
+
 require_relative 'day'
 require_relative 'capability'
 
 module Core
   module Commit
     TIER_ORDER = %w[L0 L1 L1.5 L2 L3 L5].freeze
-    # 形态首选层：focused 需要请求暂停，故不低于 L2；ambient 是 L1.5（LAYER-09）。
+    # 形态首选层只由 due 的形状定，这张表就是那一处（契约 commitState.tierFor、ARCHITECTURE §9）：
+    # focused 要请求播放器暂停，故不低于 L2；ambient 与「free / 动议」这类状态类结论落 L1.5；
+    # 没有到期项时是 L1 角标，持续状态（overdue、已受理的暂停、未选身份）落 L1.5（LAYER-02、LAYER-09）。
+    CONTRACT_COMMIT_STATE = JSON.parse(File.read(File.expand_path('../contract/contract.json', __dir__)))
+                               .fetch('commitState')
     FORM_TIER = { 'focused' => 'L2', 'ambient' => 'L1.5' }.freeze
-    STRENGTH_DEFAULT_TIER = { 'accompanied' => 'L3', 'negotiated' => 'L2', 'selfManaged' => 'L1' }.freeze
+    TIER_WITHOUT_DUE = 'L1'.freeze
+    TIER_PERSISTENT = 'L1.5'.freeze
+    STRENGTH_DEFAULT_TIER = CONTRACT_COMMIT_STATE.fetch('strengthDefaultTier').freeze
+    STATE_FIELDS = CONTRACT_COMMIT_STATE.fetch('fields').freeze
 
     module_function
+
+    # 形态首选层：一个函数答完契约那张表的五行，别处不再各写一份 tier（D45）。
+    def tier_for(due: nil, next_action: nil, persistent: false)
+      return TIER_PERSISTENT if due.nil? && persistent
+      return TIER_WITHOUT_DUE if due.nil?
+      return 'L1.5' if due['kind'].to_s == 'free' || next_action.to_s == 'motion'
+
+      FORM_TIER.fetch(due['mode'].to_s, TIER_PERSISTENT)
+    end
+
+    # 内核输出的形状：字段名就是契约 commitState.fields 那一行，电视端读的是这一份（M1.4）。
+    def state(profile:, plan:, q:, strength: 'negotiated', mode: nil, motion_state: {}, capability: {},
+              probe: nil, requested: false)
+      v = decide(profile: profile, plan: plan, q: q, strength: strength, mode: mode,
+                 motion_state: motion_state, capability: capability, probe: probe, requested: requested)
+      {
+        'status' => v[:status],
+        'activeProfile' => profile.to_s == 'none' ? nil : profile.to_s,
+        'planVersion' => plan.fetch('planVersion', 1),
+        'due' => due_shape(v, q, plan),
+        'tier' => v[:tier],
+        'tierCeiling' => v[:tierCeiling],
+        'nextAction' => v[:next_action],
+        'wording' => v[:wording],
+        'surface' => v[:surface],
+        'fallbackReason' => v[:fallbackReason]
+      }
+    end
+
+    # due 的形状照契约 dueFields；绝对时刻由设备端时钟填，模型只给相对量与当下窗口。
+    def due_shape(v, q, plan)
+      return nil unless v[:due]
+
+      kind = v[:due]['kind']
+      deficit = if kind == 'quiz'
+                  { 'kind' => 'questions', 'unit' => 'questions',
+                    'amount' => [plan.fetch('roundTarget', 5).to_i - q['answeredInTask'].to_i, 0].max }
+                elsif kind == 'exercise'
+                  { 'kind' => 'reps', 'unit' => 'reps',
+                    'amount' => [plan.fetch('exerciseRounds', 1).to_i - q['roundsDone'].to_i, 0].max }
+                else
+                  { 'kind' => 'none', 'unit' => 'none', 'amount' => 0 }
+                end
+      {
+        'kind' => kind,
+        'mode' => v[:due]['mode'],
+        'deficit' => deficit,
+        'window' => { 'earliest' => v[:due]['window'], 'latest' => v[:due]['window'] },
+        'howToAsk' => v[:due]['mode'] == 'focused' ? 'requestPauseThenAnswer' : 'badgeOnly',
+        'ruleId' => v[:value]['ruleId'] || 'present',
+        'nextAction' => v[:next_action]
+      }
+    end
 
     def tier_min(a, b)
       TIER_ORDER[[TIER_ORDER.index(a).to_i, TIER_ORDER.index(b).to_i].min]
@@ -26,13 +88,14 @@ module Core
 
       if motion_state['pause']
         # 已受理的暂停：冻结倒数，pauseMs 单列，状态层 L1.5（COMMIT-07）
-        return out.merge(status: 'honored', due: nil, tier: 'L1.5', wording: 'statusSentence',
-                         shown: %w[恢复时刻], events: [], value: { 'pauseMs' => motion_state['pauseMs'].to_i })
+        return out.merge(status: 'honored', due: nil, tier: tier_for(persistent: true),
+                         wording: 'statusSentence', shown: %w[恢复时刻], events: [],
+                         value: { 'pauseMs' => motion_state['pauseMs'].to_i })
       end
 
       unless Day.in_slot?(plan)
         shown = Day.slot_mode(plan) == 'onlyWithinSlots' ? %w[下一个可用时刻] : []
-        return out.merge(status: 'honored', due: nil, tier: 'L1', shown: shown,
+        return out.merge(status: 'honored', due: nil, tier: tier_for, shown: shown,
                          value: { 'watchedMs' => watched })
       end
 
@@ -42,11 +105,11 @@ module Core
       if watched >= allowance
         # COMMIT-04：条件是 ≥ allowance；零量不写 OVER（写了只是噪声）
         over = [watched - allowance, 0].max
-        out.merge(status: 'overdue', due: nil, tier: 'L1.5', wording: 'statusSentence',
+        out.merge(status: 'overdue', due: nil, tier: tier_for(persistent: true), wording: 'statusSentence',
                   events: over.positive? ? %w[OVER] : [], shown: %w[超出约定分钟数],
                   value: { 'overMs' => over, 'watchedMs' => watched })
       elsif watched < grace
-        out.merge(status: 'honored', due: nil, tier: 'L1', shown: %w[角标剩余],
+        out.merge(status: 'honored', due: nil, tier: tier_for, shown: %w[角标剩余],
                   value: { 'remainingMs' => grace - watched, 'watchedMs' => watched })
       else
         due_of(out, plan, q, strength, mode, watched, capability, probe, requested)
@@ -61,7 +124,7 @@ module Core
 
     # 未选身份：只落账不判定，也不发任何邀请（COMMIT-11）。
     def unselected(out)
-      out.merge(status: 'honored', due: nil, tier: 'L1.5', shown: %w[选择身份的提示],
+      out.merge(status: 'honored', due: nil, tier: tier_for(persistent: true), shown: %w[选择身份的提示],
                 value: { 'eventProfile' => 'none', 'quizIssued' => false,
                          'exerciseInvite' => false, 'coWatchInvite' => false })
     end
@@ -96,13 +159,13 @@ module Core
       ceiling = STRENGTH_DEFAULT_TIER.fetch(strength.to_s, 'L2')
       want = 'ambient' unless focused_holds?(form: want, capability: capability, probe: probe,
                                              requested: requested, strength: strength)
-      tier = tier_min(FORM_TIER.fetch(want, 'L1.5'), ceiling)
+      tier = tier_min(tier_for(due: { 'kind' => kind, 'mode' => want }, next_action: kind), ceiling)
       # 回退规则只有一条：该层必需的能力拿不到，就落到最保守的可用档并在画面里写明原因（LAYER-08）。
       missing = Capability.missing_for(tier, capability)
       fallback = nil
       unless missing.empty?
         want = 'ambient'
-        tier = tier_min(FORM_TIER.fetch(want, 'L1.5'), ceiling)
+        tier = tier_min(tier_for(due: { 'kind' => kind, 'mode' => want }), ceiling)
         fallback = '当前模式与原因'
       end
       extra = { 'playerPaused' => missing.empty?, 'resumedAfterAnswer' => missing.empty?, 'retried' => false }
@@ -118,7 +181,7 @@ module Core
     end
 
     def honored_after_done(out, watched)
-      out.merge(status: 'honored', due: nil, tier: 'L1', events: %w[DONE],
+      out.merge(status: 'honored', due: nil, tier: tier_for, events: %w[DONE],
                 value: { 'watchedMs' => watched })
     end
 

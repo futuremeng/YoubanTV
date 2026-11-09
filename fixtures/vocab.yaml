@@ -220,6 +220,7 @@ predicates:
   unchanged: {listOf: metric}
   identicalAcross: {map: dimensionFields}
   sameSource: {listOf: codePath}
+  stateFields: {values: [agree], note: "内核产出的字段集合与契约 commitState.fields 是同一组"}
   shown: {listOf: name}
   notShown: {listOf: name}
   visibleOn: {listOf: surface}
@@ -270,6 +271,7 @@ metricNames: [watchedMs, allowanceMs, graceMs, moveFromMs, pauseMs, overMs, roun
   dynamicGeneration, fallbackApplied, source, gradeMethod, verify, verifySemanticsUnchanged,
   sensorModeAllowed, manualConfirmation, signalSource, counting, exerciseVerdict,
   ceilingApplied, poolSame, poolSize, evicted, httpStatus, endpoint, apiExists, writePathExists,
+  commitStateTier,
   newEndpointNeeded, allowed, writable, allowedBranchSites, branchInForbiddenSites,
   selfManagedFields, selfManagedMayLowerGrace, acknowledgementOnlyItems, humanAction,
   profileDomain, activeMemberProfile, eventProfile, eventSequenceOrder, inheritedWatchedMs,

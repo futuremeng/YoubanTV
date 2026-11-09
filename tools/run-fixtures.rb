@@ -623,6 +623,8 @@ class World
       'item' => @item ? "#{@item}:#{checklist_status(@item)}" : nil,
       'capabilityState' => @capability,
       # 「每项能力必须登记当前层」——措辞与判定读的都是登记表这一份（LAYER-01）。
+      # 内核输出的形状：字段与落层都从 CommitState 这一份取（M1.4）。
+      'commitStateTier' => commit_state['tier'],
       'registryTier' => (k = @capability.keys.find { |x| Core::Capability.known?(x) }) ? Core::Capability.tier(k) : nil,
       # 选题与知识点（ASK-01/03/04/06/07/10、PACK-02/04）：这里只摆规则算得出的量，
       # 题干文本与星级估算在内容包里，模型不自己编（PACK-08）。
@@ -904,6 +906,11 @@ class World
     self
   end
 
+  # 电视端要读的那一份：契约 commitState 的形状（M1.4）。工具与设备端读的都是这个出口。
+  def commit_state
+    Core::Commit.state(**decide_args)
+  end
+
   private
 
   # 端点名不硬编码在模型里，一律回契约查。
@@ -1005,10 +1012,15 @@ class World
     @verdict = decide
   end
 
+  # 内核的入参只在这里拼一次：判定与 CommitState 用的是同一份（M1.4）。
+  def decide_args
+    { profile: @profile, plan: @plan, q: @ledger.project(@profile), strength: @strength,
+      mode: @mode_requested, motion_state: @motion_state || {}, capability: @capability,
+      probe: @probe, requested: !!@form_requested_now }
+  end
+
   def decide
-    v = Core::Commit.decide(profile: @profile, plan: @plan, q: @ledger.project(@profile),
-                            strength: @strength, mode: @mode_requested, motion_state: @motion_state || {},
-                            capability: @capability, probe: @probe, requested: !!@form_requested_now)
+    v = Core::Commit.decide(**decide_args)
     @shown.concat(Array(v[:fallbackReason])) if v[:fallbackReason]
     pick!
     @shown.concat(Core::Sense.display_tokens(signal_source: @signal_source,
@@ -1098,6 +1110,9 @@ def check(key, want, world, before)
   when 'tierCeiling' then cmp(want, world.verdict[:tierCeiling])
   when 'capability' then want.all? { |k, v| Core::Capability.state_of(world.capability, k) == v.to_s } ? :pass : :fail
   when 'sameSource' then Array(want).all? { |n| same_source?(n, world) } ? :pass : :fail
+  # 产出的字段集合是否就是契约声明的那一组（多了少了都算不一致）。
+  when 'stateFields'
+    world.commit_state.keys == CONTRACT['commitState']['fields'] ? :pass : :fail
   when 'evidenceFrom' then Array(want).all? { |n| evidence_from?(n, world) } ? :pass : :fail
   when 'checklist' then checklist_assert(want, world)
   when 'reopened' then Array(want).all? { |p| world.reopened.any? { |id| glob(p, id) } } ? :pass : :fail
@@ -1251,10 +1266,16 @@ def run(entries_filter, files)
   puts '-' * 46
   puts format('合计：通过 %d，失败 %d，未支持 %d', total[:pass], total[:fail], total[:unsupported])
   puts "失败明细：\n  " + failing.join("\n  ") unless failing.empty?
-  puts "未支持明细：\n  " + unsupported.first(12).join("\n  ") unless unsupported.empty?
+  # 未支持的一律逐条列出，不做截断：藏起来就等于把没做的说成做完了。
+  unless unsupported.empty?
+    puts "未支持明细（#{unsupported.size} 条）："
+    puts unsupported.map { |u| "  #{u}" }.join("\n")
+  end
   exit(total[:fail].zero? && (!entries_filter || total[:unsupported].zero?) ? 0 : 1)
 end
 
+# 直接跑才出报告；被别的工具 require 时只暴露 World 与判定入口（tools/tv-status.rb）。
+if $PROGRAM_NAME == __FILE__
 only = nil
 files = []
 ARGV.each_with_index do |a, i|
@@ -1263,3 +1284,4 @@ ARGV.each_with_index do |a, i|
 end
 files = Dir[File.join(root, 'fixtures/*.yaml')].reject { |f| f.end_with?('vocab.yaml') }.sort if files.empty?
 run(only, files)
+end

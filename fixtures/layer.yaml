@@ -181,6 +181,22 @@ LAYER-11:
       when: { motion: { kind: slotChange, target: "member:kid", accepted: true } }
       expect: { applied: true, allowed: false, absent: ["POST /api/l5"], notShown: [已为你关闭] }
 
+LAYER-13:
+  spec: [spec/LAYER.md#LAYER-02, spec/LAYER.md#LAYER-07, spec/COMMIT.md#COMMIT-01]
+  # 内核输出的形状只有一处定义：契约的 commitState；产出只有一处：core/commit（M1.4）。
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true }
+  cases:
+    - name: 结论的形状与落层出自同一处
+      given: { mode: focused }
+      when: { mode: focused }
+      # focused 的形态首选层是 L2，与协商式默认档取低后仍是 L2（契约 tierFor 那一处）。
+      expect: { stateFields: agree, sameSource: core/commit, value: { commitStateTier: L2 }, tier: L2 }
+    - name: 无到期项时形状里也带落层，界面不必自己推
+      # 在约定线之前没有到期项：形状里 due 是 null，tier 仍是 L1 角标那一档。
+      given: { watchedMs: 600000 }
+      when: { stillWatching: true }
+      expect: { stateFields: agree, value: { commitStateTier: L1 }, tier: L1, due: null }
+
 LAYER-12:
   spec: [spec/LAYER.md#LAYER-12, docs/LAYERING.md#§2]
   cases:

@@ -27,6 +27,7 @@ YoubanTV/
 │   ├── check-contract-refs.sh # 数据侧引用门：规格 id / 锚点 / 禁止字段 / 事件枚举
 │   ├── check-fixtures.sh      # 数据侧词汇门：断言键与取值必须落在契约与 vocab 里
 │   ├── run-fixtures.rb        # 夹具执行器：跑 model/，逐条判真假；不认识的键记「未支持」
+│   ├── tv-status.rb           # 把一轮 given/when 跑成内核的 CommitState：电视端将来读的那一份
 │   ├── probe-gate.sh          # 实测数据一致性门：样本 ↔ 门槛 ↔ facts 措辞（D43）
 │   ├── probe-record.rb        # 实测样本录入器：只登记事实并当场算出结论，不做推断
 │   └── f12-adb-probe.sh       # F12 现场跑：以画面时间码判定暂停是否真生效，带两道控制（D44）
@@ -150,7 +151,9 @@ grade/     自评与查阅修订：本人对照评分标准自评 → 星与掌�
 
 ## 9. 分层执行器 `enforcement/`
 
-内核产出的结论结构：
+内核产出的结论结构（**M1.4 已定稿**：字段名与 `tierFor(due)` 那张表的定义在
+`contract/contract.json` 的 `commitState`，`tools/check-contract-refs.sh` 每次跑都比对
+契约 ↔ 本文件 ↔ `model/commit.rb` 三处，夹具侧由 `LAYER-13` 守）：
 
 ```
 CommitState { status: honored|due|overdue, activeProfile, planVersion,

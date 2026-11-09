@@ -73,13 +73,14 @@
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | 实现切片 M1–M8：交付项、验收与依赖顺序 |
 | [`spec/`](spec/README.md) | 行为规格条目（代码里的 `SPEC:` 标签指向这里） |
 | [`contract/contract.json`](contract/contract.json) | 契约单一来源：主体与角色、scopes、端点、枚举、禁止字段与退役取值 |
-| [`fixtures/`](fixtures/) | 决策表与行为夹具：`COMMIT` / `DAY` / `PROFILE` / `ASK` / `PACK` / `ONBOARD` / `LAYER` / `SENSE` 每条至少一条断言（当前 470 通过、0 失败、82 未支持） |
+| [`fixtures/`](fixtures/) | 决策表与行为夹具：`COMMIT` / `DAY` / `PROFILE` / `ASK` / `PACK` / `ONBOARD` / `LAYER` / `SENSE` 每条至少一条断言（当前 478 通过、0 失败、82 未支持） |
 | [`tools/check-contract-refs.sh`](tools/check-contract-refs.sh) | 契约与夹具的引用完整性门：规格 id、锚点、禁止字段、事件枚举（数据侧） |
 | [`docs/facts/PROBES.md`](docs/facts/PROBES.md) | F12 / F13 的实测协议与跑法：一条命令跑 20 次并落样本；判据是画面不是状态字段（D44）；仿真与估计值不得抬默认档（D43）。F12 已在 2026-11-09 于一台 Android 9 电视与一台 Android 7.1.1 手机上跑通，四行样本均 0/20 |
 | [`tools/probe-gate.sh`](tools/probe-gate.sh) | 实测数据一致性门：样本 ↔ 门槛常量 ↔ `DEVICES.md` 措辞，三者不一致即红 |
 | [`tools/check-fixtures.sh`](tools/check-fixtures.sh) | 夹具词汇与结构门：断言键必须登记、取值必须落在契约枚举（数据侧） |
 | [`model/`](model/) | 决策表的可执行规范模型（账本、当日方案、约定引擎、执行面、能力登记表、待确认清单、信号源与成组）——生产内核 Kotlin 与之逐条对齐 |
 | [`tools/run-fixtures.rb`](tools/run-fixtures.rb) | 夹具执行器：把 `given`/`when` 喂给模型再判 `expect`；不认识的键一律记「未支持」，不静默跳过 |
+| `ruby tools/tv-status.rb fixtures/commit.yaml COMMIT-04` | 把一轮 `given`/`when` 跑成内核的 `CommitState` JSON —— 电视端将来读的就是这一份（M1.4） |
 | [`fixtures/FORMAT.md`](fixtures/FORMAT.md) | 夹具格式与断言词汇：一条断言只回答一个问题，词汇单一来源 [`fixtures/vocab.yaml`](fixtures/vocab.yaml) |
 
 ## 状态
