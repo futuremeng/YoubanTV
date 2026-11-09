@@ -1,0 +1,5 @@
+界面用字体：Noto Sans SC（Google / Notofonts，SIL Open Font License 1.1）的按需子集。
+来源：github.com/notofants/noto-cjk（Sans/SubsetOTF/SC/NotoSansSC-Regular.otf），本仓库内只做
+了字形裁剪（子集约 170 个字，见 tools/check-font-subset.rb 那条门禁），未做其它修改。
+OFL 1.1 全文今晚取不到（scripts.sil.org 403、raw.githubusercontent 404），所以这里放的是出处与
+许可证名，不是许可证全文——随包发布前必须补上全文，这条记在 docs/PROVENANCE.md。

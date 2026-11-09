@@ -26,10 +26,13 @@ import java.io.FileWriter;
  */
 public class MainActivity extends Activity {
     /** 内核结论落在这个文件里；设备端只读它，不自己算（D47）。 */
-    static final String STATE_FILE = "/sdcard/Download/youban-state.json";
+    static final String STATE_NAME = "youban-state.json";
     /** 遥控器按键落在这儿：设备测试从 adb 读回它，验「按键真的到了设备」。 */
-    static final String INPUT_FILE = "/sdcard/Download/youban-input.json";
+    static final String INPUT_NAME = "youban-input.json";
+    /** 公共目录做兜底：装了存储权限的开发机可以 adb push 到那儿直接看效果。 */
+    static final String PUBLIC_DIR = "/sdcard/Download";
 
+    private String fontNote = null;
     private TextView sentence;
     private TextView badge;
     private TextView foot;
@@ -39,7 +42,7 @@ public class MainActivity extends Activity {
         public void onReceive(Context context, Intent intent) {
             String json = intent.getStringExtra("state");
             if (json != null) {
-                write(STATE_FILE, json);
+                write(path(context, STATE_NAME, true), json);
             }
             render();
         }
@@ -52,6 +55,18 @@ public class MainActivity extends Activity {
         sentence = (TextView) findViewById(R.id.sentence);
         badge = (TextView) findViewById(R.id.badge);
         foot = (TextView) findViewById(R.id.foot);
+        // 这台电视的系统字体里没有汉字（/system/fonts 只有拉丁与各非中文字脚本，见 F17），
+        // 所以随包带一个 OFL 的 Noto Sans SC 子集（60KB，字符集由构建脚本按界面文案裁出）。
+        try {
+            android.graphics.Typeface face = android.graphics.Typeface.createFromAsset(
+                    getAssets(), "fonts/youban-subset.otf");
+            sentence.setTypeface(face);
+            badge.setTypeface(face);
+            foot.setTypeface(face);
+        } catch (Exception e) {
+            // 带不上字体就用系统字体：会显成方块，脚注里说明，不拿方块当正常显示。
+            fontNote = "没带上汉字子集，这台设备画不出中文（F17）";
+        }
         render();
     }
 
@@ -107,16 +122,36 @@ public class MainActivity extends Activity {
 
     private void record(String key) {
         long now = System.currentTimeMillis();
-        write(INPUT_FILE, "{\"key\":\"" + key + "\",\"at\":" + now + ",\"monoMs\":"
-                + android.os.SystemClock.elapsedRealtime() + "}");
+        write(path(this, INPUT_NAME, true), "{\"key\":\"" + key + "\",\"at\":" + now
+                + ",\"monoMs\":" + android.os.SystemClock.elapsedRealtime() + "}");
+    }
+
+    /**
+     * 应用自己的外部目录（不用任何存储权限，adb 也读得到）。
+     * 之前直接写 /sdcard/Download：API 28 上没声明存储权限就是写不进去，按键像没被接到一样
+     * ——这条是实测踩出来的（facts/DEVICES.md#F17）。公共目录只作兜底。
+     */
+    static String path(Context c, String name, boolean forWrite) {
+        java.io.File dir = c.getExternalFilesDir(null);
+        if (dir != null) {
+            if (!forWrite || dir.isDirectory()) {
+                return new java.io.File(dir, name).getAbsolutePath();
+            }
+        }
+        return PUBLIC_DIR + "/" + name;
+    }
+
+    private String stateJson() {
+        String json = read(path(this, STATE_NAME, false));
+        return json != null ? json : read(PUBLIC_DIR + "/" + STATE_NAME);
     }
 
     private void render() {
-        String json = read(STATE_FILE);
+        String json = stateJson();
         if (json == null) {
             sentence.setText("还没有读到内核的结论：这一屏不做任何判定。");
             badge.setText("");
-            foot.setText("状态来源：adb broadcast com.youban.STATE 或 " + STATE_FILE);
+            foot.setText("状态来源：adb broadcast com.youban.STATE 或 " + STATE_NAME);
             return;
         }
         // 只取契约里那几个字段（commitState.fields）；界面不从 status 反推层，层是内核给的。
@@ -128,7 +163,8 @@ public class MainActivity extends Activity {
         sentence.setText(line(status, wording, json));
         badge.setText(tier + " · " + ("due".equals(status) ? "待做" : "无到期项"));
         foot.setText("落层 " + tier + " · 强度天花板 " + ceiling
-                + (reason.isEmpty() ? "" : " · " + reason));
+                + (reason.isEmpty() ? "" : " · " + reason)
+                + (fontNote == null ? "" : " · " + fontNote));
     }
 
     /** 措辞仍按 LAYERING §4 那一句：状态句 + 下一步，不指责、不催促、不承诺兑换。 */
@@ -164,7 +200,11 @@ public class MainActivity extends Activity {
 
     private static void write(String path, String body) {
         try {
-            FileWriter w = new FileWriter(path);
+            java.io.File f = new java.io.File(path);
+            if (f.getParentFile() != null) {
+                f.getParentFile().mkdirs();
+            }
+            FileWriter w = new FileWriter(f);
             w.write(body);
             w.close();
         } catch (Exception e) {

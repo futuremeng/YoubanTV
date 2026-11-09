@@ -170,3 +170,22 @@
   `ruby tools/tv-at.rb --serial=<序列号>`（跑清单）、`--only=LAYER-07`（跑一步）、`--cycle=3`（连播）。
 - 结论：**adb 能承担调试与设备测试**——判定 → 落层 → 措辞 → 呈现这条链每一步都要自证；
   但它替代不了界面：输入、按键受理、焦点这些必须有原生 APK。M3 之前电视端的「测试」就是这条命令。
+
+## F17 装上原生壳层之后：遥控器按键真落到设备了，但汉字还是画不对
+
+- 实测（2026-11-10，BOX-B，Konka Android TV 9652 / Android 9）：
+  - `adb install` 自签名的 `youban-tv.apk`（0.06 MB）成功；`am start -n com.youban.tv/.MainActivity`
+    起来后 `mCurrentFocus` 就是 `com.youban.tv/com.youban.tv.MainActivity`；
+    `adb shell input keyevent 23`（确认键）之后设备上出现
+    `/sdcard/Android/data/com.youban.tv/files/youban-input.json` = `{"key":"accept","at":…,"monoMs":…}`
+    ——**F16 说的「输入通路是空的」从今天起只对免安装的通路成立**。
+  - 两个坑：① 应用直接写 `/sdcard/Download` 写不进去（API 28 没声明存储权限），看起来就像按键没被接到；
+    换到 `getExternalFilesDir(null)` 就有了，公共目录只作兜底。② 这台电视的屏保
+    （`com.smartisanos.screensaver`）会在活动起来之后抢走前台，截图截到的是屏保的钟；
+    所以先 `keyevent 82`（必要时再 `220`），确认 `mCurrentFocus` 是我们的组件，才允许截图。
+  - **汉字仍不对**：这台设备 `/system/fonts` 里没有汉字字形（拉丁与各非中文字脚本一大堆），随包带的
+    OFL 子集字体（170 字 / 60 KB）在角标与脚注那两行正常，主状态句那一行每个字渲染成同一个字形——
+    **没修好，不许按「已能显示中文」记账**；下一轮要查子集 cmap 与那一行文本的对应关系。
+- 复核：`sh device/android/build-apk.sh && adb -s <电视> install -r device/android/out/youban-tv.apk`
+  → `adb -s <电视> shell am start -n com.youban.tv/.MainActivity` → `adb -s <电视> shell input keyevent 23`
+  → `adb -s <电视> shell cat /sdcard/Android/data/com.youban.tv/files/youban-input.json`。

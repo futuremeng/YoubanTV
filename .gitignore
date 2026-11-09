@@ -19,3 +19,5 @@ panel/public/assets/vendor/
 *.idsig
 *.jks
 *.keystore
+# 打出来的包与本地测试密钥，都不入库
+device/android/out/
