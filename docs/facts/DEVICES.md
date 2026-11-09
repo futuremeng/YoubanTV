@@ -121,3 +121,17 @@
   无标记动作捕捉在临床量级存在系统偏差，本项目的用途限于计次与节律（`SENSE-03`、
   `research/MOBILE-COMPANION.md` §4）。
 
+## F14 自带浏览器画不出网页里的中文（呈现通路，不是产品界面）
+
+- 现象（2026-11-09，PHONE-C）：用 `tools/tv-present.rb` 把一块状态页推到手机自带浏览器，
+  中文全是方块；指名包名 `-p com.android.browser` 并在页里 `@font-face` 引
+  `/system/fonts/DroidSansFallback.ttf` 之后，只有开头几个字有字形，其余仍是方块。
+  另外两次时序坑也在这里：不 force-stop 前台应用会看到上一轮的旧页面；force-stop 后立刻
+  `am start` 会拿到白页。现在这条命令自己验：画面平均亮度（`signalstats` 的 YAVG）低于
+  200 才算画出来了，否则直接报错，不出「已显示」。
+- 复核：`ruby tools/tv-present.rb fixtures/day.yaml DAY-01 --serial=<手机> --shot=/tmp/x.png`
+  然后看截图；对照 `adb shell pm list packages | grep browser`（这台机器上同时装了 Chromium，
+  它会按同源策略挡掉 `file://` 页面里的字体引用）。
+- 结论：**网页这条路只够验证「判定 → 落层 → 这一层该说什么」这条链，不能当设备端界面**；
+  M3 的界面必须是 device/ 的原生 UI（用系统字体，不走这条路）。电视端（BOX-B）这条路没测：
+  今晚它不在线，`adb connect 192.168.1.44:5555` 挂不上。

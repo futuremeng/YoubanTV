@@ -13,9 +13,9 @@ module Core
     # 没有到期项时是 L1 角标，持续状态（overdue、已受理的暂停、未选身份）落 L1.5（LAYER-02、LAYER-09）。
     CONTRACT_COMMIT_STATE = JSON.parse(File.read(File.expand_path('../contract/contract.json', __dir__)))
                                .fetch('commitState')
-    FORM_TIER = { 'focused' => 'L2', 'ambient' => 'L1.5' }.freeze
-    TIER_WITHOUT_DUE = 'L1'.freeze
-    TIER_PERSISTENT = 'L1.5'.freeze
+    # 契约那张表按 id 取用：行序与措辞留在契约里，这里只拿层，不再抄一遍档位。
+    TIER_ROW = CONTRACT_COMMIT_STATE.fetch('tierFor').to_h { |r| [r.fetch('id'), r.fetch('tier')] }.freeze
+    FORM_TIER = { 'focused' => TIER_ROW.fetch('focused'), 'ambient' => TIER_ROW.fetch('ambient') }.freeze
     STRENGTH_DEFAULT_TIER = CONTRACT_COMMIT_STATE.fetch('strengthDefaultTier').freeze
     STATE_FIELDS = CONTRACT_COMMIT_STATE.fetch('fields').freeze
 
@@ -23,11 +23,11 @@ module Core
 
     # 形态首选层：一个函数答完契约那张表的五行，别处不再各写一份 tier（D45）。
     def tier_for(due: nil, next_action: nil, persistent: false)
-      return TIER_PERSISTENT if due.nil? && persistent
-      return TIER_WITHOUT_DUE if due.nil?
-      return 'L1.5' if due['kind'].to_s == 'free' || next_action.to_s == 'motion'
+      return TIER_ROW.fetch('persistent') if due.nil? && persistent
+      return TIER_ROW.fetch('noDue') if due.nil?
+      return TIER_ROW.fetch('freeOrMotion') if due['kind'].to_s == 'free' || next_action.to_s == 'motion'
 
-      FORM_TIER.fetch(due['mode'].to_s, TIER_PERSISTENT)
+      TIER_ROW.fetch(due['mode'].to_s, TIER_ROW.fetch('persistent'))
     end
 
     # 内核输出的形状：字段名就是契约 commitState.fields 那一行，电视端读的是这一份（M1.4）。

@@ -696,24 +696,29 @@
     },
     "tierFor": [
       {
+        "id": "noDue",
         "when": "due == null 且非持续状态",
         "tier": "L1",
         "note": "角标剩余；待受理动议也只是一条提示（LAYER-02）"
       },
       {
+        "id": "persistent",
         "when": "due == null 且持续状态（overdue / 已受理的暂停 / 未选身份）",
         "tier": "L1.5",
         "note": "状态类信息走常驻提示条 + 顶栏角标（LAYERING §3）"
       },
       {
+        "id": "freeOrMotion",
         "when": "kind == free 或 nextAction == motion",
         "tier": "L1.5"
       },
       {
+        "id": "ambient",
         "when": "mode == ambient",
         "tier": "L1.5"
       },
       {
+        "id": "focused",
         "when": "mode == focused",
         "tier": "L2",
         "note": "请求播放器暂停不得低于 L2（LAYER-07）"
