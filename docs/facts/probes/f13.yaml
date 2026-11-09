@@ -1,0 +1,17 @@
+# F13 样本：手机端姿态计次的可用性与误计率。跑法见 docs/facts/PROBES.md §F13。
+# 空着 = 未标定 = 摄像头通道默认关，界面走加速度计 + 手动确认（D36、SENSE-02/04）。
+threshold:
+  selfTestAttempts: 20
+  falseCountMax: 0.05
+  referenceTrials: 200
+projects: []
+# 每个项目 × 机型一段，形如：
+#   - name: 开合跳
+#     device: Pixel 6A
+#     cameraDistanceCm: 180
+#     lightLux: 320
+#     selfTest: { attempts: 20, falseCounts: 1 }
+#     reference: { trials: 210, manualSum: 640, autoSum: 628 }
+#     frameMs: 28
+#     tempC: 34
+#     source: manual

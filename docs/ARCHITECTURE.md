@@ -22,7 +22,9 @@ YoubanTV/
 ├── tools/                    # 契约生成器、qpack 打包器、决策表夹具执行器、发版与可复现校验、adb 冒烟
 │   ├── check-contract-refs.sh # 数据侧引用门：规格 id / 锚点 / 禁止字段 / 事件枚举
 │   ├── check-fixtures.sh      # 数据侧词汇门：断言键与取值必须落在契约与 vocab 里
-│   └── run-fixtures.rb        # 夹具执行器：跑 model/，逐条判真假；不认识的键记「未支持」
+│   ├── run-fixtures.rb        # 夹具执行器：跑 model/，逐条判真假；不认识的键记「未支持」
+│   ├── probe-gate.sh          # 实测数据一致性门：样本 ↔ 门槛 ↔ facts 措辞（D43）
+│   └── f12-adb-probe.sh       # F12 现场跑：连着 adb 的设备上循环请求暂停并落样本
 ├── docs/                     # 用户与运维文档 + 实机事实
 └── Makefile                  # make check = 契约（含 `tools/check-contract-refs.sh`）+ 决策表 + 棘轮 + 字号 + 包校验 + 血统扫描
 ```

@@ -82,6 +82,12 @@
 
 ## F12 请求播放器暂停的响应率待实测
 
+- 跑法与样本：[`PROBES.md`](PROBES.md) §F12；样本登记在 [`probes/f12.yaml`](probes/f12.yaml)；
+  一致性与反造假由 `tools/probe-gate.sh` 守（来源不是 adb/manual 的样本不得抬默认档）。
+
+- 跑法与样本：[`PROBES.md`](PROBES.md) §F12；样本登记在 [`probes/f12.yaml`](probes/f12.yaml)；
+  一致性与反造假由 `tools/probe-gate.sh` 守（来源不是 adb/manual 的样本不得抬默认档）。
+
 - **待测**：音频焦点丢失 / `KEYCODE_MEDIA_PAUSE` 在各机型自带播放器与第三方播放器上的响应率。
   这是 `focused` 参与形式（停下来答题 / 停下来做运动）唯一的技术依赖。
 - 现有事实里的相关线索：遥控器在息屏后仍有广播（F10）说明媒体键通路存在；但「广播被收到」不等于
@@ -91,6 +97,10 @@
   是否作为默认值。
 
 ## F13 手机端姿态计次的可用性与误计率待实测
+
+- 跑法与样本：[`PROBES.md`](PROBES.md) §F13；样本登记在 [`probes/f13.yaml`](probes/f13.yaml)（自检 + 对照两段）。
+
+- 跑法与样本：[`PROBES.md`](PROBES.md) §F13；样本登记在 [`probes/f13.yaml`](probes/f13.yaml)（自检 + 对照两段）。
 
 - 待测：前置摄像头姿态计次在手机上的可用距离、光照下限、遮挡影响与误计率；与人工计数对照 ≥200 次，
   按项目（开合跳 / 深蹲 / 坐姿操）与机型分档。

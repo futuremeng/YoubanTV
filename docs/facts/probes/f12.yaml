@@ -1,0 +1,12 @@
+# F12 样本：请求播放器暂停的响应率。跑法见 docs/facts/PROBES.md §F12。
+# 空着 = 未测 = focused 不作默认档（D36）。source 为 simulated/estimated 时不得抬默认档。
+threshold:
+  sampleMin: 20
+  responseRate: 0.95
+devices: []
+# 每台设备一段，形如：
+#   - model: Pixel 6A
+#     android: "14"
+#     player: stock            # stock | third-party
+#     source: adb              # adb | manual | pending
+#     trials: [1, 1, 0, 1]     # 1 = 内容真的停了；0 = 收到广播但没停

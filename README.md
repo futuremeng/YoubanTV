@@ -75,6 +75,8 @@
 | [`contract/contract.json`](contract/contract.json) | 契约单一来源：主体与角色、scopes、端点、枚举、禁止字段与退役取值 |
 | [`fixtures/`](fixtures/) | 决策表与行为夹具：`COMMIT` / `DAY` / `PROFILE` / `ASK` / `ONBOARD` 每条至少一条断言 |
 | [`tools/check-contract-refs.sh`](tools/check-contract-refs.sh) | 契约与夹具的引用完整性门：规格 id、锚点、禁止字段、事件枚举（数据侧） |
+| [`docs/facts/PROBES.md`](docs/facts/PROBES.md) | F12 / F13 的实测协议与跑法：一条命令跑 20 次并落样本；仿真与估计值不得抬默认档（D43） |
+| [`tools/probe-gate.sh`](tools/probe-gate.sh) | 实测数据一致性门：样本 ↔ 门槛常量 ↔ `DEVICES.md` 措辞，三者不一致即红 |
 | [`tools/check-fixtures.sh`](tools/check-fixtures.sh) | 夹具词汇与结构门：断言键必须登记、取值必须落在契约枚举（数据侧） |
 | [`model/`](model/) | 决策表的可执行规范模型（账本、当日方案、约定引擎、执行面）——生产内核 Kotlin 与之逐条对齐 |
 | [`tools/run-fixtures.rb`](tools/run-fixtures.rb) | 夹具执行器：把 `given`/`when` 喂给模型再判 `expect`；不认识的键一律记「未支持」，不静默跳过 |
