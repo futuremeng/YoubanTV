@@ -171,7 +171,27 @@
 - 结论：**adb 能承担调试与设备测试**——判定 → 落层 → 措辞 → 呈现这条链每一步都要自证；
   但它替代不了界面：输入、按键受理、焦点这些必须有原生 APK。M3 之前电视端的「测试」就是这条命令。
 
-## F17 装上原生壳层之后：遥控器按键真落到设备了，但汉字还是画不对
+## F17 装上原生壳层之后：遥控器按键真落到设备了；汉字**还是错**，但我此前给的病因是错的
+
+- **按键这条通了**（BOX-B / Android 9）：`adb install` 自签名 `youban-tv.apk`（0.02 MB）Success →
+  `am start -n com.youban.tv/.MainActivity` 后 `mCurrentFocus` 就是我们的组件 →
+  `adb shell input keyevent 23` → 设备上出现
+  `/sdcard/Android/data/com.youban.tv/files/youban-input.json` = `{"key":"accept","at":…,"monoMs":…}`。
+  F16 那句「输入通路是空的」从此只对免安装的通路成立。两个坑：应用写 `/sdcard/Download` 在 API 28
+  静默失败（看着像按键没接到，改 `getExternalFilesDir`）；这台电视的屏保会在活动起来后抢前台
+  （先 `keyevent 82`，确认 `mCurrentFocus` 是我们组件才截图）。
+- **更正我之前的两条错话**：
+  1. 「这台电视 `/system/fonts` 里没有汉字字形」——**错了**，那是 `ls | head -20` 看漏：机器上有
+     `NotoSansCJK-Regular.ttc`、`NotoSerifCJK-Regular.ttc`、`SourceHanSerifSC-Bold/Heavy.otf`。
+     旁证就在屏幕上：窗口标题「伴看板」（系统自己画的）一直是好的。F15 里那句同样的话也一并作废。
+  2. 「随包带的字体没生效」——也不是病因。真在编译期坏过一次：**`javac` 少了 `-encoding UTF-8`**，
+     界面文案里的中文常量全变成同一个字符（`javap`/class 里可查），已修（`build-apk.sh` 里写了原因）。
+- **仍未修好**：修完编码之后，界面上每个汉字还是同一个 last-resort 字形，而系统标题栏同样中文却正常。
+  排查到哪：源文件里每个字都是不同的码位（脚本点过 ✓）→ class 里常量正确 ✓ → 换设备自带字体
+  (`createFromFile /system/fonts/NotoSansCJK-Regular.ttc`) 这一步我改坏了没验成。
+  下一步照这条走：要么显式 `fontFamily` 指向设备那套 CJK，要么 `Typeface.createFromFile` 那个 .ttc，
+  并且**只能在设备上验**（见 F18）。不许按「已能显示中文」记账。
+
 
 - 实测（2026-11-10，BOX-B，Konka Android TV 9652 / Android 9）：
   - `adb install` 自签名的 `youban-tv.apk`（0.06 MB）成功；`am start -n com.youban.tv/.MainActivity`
@@ -189,3 +209,13 @@
 - 复核：`sh device/android/build-apk.sh && adb -s <电视> install -r device/android/out/youban-tv.apk`
   → `adb -s <电视> shell am start -n com.youban.tv/.MainActivity` → `adb -s <电视> shell input keyevent 23`
   → `adb -s <电视> shell cat /sdcard/Android/data/com.youban.tv/files/youban-input.json`。
+
+## F18 本地 ImageMagick 出图不是中文显示的验收依据
+
+- 现象：同一份字体文件，`magick -font <ttf/otf> -annotate` 在 Mac 上把每个汉字画成同一个字形
+  （DroidSansFallback 原文件如此，子集也如此），换 Mac 自己的 Songti/STHeiti 就正常。
+  也就是说：本地出图只能验**英文与版式**，验不了中文。
+- 复核：`magick -size 900x80 xc:#101014 -font <字体> -annotate +20+40 '还没有读到内核的结论' x.png`
+  再用 `magick compare -metric AE` 与设备截图比——只能证伪「英文/版式」那部分。
+- 结论：**设备端中文只能在这台设备上验**（截图 + 前台窗口确认）。写进 `tools/tv-at.rb` 的清单才算数，
+  别拿本地图或 `fc-list` 推断设备行为。

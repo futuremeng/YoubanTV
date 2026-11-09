@@ -47,10 +47,11 @@ Source Available — Personal Use Only），在此致谢。本项目与它是独
 
 ## 界面字体与构建取件（2026-11-10）
 
-- 界面用字体：Noto Sans SC 的按需子集（`device/android/app/src/main/assets/fonts/youban-subset.otf`，
-  170 字 / 60 KB），原字体在 Notofonts `noto-cjk` 的 `Sans/SubsetOTF/SC/` 下，许可 SIL OFL 1.1。
-  **今晚没取到 OFL 全文**（`scripts.sil.org` 403、`raw.githubusercontent` 404），包内那张
-  `LICENSE-NotoSansSC.txt` 目前只写了出处与许可证名——**随包发布前必须补全文**，这是硬门槛。
+- 界面字体：**当前 APK 不随包带任何字体**（试过 Noto Sans SC 子集与 DroidSansFallback 子集各一次，
+  都没在设备上验成，已回退，`facts/DEVICES.md#F17`）。原因是设备本来就有 CJK 字体
+  （`NotoSansCJK-Regular.ttc` 等），随包带字体这条路的授权成本本来不必要——
+  等确定设备自带字体不能用时再谈带字体，届时 OFL/Apache 全文必须一起进包。
+  今晚顺手记下：`scripts.sil.org` 403、`raw.githubusercontent` 上那两条路径 404，取全文要换源。
 - 构建取件走镜像：`mirrors.cloud.tencent.com/AndroidSDK/`（build-tools 34.0.0、platform-33_r01），
   约 1.5 MB/s；同一批文件走 `dl.google.com` 今晚反复超时。**镜像包没有拿到权威校验值**，
   只做了 zip 完整性与内部结构核对（`aapt2`/`d8` 在位、`android.jar` 里有 `TIRAMISU`）。

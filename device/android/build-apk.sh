@@ -25,15 +25,19 @@ rm -rf "$work" && mkdir -p "$work/obj" "$work/res" "$work/apk" "$work/gen"
 # Gradle 会自己把 assets 塞进去，我们不用 Gradle，就得自己压——漏了它这台电视上就是方块（F17）。
 "$bt/aapt2" link -o "$work/base.apk" -I "$jar" --manifest "$root/app/src/main/AndroidManifest.xml" \
   --java "$work/gen" --auto-add-overlay "$work/res.zip"
-javac -source 8 -target 8 -bootclasspath "$jar" -d "$work/obj" -proc:none \
+# -encoding UTF-8 不能省：不写就按平台默认编码读源文件，中文常量全变成同一个替换字符——
+# 屏幕上就是一排排一模一样的字，看着像「设备画不出中文」，其实是编译期就毁了（F17）。
+javac -source 8 -target 8 -encoding UTF-8 -bootclasspath "$jar" -d "$work/obj" -proc:none \
   $(find "$root/app/src/main/java" "$work/gen" -name '*.java')
 "$bt/d8" --lib "$jar" --min-api 19 --output "$work/apk" $(find "$work/obj" -name '*.class')
 # build-tools 里没有 zip 这个可执行文件（别把 $bt/zip 当工具用），用系统的。
 cp "$work/base.apk" "$work/app.apk"
 (cd "$work/apk" && zip -q -j "$work/app.apk" classes.dex)
-# assets 要带路径前缀，不然运行时 getAssets() 里找不到 fonts/youban-subset.otf。
-(cd "$root/app/src/main" && zip -q -r "$work/app.apk" assets)
-unzip -l "$work/app.apk" | grep -q "assets/fonts/" || { echo "APK 里没有字体子集，这台电视上会显成方块"; exit 1; }
+# assets 只在需要随包带字体时才压进来。这台电视自带中文字形（F17），所以现在不带；
+# 真要带的时候必须带路径前缀，并且**在设备上验**，本地 ImageMagick 出图不算数（F18）。
+if [ -d "$root/app/src/main/assets" ]; then
+  (cd "$root/app/src/main" && zip -q -r "$work/app.apk" assets)
+fi
 # 自签名：这台设备装的是自己造的包，测试用的 debug keystore 就地生成，不入库。
 ks="$out/youban-debug.keystore"
 [ -f "$ks" ] || keytool -genkeypair -keystore "$ks" -alias youban -storepass youban -keypass youban \
