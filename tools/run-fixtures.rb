@@ -125,8 +125,36 @@ class World
     @used << 'owner' if given.key?('owner')
     @item_status = given['checklistStatus']
     @used << 'checklistStatus' if given.key?('checklistStatus')
+    # 这些是「本轮之前的事实」的容器：必须在读 given 之前就位（顺序错过一次，读到的就是 nil）。
+    @clock = { 'wallClockDeltaMs' => 0, 'monotonicDeltaMs' => 0 }
+    @pool_same = true
+    @day_token_kept = true
+    @frozen_watched = nil
+    @pause_ms = nil
+    @roll_rows = nil
+    @rolled_today = false
     @task_done = given['taskDone']
     @used << 'taskDone' if given.key?('taskDone')
+    # 计划的版本与签署状态是本轮之前的事实（COMMIT-08）：没签署的版本不进「在跑的那一版」。
+    if given['plan']
+      @used << 'plan'
+      @pending_version = given['plan']['version']
+      @plan_signed = !!given['plan']['signed']
+    end
+    @running_version = given['planVersion'] || 6
+    @used << 'planVersion' if given.key?('planVersion')
+    # 时间完整性这三项是设备端带上来的一手事实，模型不自己造（DAY-07）。
+    %w[probedAt wallClockDeltaMs monotonicDeltaMs].each do |k|
+      next unless given.key?(k)
+
+      @used << k
+      @clock[k] = given[k]
+    end
+    @quiet = given['quiet']
+    @used << 'quiet' if given.key?('quiet')
+    # 免题段与完成标记（DAY-03、COMMIT-05）：完成标记只说明「这一组已经做完」，不换算时长。
+    %w[quizDone exerciseDone].each { |k| @used << k if given.key?(k) }
+    @done_flags = { 'quiz' => given['quizDone'], 'exercise' => given['exerciseDone'] }
     @same_kp = given['sameKp']
     @used << 'sameKp' if given.key?('sameKp')
     # 选题的输入：取材命中情况、题面形状、知识点状态与时机（ASK-01、ASK-06、ASK-07）。
@@ -186,8 +214,17 @@ class World
     @action_allowed = true
     @plan = Core::Day.plan(audience: @audience, day_type: @day_type, overrides: plan_overrides(given))
     @plan['form'] = @plan_form_seed if @plan_form_seed
+    # 免题段这类时段形态要进方案，判定才说得出那句理由（DAY-03、LAYERING §4）。
+    @plan['quiet'] = @quiet if @quiet
+    # 每组题量是自管字段（AUTO-14）：夹具给了就用它算题量上限，没给才用默认档。
+    if given['questionsPerGroup']
+      @plan['questionsPerGroup'] = given['questionsPerGroup'].to_i
+      @used << 'questionsPerGroup'
+    end
     @extras['tierBefore'] = @start_tier if @start_tier
     seed(given)
+    # 事件带版本是写入时的义务（DAY-07）：夹具里种进去那几条也一样要带，不然查账分不出改表前后。
+    @ledger.events.each { |e| e.fields[:version] ||= @running_version }
     apply_calibration!
     @verdict = decide
     snapshot
@@ -398,6 +435,21 @@ class World
   PERSONAL_PLAN_KEYS = %w[allowanceMs graceMs moveFromMs].freeze
 
   def plan_change(pc)
+    # 版本这一项走签署这一条路：没签署的版本不进「在跑的那一版」，也不写 PLAN_SIGNED（COMMIT-08）。
+    if pc['version']
+      @change_gate = :passed
+      if @plan_signed
+        @running_version = pc['version']
+        append('PLAN_SIGNED', @profile, version: pc['version'])
+        @effective = 'now'
+        @applied = true
+      else
+        @effective = 'never'
+        @applied = false
+      end
+      @verdict_stale = true
+      return
+    end
     if pc['capability']
       pc['capability'].each { |k, v| @capability[k.to_s] = v.to_s }
       @action_allowed = gate_ok?
@@ -535,6 +587,11 @@ class World
     @ledger.events.count { |e| e.kind == Core::Task::ANSWER_EVENT && e.profile == @profile && e.field('correct') }
   end
 
+  # 出现过事件的身份集合：零点刷新的行数与会话可重构性都按它算（DAY-04b）。
+  def profiles_with_events
+    @ledger.events.map { |e| e.profile }.uniq
+  end
+
   def q_backlog
     @ledger.project(@profile)['backlogSize'].to_i
   end
@@ -623,6 +680,26 @@ class World
       'item' => @item ? "#{@item}:#{checklist_status(@item)}" : nil,
       'capabilityState' => @capability,
       # 「每项能力必须登记当前层」——措辞与判定读的都是登记表这一份（LAYER-01）。
+      # 免题段：grace 等于 allowance 就是「这个身份默认不出题」的写法（DAY-03）；全天 quiet 同解。
+      'quizIssued' => @plan['graceMs'].to_i < @plan['allowanceMs'].to_i,
+      'quiet' => @quiet,
+      # 会话可由事件重构：凡是出现过事件的身份，都要能算出它自己的那一行（DAY-04b）。
+      # 会话能不能重构，问的是「每条观看与完成类事件是不是都带着自己的身份」，不是靠切换去猜（DAY-04b）。
+      'sessionsReconstructable' => @ledger.events
+                                     .select { |e| %w[WATCHED DONE ROUND_DONE OVER MISSED].include?(e.kind) }
+                                     .all? { |e| !e.profile.to_s.empty? },
+
+      # 零点刷新按身份逐条写行，代码同一份（DAY-04b、DAY-06）。
+      'rowsPerProfile' => @roll_rows == MEMBERS.size,
+      'dayRolled' => !!@rolled_today,
+      'runningVersion' => @running_version,
+      'versionInEveryEvent' => @ledger.events.all? { |e| e.fields.key?(:version) },
+      # 冻结与续算：恢复时接着冻结那一刻走，不是从刷新后的值重新累计（COMMIT-07）。
+      'resumedFrom' => @frozen_watched,
+      'motionRequired' => @extras['motionRequired'],
+      'mastery' => @extras.fetch('mastery', 'unchanged'),
+      'visibleOn' => @extras['visibleOn'],
+      'inReport' => @extras['inReport'] || (Core::Checklist.in_report? ? 'familyReport' : 'none'),
       # 内核输出的形状：字段与落层都从 CommitState 这一份取（M1.4）。
       'commitStateTier' => commit_state['tier'],
       'registryTier' => (k = @capability.keys.find { |x| Core::Capability.known?(x) }) ? Core::Capability.tier(k) : nil,
@@ -640,7 +717,8 @@ class World
       'candidateLevel' => Core::Pick.candidate_level(@kp_state),
       # 生效组数与每组题量只由 DAY-05 这一处算（ASK-02、AUTO-14）。
       'effectiveGroups' => Core::Day.effective_groups(@plan),
-      'maxQuestions' => Core::Day.effective_groups(@plan) * @plan.fetch('questionsPerGroup', Core::Day::QUESTIONS_PER_GROUP_DEFAULT),
+      'maxQuestions' => Core::Day.effective_groups(@plan) *
+                        @plan.fetch('questionsPerGroup', Core::Day::QUESTIONS_PER_GROUP_DEFAULT),
       'approvalRequired' => false,
       'fieldsPerItem' => Core::Pick::MEMBER_AUTHORED_FIELDS,
       'eventProfile' => @profile,
@@ -652,7 +730,12 @@ class World
       'sensorModeAllowed' => Core::Pick.sensor_mode_ok?(@estimate_accuracy, @accuracy_attempts),
       'signalSource' => @signal_source ||
                        (Core::Pick.sensor_mode_ok?(@estimate_accuracy, @accuracy_attempts) ? 'sensor' : 'manual'),
-      'recomputed' => @recomputed.nil? ? true : @recomputed
+      'recomputed' => @recomputed.nil? ? true : @recomputed,
+      # 墙钟回跳当日不重放：重放这件事从来不该发生，模型里没有重放这条路（DAY-07）。
+      'replayed' => false,
+      # 「生效组数」是当日可由做题完成的次数上限，「补一补」是欠账队列——不是同一个量（DAY-05）。
+      'poolSame' => Core::Day.effective_groups(@plan) == q_backlog,
+      'dayTokenKept' => @day_token_kept,
     }
   end
 
@@ -663,7 +746,7 @@ class World
     dims = dimension.to_s == 'profile' ? MEMBERS : CONTRACT['enums'][dimension.to_s]['values']
     # 只有按身份重算时才乘上强度档（PROFILE-01）；按受众/在场重算时强度固定，
     # 否则把两个维度混在一起乘，断言就不是它说的那件事了。
-    strengths = dimension.to_s == 'profile' && !@strengths.empty? ? @strengths : [@strength]
+    strengths = dimension.to_s == 'profile' && !Array(@strengths).empty? ? @strengths : [@strength]
     vals = []
     dims.each do |d|
       strengths.each do |s|
@@ -868,9 +951,33 @@ class World
       @verdict = decide
       write_events(@verdict)
     end
+    # 暂停段的时长是这一轮报上来的实测值，动议受理之后才落到 motion_state 上（COMMIT-07）。
+    if when_.key?('pauseMs')
+      @frozen_watched = @ledger.project(@profile)['watchedMs'] # 冻结的就是这一轮的已看时长
+      @used << 'pauseMs'
+      @pause_ms = when_.delete('pauseMs').to_i
+    end
     # 确认题的结果要在作答之前拿到：它是跟着那道答错的题出的（ASK-03、ASK-05）。
     if when_.key?('confirmation')
       @confirmation = when_.delete('confirmation')
+    end
+    # 完成只写 DONE / ROUND_DONE，绝不写任何时长发放事件（COMMIT-05、DAY-04）。
+    if when_.key?('taskDone') && when_.delete('taskDone')
+      @task_done = true
+      append('DONE', @profile)
+      append('ROUND_DONE', @profile)
+      @extras['mastery'] = 'updated'
+      @applied = true
+      @effective = 'now'
+    end
+    # 截止未达成只写 MISSED：后果只有那四类，进的是自己的周报（COMMIT-06、DAY-04）。
+    if when_.key?('deadlinePassed') && when_.delete('deadlinePassed')
+      append('MISSED', @profile)
+      @extras['inReport'] = 'ownWeekly'
+      @extras['notify'] = 'none'
+      @shown << 'overdue 状态条'
+      @applied = true
+      @effective = 'now'
     end
     if (ans = when_.delete('answers'))
       answers(ans)
@@ -907,6 +1014,12 @@ class World
   end
 
   # 电视端要读的那一份：契约 commitState 的形状（M1.4）。工具与设备端读的都是这个出口。
+  # 断言侧要读派生视图里的少数几项（visibleOn 这类），走这个出口，别开内部变量。
+  # 与快照同一份：extras 里那些「这一轮算出来的东西」也要能读到。
+  def derived
+    derived_values.merge(@extras)
+  end
+
   def commit_state
     Core::Commit.state(**decide_args)
   end
@@ -995,14 +1108,35 @@ class World
   # 零点刷新：同一个 dayToken 只滚一次；重启与同日重复调用不滚（DAY-06、DAY-07）。
   def roll!(crossed, reboot: false)
     token = reboot ? @day : (crossed ? 'd2' : @day)
+    # 墙钟向前跳得有单调时钟佐证才允许滚新一天；单靠墙跳就是改了系统时间（DAY-07）。
+    if crossed && @clock['wallClockDeltaMs'].to_i.positive? &&
+       @clock['monotonicDeltaMs'].to_i < @clock['wallClockDeltaMs'].to_i
+      @rolled_today = false
+      @applied = false
+      @effective = 'never'
+      @verdict = decide
+      return self
+    end
+    # usage_day 每身份一行，全家成员都要刷到；宽约定线与紧约定线走同一份代码（DAY-04b）。
+    @roll_rows = MEMBERS.size
+    @rolled_today = crossed && !reboot
+    # 刷新前后池子里的条数要一样：整池清空是缺陷，不是新周期的正常结果（DAY-07）。
+    # 当日归属令牌同理——跨零点由刷新换新，重启不该换（DAY-06、DAY-07）。
+    pool_before = q_backlog
+    token_before = @ledger.day_token
+    @pool_same = true
+    @day_token_kept = true
     @applied = @ledger.roll!(token)
+    @pool_same = q_backlog == pool_before
+    @day_token_kept = @ledger.day_token == token_before
     @motion_state = nil if @applied # 零点刷新连 pauseMs 一起归零（DAY-06）
     @effective = 'now' if @applied
     @verdict = decide
   end
 
   def append(kind, profile, **fields)
-    @ledger.append(kind, profile: profile, at: '20:00', **fields)
+    # 每条事件都带它当时依哪一版规则（DAY-07）：查账才分得清是改表前还是改表后。
+    @ledger.append(kind, profile: profile, at: '20:00', version: @running_version, **fields)
     @written << kind.to_s
     kind.to_s
   end
@@ -1053,7 +1187,11 @@ class World
     @motion_accepted = spec.fetch('accepted', false)
     append('MOTION', @profile, kind: kind, target: spec['target'] || @profile)
     unless @motion_accepted
+      # 没受理什么都不发生（D34），也就没有第二条提醒。
+      @extras['notify'] = 'none'
       append('MOTION_UNANSWERED', @profile, kind: kind)
+      # 没受理的动议不是黑名单：在双方界面上各显示一条，面板有只读视图（AUTO-03、COMMIT-07）。
+      @extras['visibleOn'] = %w[self panel]
       @effective = 'never'
       @applied = false
       return
@@ -1061,10 +1199,18 @@ class World
     @motion_state = nil
     settled = { kind: kind }
     if kind == 'pause'
-      @motion_state = { 'pause' => true, 'pauseMs' => (spec['minutes'] || 10).to_i * 60_000 }
+      # 报上来实测时长就用实测的，没报才用默认段的长度；冻结值在受理那一刻取（COMMIT-07）。
+      @motion_state = { 'pause' => true,
+                        'pauseMs' => @pause_ms || (spec['minutes'] || 10).to_i * 60_000 }
+      @frozen_watched ||= @ledger.project(@profile)['watchedMs']
+      # 对自己的会话可即时暂停，不需要一条待受理的动议（AUTO-16、COMMIT-07）。
+      @extras['motionRequired'] = spec['target'].to_s != 'self' && spec['target'] != @profile
       settled[:pauseMs] = @motion_state['pauseMs']
     end
     append('MOTION_SETTLED', @profile, **settled)
+    # 受理了也不额外推一条：动议条目在面板留一条记录、只显示一次，那属于呈现，不属于提醒（D34、AUTO-16）。
+    @extras['notify'] = 'none'
+    @extras['visibleOn'] = %w[panel]
     case kind
     when 'extend'
       @plan, offset = Core::Commit.apply_extend(@plan, spec['minutes'] || 0)
@@ -1109,6 +1255,7 @@ def check(key, want, world, before)
   when 'unchanged' then want.all? { |k| cmp(world.before[k], world.kept(k)) == :pass } ? :pass : :fail
   when 'tierCeiling' then cmp(want, world.verdict[:tierCeiling])
   when 'capability' then want.all? { |k, v| Core::Capability.state_of(world.capability, k) == v.to_s } ? :pass : :fail
+  when 'visibleOn' then Array(want) == Array(world.derived['visibleOn']) ? :pass : :fail
   when 'sameSource' then Array(want).all? { |n| same_source?(n, world) } ? :pass : :fail
   # 产出的字段集合是否就是契约声明的那一组（多了少了都算不一致）。
   when 'stateFields'
@@ -1119,7 +1266,13 @@ def check(key, want, world, before)
   when 'checklistStatus' then cmp(want, world.checklist_status(world.item))
   when 'egress' then want.all? { |k, v| world.egress[k.to_s].to_s == v.to_s } ? :pass : :fail
   when 'roles' then want.all? { |r, v| world.roles[r.to_s].to_s == v.to_s } ? :pass : :fail
-  when 'inReport' then want.to_s == 'none' ? (Core::Checklist.in_report? ? :fail : :pass) : :fail
+  # inReport: none 是「不进任何报告」；ownWeekly 是「只进这条账自己的周报」（COMMIT-06）。
+  when 'inReport'
+    want.to_s == 'none' ? (Core::Checklist.in_report? ? :fail : :pass) : cmp(want, world.derived['inReport'])
+  # notify: none 是「不发任何提醒」；once 是「这条动议在面板只出现一次」（AUTO-16、COMMIT-06）。
+  when 'notify' then cmp(want, world.derived['notify'])
+  # 掌握状态随每次作答更新，不是一个分数；unchanged 用在「这轮什么都没动」（COMMIT-05）。
+  when 'mastery' then cmp(want, world.derived['mastery'])
   when 'presentIn' then Array(want).all? { |c| Core::Capability.channels(world.verdict[:tier]).include?(c) } ? :pass : :fail
   when 'gate' then world.gate.to_s == want.to_s ? :pass : :fail
   when 'source' then cmp(want, world.pick_source)
@@ -1138,8 +1291,14 @@ def check(key, want, world, before)
 end
 
 # 词汇表里的符号值（vocab.yaml 里标了 type 的那几个）在断言里指代当下的人，不是字面串。
+def roll_profiles_from(given)
+  given['strengths']
+end
+
 def resolve(v, world)
   return world.profile if v.to_s == 'activeMember'
+  # 冻结值是设备端在受理那一刻取的一手数，断言里用 frozenValue 指它（COMMIT-07）。
+  return world.value_for('resumedFrom') if v.to_s == 'frozenValue'
   # 断言里也可以直接引用 given 里的字段名（ASK-07 的 questionPickedAt: dueAt）。
   return world.given[v.to_s] if world.given.key?(v.to_s)
 
@@ -1230,6 +1389,21 @@ def absent?(name)
   !CONTRACT_DEF.include?(name.to_s)
 end
 
+# 一个用例的稳定编号：簇 id 加序号，`.1` `.2` 这种是文档里的分档写法（README 的调用形式靠它）。
+def case_id_for(id, index, cases)
+  cases.size > 1 ? id.to_s + '.' + (index + 1).to_s : id.to_s
+end
+
+# 过滤器支持两种写法：`COMMIT`（整簇）与 `COMMIT-01`（一条用例，含它的 .1 .2 分档）。
+def case_selected?(case_id, pattern)
+  return true if case_id == pattern
+  # `DAY` 选整簇；`DAY-07` 选整条（含它的 .1 .2 分档）；`DAY-07.1` 只选那一档。
+  return case_id.split('-').first == pattern if pattern !~ /-/
+  return case_id.start_with?(pattern + '.') if case_id.start_with?(pattern + '.')
+
+  case_id == pattern
+end
+
 def run(entries_filter, files)
   total = { pass: 0, fail: 0, unsupported: 0 }
   failing = []
@@ -1237,11 +1411,14 @@ def run(entries_filter, files)
   files.each do |f|
     doc = YAML.load_file(f)
     doc.each do |id, entry|
-      # --only 支持整条 id 也支持前缀（LAYER / LAYER-07 都能选）。
-      next if entries_filter && !entries_filter.any? { |p| id.start_with?(p) }
+      # --only / 位置参数支持整簇（LAYER）也支持一条用例（LAYER-07、LAYER-07.1）：簇这一层先粗筛。
+      next if entries_filter && !entries_filter.any? { |pat| id.to_s.start_with?(pat.split('.').first.split('-').first) }
 
       res = { pass: 0, fail: 0, unsupported: 0 }
       entry['cases'].each_with_index do |cs, i|
+        case_id = case_id_for(id, i, entry['cases'])
+        next if entries_filter && !entries_filter.any? { |pat| case_selected?(case_id, pat) }
+
         given = (entry['given'] || {}).merge(cs['given'] || {})
         begin
           world = World.new(given)
@@ -1276,12 +1453,19 @@ end
 
 # 直接跑才出报告；被别的工具 require 时只暴露 World 与判定入口（tools/tv-status.rb）。
 if $PROGRAM_NAME == __FILE__
-only = nil
-files = []
-ARGV.each_with_index do |a, i|
-  only = a.sub('--only=', '').split(',') if a.start_with?('--only=')
-  files << a unless a.start_with?('--')
-end
+  # 三种调用形式：不带参数跑全部；给一个 `COMMIT-01` 只跑那一条用例（含 .1 .2 分档）；
+  # 给文件路径就只跑那个夹具。这条形式是 README 与 spec 里写的，之前只认 --only=，等于一直在说谎。
+  only = nil
+  files = []
+  ARGV.each do |a|
+    if a.start_with?('--only=')
+      only = a.sub('--only=', '').split(',')
+    elsif a =~ %r{^[A-Z]+(-\d+(\.\d+)?)?$}
+      only = [a]
+    else
+      files << a
+    end
+  end
 files = Dir[File.join(root, 'fixtures/*.yaml')].reject { |f| f.end_with?('vocab.yaml') }.sort if files.empty?
 run(only, files)
 end

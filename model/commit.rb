@@ -93,6 +93,8 @@ module Core
                          value: { 'pauseMs' => motion_state['pauseMs'].to_i })
       end
 
+      # 免题段覆盖全天（老人那一行）：这句说明放常驻位置，不是不给理由（DAY-03、LAYERING §4）。
+      quiet_note = plan['quiet'].to_s == 'allDay' ? %w[免题段说明] : []
       unless Day.in_slot?(plan)
         shown = Day.slot_mode(plan) == 'onlyWithinSlots' ? %w[下一个可用时刻] : []
         return out.merge(status: 'honored', due: nil, tier: tier_for, shown: shown,
@@ -109,7 +111,10 @@ module Core
                   events: over.positive? ? %w[OVER] : [], shown: %w[超出约定分钟数],
                   value: { 'overMs' => over, 'watchedMs' => watched })
       elsif watched < grace
-        out.merge(status: 'honored', due: nil, tier: tier_for, shown: %w[角标剩余],
+        # 有当日任务额度时，常驻呈现要带今天的次数进度（DAY-05、LAYERING §4）。
+        shown = %w[角标剩余] + quiet_note
+        shown += %w[进度] if plan['groupsPerTask']
+        out.merge(status: 'honored', due: nil, tier: tier_for, shown: shown,
                   value: { 'remainingMs' => grace - watched, 'watchedMs' => watched })
       else
         due_of(out, plan, q, strength, mode, watched, capability, probe, requested)

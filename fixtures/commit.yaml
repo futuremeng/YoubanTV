@@ -124,11 +124,14 @@ COMMIT-07:
         tier: L1.5
         value: { pauseMs: 600000, resumedFrom: frozenValue }
         unchanged: [watchedMs]
-        notify: once
+        # 「在面板只显示一次」是呈现，不是提醒：受理了也不额外推一条（D34、AUTO-16）。
+        notify: none
+        visibleOn: [panel]
     - name: 对自己的会话可即时暂停
       given: { actor: "member:kid", target: self }
       when: { motion: { kind: pause, target: self, accepted: true } }
-      expect: { applied: true, value: { motionRequired: false }, delta: { pauseMs: 1 } }
+      # 对自己的会话不需要一条待受理的动议；这一段的时长按动议带的默认段长入账（AUTO-16）。
+      expect: { applied: true, value: { motionRequired: false }, delta: { pauseMs: 600000 } }
     - name: 对他人未经受理不生效
       given: { actor: "member:kid", target: "member:mom" }
       when: { motion: { kind: pause, target: "member:mom", accepted: false } }
@@ -232,7 +235,8 @@ AUTO-16:
     - name: 受理才生效，生效后只走 L1.5 状态句
       given: { actor: "member:kid", target: "member:dad" }
       when: { motion: { kind: pause, target: "member:dad", accepted: true } }
-      expect: { applied: true, tier: L1.5, notify: none, wording: statusSentence, delta: { pauseMs: 1 } }
+      # 生效后按动议带的默认段长入账；不额外发提醒（D34）。
+      expect: { applied: true, tier: L1.5, notify: none, wording: statusSentence, delta: { pauseMs: 600000 } }
     - name: 单方面控制他人的 API 不存在
       when: { capability: { overlay: granted } }
       expect: { absent: [LockTask, DeviceAdmin, performGlobalAction], sameSource: [device/enforcement] }

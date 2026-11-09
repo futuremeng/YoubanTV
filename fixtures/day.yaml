@@ -60,7 +60,9 @@ DAY-04:
   cases:
     - name: 时长与完成各写各的事件，不写发放事件
       when: { taskDone: true }
-      expect: { events: [WATCHED, DONE, ROUND_DONE], absent: [grantMinutes, unspentMs, unlocked] }
+      # WATCHED 是观看会话写的，不是「完成任务」这个动作写的（D45：given 是本轮之前的事实）；
+      # 这一轮 taskDone 只写 DONE 与 ROUND_DONE，也不写任何时长发放事件。
+      expect: { events: [DONE, ROUND_DONE], absent: [grantMinutes, unspentMs, unlocked] }
     - name: 未达成写 MISSED
       when: { deadlinePassed: true }
       expect: { events: [MISSED], delta: { backlogSize: 1 } }
@@ -141,6 +143,12 @@ DAY-07:
     - name: 重启不触发当日重放
       when: { rebooted: true }
       expect: { applied: false, value: { dayRolled: false } }
+    - name: 整点跳表触发跨天但墙钟跳得比单调钟多，当日不滚
+      # 触发器在整点重算时确实报了 crossedMidnight，但墙钟跳了 2 小时而单调钟只走 1 分钟：
+      # 单靠墙钟跳就是改了系统时间，这条佐证不过，当日不滚（DAY-07、AUTO-11）。
+      given: { wallClockDeltaMs: 7200000, monotonicDeltaMs: 60000 }
+      when: { crossedMidnight: true }
+      expect: { applied: false, value: { dayRolled: false }, unchanged: [watchedMs] }
     - name: 零点前五分钟内的收紧顺延零点后生效
       given: { actor: "member:mom", target: "member:kid" }
       when: { motion: { kind: planChange, tighten: true, target: "member:kid", accepted: true }, at: "23:58" }
