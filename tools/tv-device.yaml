@@ -1,0 +1,26 @@
+# 电视端 adb 设备测试要跑的用例清单。
+#
+# 这里只列**引用**：判定期望一律取自被引用的夹具本身，不在这里再写一份（D46：一类规则只留一处）。
+# 每一步两道：
+#   内核侧  ruby tools/run-fixtures.rb <ID> 必须 0 失败，且这一步不许有「未支持」；
+#   设备侧  ruby tools/tv-present.rb <file> <ID> 在这台真机上显示，并由它自己验「画出来了没有」
+#           （前台窗口是我们指名那个应用 + 画面不白 + 与本地卡灰度比对一致，见 facts/DEVICES.md#F15）。
+# 这份是**测试清单**不是夹具，所以放在 tools/ 旁边：判定期望仍只在夹具那一份（D46）。
+# 跑法：ruby tools/tv-at.rb --serial=192.168.1.44:5555
+scenarios:
+  - case: fixtures/layer.yaml#LAYER-07
+    why: 到期且 focused → 先请求暂停再答题（L2 悬浮层）
+  - case: fixtures/commit.yaml#COMMIT-04
+    why: 超出约定只记 overdue，不打断观看（L1.5 常驻状态句）
+  - case: fixtures/commit.yaml#COMMIT-01
+    why: 还没到期只落角标（L1，不进应用）
+  - case: fixtures/commit.yaml#COMMIT-11
+    why: 没选身份时只入账，不发任何邀请
+  - case: fixtures/day.yaml#DAY-03.3
+    why: 老人免题段覆盖全天，走 quiet 并说明理由
+  - case: fixtures/commit.yaml#COMMIT-07
+    why: 已受理的暂停冻结倒数，暂停段单列（L1.5）
+  - case: fixtures/day.yaml#DAY-07.4
+    why: 墙钟跳得比单调钟多，当日不滚——这一屏不该出现「新的一天」
+  - case: fixtures/ask.yaml#ASK-01
+    why: 题面取自内容包，标注来源；这一屏显示的是到期与还差多少

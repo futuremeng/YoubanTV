@@ -805,6 +805,14 @@ class World
     lookup(key)
   end
 
+  # 呈现侧读量：这一屏可能就是没有这个数（已受理的暂停段没有 remainingMs），读不到就是「没有」，
+  # 不报错也不编一个。断言侧仍走严格的 lookup——未知键必须记「未支持」（D41）。
+  def value_opt(key)
+    lookup(key)
+  rescue Unsupported
+    nil
+  end
+
   def unconsumed
     @given.keys - @used.to_a - %w[spec]
   end

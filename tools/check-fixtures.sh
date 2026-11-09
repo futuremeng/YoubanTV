@@ -152,3 +152,6 @@ else
   exit 1
 end
 ' "$@"
+
+# 电视端设备清单只许引用夹具用例，不许自带期望（D46：期望只留夹具那一份）。
+ruby tools/check-tv-list.rb

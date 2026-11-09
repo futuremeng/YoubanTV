@@ -152,3 +152,21 @@
 - 结论：在这台电视上，**免安装的呈现通路只有一条：本地图形 + 相册打开**；它验证的是
   「判定 → 落层 → 措辞」这条链，不是界面。要用原生界面必须装 APK → 需要 Android SDK
   （今晚 `dl.google.com` 不可达）。字形要用常规体：`45 Light` 这类薄体在 72px + 电视缩放下糊成重影。
+
+## F16 adb 在这两台设备上能到哪、不能到哪（电视端设备测试的前提）
+
+- 实测（2026-11-09，BOX-B 与 PHONE-C 各跑同一份 `fixtures/tv-device.yaml`，8 步全过）：
+  - **能到的**：推文件、`am start -W` 打开、`screencap`、`dumpsys window` 看前台、读一手事实
+    （`date +%s`、`/proc/uptime`、`persist.sys.timezone`、`wm size`、`dumpsys power` 的醒/睡）。
+    这五项正好是内核要的时间输入（`probedAt` / 墙钟差 / 单调钟差）与呈现自证所需的全部。
+  - **不能到的**：这台设备上没有任何组件认领我们的状态更新
+    （`cmd package query-receivers -a com.youban.STATE` → 空），所以**遥控器按键现在没人接**，
+    换页只能从 Mac 侧走 adb。要让遥控器能用，必须有 `device/` 的原生 APK。
+  - **老设备的坑**：OD103 / Android 7.1 上 `resolve-activity` 对 `file://` 的 HTML 问不到组件，
+    但 `am start -a VIEW` 打得开；而且此时 `mCurrentFocus` 是 `android`，真正在前台的是 `mFocusedApp`。
+    只看前者会把确实打开着的应用当成没打开——通路探测现在两处都读，问不到就现场开一次，
+    用「前台换了 + 画面是深的」认定这条通路真能用。
+- 复核：`ruby tools/tv-at.rb --serial=<序列号> --facts`（打印上述事实与「输入通路」）、
+  `ruby tools/tv-at.rb --serial=<序列号>`（跑清单）、`--only=LAYER-07`（跑一步）、`--cycle=3`（连播）。
+- 结论：**adb 能承担调试与设备测试**——判定 → 落层 → 措辞 → 呈现这条链每一步都要自证；
+  但它替代不了界面：输入、按键受理、焦点这些必须有原生 APK。M3 之前电视端的「测试」就是这条命令。

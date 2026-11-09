@@ -8,6 +8,7 @@
 .DS_Store
 Thumbs.db
 *.log
+tmp/
 node_modules/
 **/dist/
 panel/public/assets/vendor/

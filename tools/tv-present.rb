@@ -17,6 +17,7 @@ require 'json'
 require 'yaml'
 require 'fileutils'
 require 'tempfile'
+require 'tmpdir'
 require_relative 'run-fixtures'
 
 REMOTE = '/sdcard/Download/youban-status.html'
@@ -109,19 +110,23 @@ end
 
 # 措辞只按 LAYERING §4 那一处规则拼：状态 + 恢复/下一步，不指责、不催促、不承诺兑换。
 def sentence(st, world)
-  watched = world.value_for('watchedMs').to_i / 60_000
-  allowance = world.value_for('allowanceMs').to_i / 60_000
   return '还没有选身份：这一条只记在账上，不做判定。' if st['activeProfile'].nil?
 
+  # 已受理的暂停：这一屏说的是冻结与恢复时刻，不再报「还剩几分钟」——倒数本来就停了（COMMIT-07）。
+  if (pause = st['value'] && st['value']['pauseMs'])
+    return "已受理这一段的暂停（#{pause.to_i / 60_000} 分钟），倒数停在这里，到点自己恢复。"
+  end
+  watched = world.value_opt('watchedMs').to_i / 60_000
+  allowance = world.value_opt('allowanceMs').to_i / 60_000
   base = "今天已看 #{watched} 分钟，约定 #{allowance} 分钟。"
   if st['due']
     back = "这一组答完（#{st['due']['deficit']['amount']} #{st['due']['deficit']['unit']}）就记为已完成。"
     st['due']['mode'] == 'focused' ? "#{base}#{back}" : "#{base}有一组题待做，现在做吗？"
   elsif st['status'] == 'overdue'
-    over = world.value_for('overMs').to_i / 60_000
+    over = world.value_opt('overMs').to_i / 60_000
     "超出约定 #{over} 分钟。今天已按约定使用完。"
   else
-    left = world.value_for('remainingMs')
+    left = world.value_opt('remainingMs')
     left ? "#{base}还剩 #{left.to_i / 60_000} 分钟。" : "#{base}这一条按约定使用完了。"
   end
 end
@@ -210,6 +215,40 @@ def who_handles(args, mime)
   ok2 ? q[/packageName=([\w.]+)/, 1] : nil
 end
 
+# resolve-activity 在有些老设备上问不到东西，但真去 am start 是能开起来的（Smartisan OD103 /
+# Android 7.1 实测：问是 No activity found，开是浏览器起来）。所以问不到就现场试一次，
+# 用「前台窗口换了 + 画面是深的」认定这条通路真能用；两条都不行就报错，不硬演。
+def tmp_probe(name, body)
+  f = File.join(Dir.tmpdir, name)
+  File.write(f, body)
+  f
+end
+
+def live_probe(args, mime, local_path, remote)
+  return nil unless File.exist?(local_path)
+
+  unless adb(args, 'push', local_path, remote)[1]
+    puts "探测 #{mime} 时推不上设备"
+    return nil
+  end
+  adb(args, 'shell', 'am', 'start', '-W', '-a', 'android.intent.action.VIEW',
+          '-d', "file://#{remote}", '-t', mime)
+  6.times do
+    focus, = adb(args, 'shell', 'dumpsys', 'window')
+    # 老设备（OD103 / Android 7.1）上 mCurrentFocus 可能是「android」，真正在前台的是 mFocusedApp；
+    # 只看前者会把确实打开着的应用当成没打开（实测踩过，见 facts/DEVICES.md#F16）。
+    pkg = focus[/mCurrentFocus=.*?\s([\w.]+)\//, 1].to_s
+    pkg = focus[/mFocusedApp=.*?\s([\w.]+)\/.*?Activity/, 1].to_s if pkg == 'android' || pkg.empty?
+    if pkg && pkg !~ /launcher|systemui/i
+      adb(args, 'shell', 'screencap', '-p', CAPTURE)
+      adb(args, 'pull', CAPTURE, LOCAL_CAPTURE)
+      return pkg if dark_enough?
+    end
+    sleep 1
+  end
+  nil
+end
+
 args, rest = parse_args(ARGV)
 given, when_ = round_for(args, rest)
 world = World.new(given)
@@ -237,7 +276,20 @@ elsif image_viewer
   remote, mime, local_path = REMOTE_IMAGE, 'image/png', LOCAL_IMAGE
   viewer = image_viewer
 else
-  abort "这台设备既不认领 text/html 也不认领 image/*：免安装的呈现通路不存在，要在这台设备上看结论只能装设备端 APK。\n"         '（BOX-B 就是这一类：自带 htmlviewer 不接 file:// 的 HTML，见 facts/DEVICES.md#F15）'
+  # 问不到不等于开不了：现场各试一次，用前台窗口 + 画面深浅认定。
+  pkg = live_probe(args, 'text/html', tmp_probe('probe.html', '<html><body style="background:#101014"></body></html>'), '/sdcard/Download/youban-probe.html')
+  if pkg
+    html_viewer, = pkg
+    local = Tempfile.new(['youban-status', '.html'])
+    local.write(page(st, world, font_face(args)))
+    local.close
+    remote, mime, local_path = REMOTE, 'text/html', local.path
+    viewer = html_viewer
+    puts '通路是靠现场探测认出来的：resolve-activity 问不到，但 am start 打得开（老设备上常见）'
+  else
+    abort '这台设备既不认领 text/html 也不认领 image/*，现场探测也开不出任何一屏：免安装的呈现通路不存在，' \
+          '要在这台设备上看结论只能装设备端 APK（BOX-B 的网页那条就是这样堵死的，见 facts/DEVICES.md#F15）。'
+  end
 end
 
 _out, ok = adb(args, 'push', local_path, remote)
@@ -247,7 +299,7 @@ if args[:force_stop]
   focus, = adb(args, 'shell', 'dumpsys', 'window')
   front = focus[/mCurrentFocus=.*?\s([\w.]+)\//, 1]
   # 只关显示它的那个应用：把电视桌面关掉没道理，还会把整个界面折腾一遍（实测过）。
-  if front == viewer
+  if front == viewer || front == 'android'
     adb(args, 'shell', 'am', 'force-stop', front)
     puts "先关掉前台的 #{front}：不关会看到上一轮留下的那一屏（F12 的老教训）"
     sleep 2 # 立刻 start 会和冷启动抢时序，拿到的是白页（实测见过）
