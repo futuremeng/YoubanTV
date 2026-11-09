@@ -8,6 +8,8 @@
 #   ruby tools/tv-present.rb fixtures/layer.yaml LAYER-07 --serial=192.168.1.44:5555
 #   ruby tools/tv-present.rb --given='{"profile":"member:kid","watchedMs":4200000}' --when='{"mode":"ambient"}'
 #   ruby tools/tv-present.rb fixtures/commit.yaml COMMIT-04 --shot=/tmp/tv.png
+# 两条通路，按设备上「谁认领这个内容」自动选：能开 text/html 的走网页；一台都没有就走图片
+# （本地把结论画成一张 1080p 的图，用设备上认 image/* 的应用打开）。都选不出来就报错，不硬演。
 # 常用开关：--serial= 设备；--shot= 拉一张截图；--force-stop= 先关掉前台那个应用
 #            （不然浏览器会把上一轮的页面留着，看到旧结论——F12 那条老教训）；
 #            --font= 设备上可用的中文字体路径；--no-font 不加字体引用。
@@ -18,11 +20,40 @@ require 'tempfile'
 require_relative 'run-fixtures'
 
 REMOTE = '/sdcard/Download/youban-status.html'
+REMOTE_IMAGE = '/sdcard/Download/youban-status.png'
+LOCAL_IMAGE = '/tmp/youban-status-card.png'
+# 本地图形的字体：按 fontconfig 找一个带中文的；画出来是方块就说明这个字体不行（F15）。
+FONT_NOTE = '`fc-list :lang=zh` 找得到谁就用谁，找不到就说画不出中文'
 CAPTURE = '/sdcard/Download/youban-cap.png'
 LOCAL_CAPTURE = '/tmp/youban-present-cap.png'
 
 # 页面底色深灰：画面平均亮度低于这条线才算真的画出来了，白页会接近 255。
 DARK_MAX = 200
+# 16x16 灰度格的平均差阈值：载入中的黑屏与这张深色卡会差出几十，12 是留了余量的。
+DIFF_MAX = 12.0
+
+# 光「画面变暗」不够：电视的相册在载入时会先给一屏黑 + 转圈，亮度也是暗的（实测被它骗过一次）。
+# 所以拿本地那张图和截屏各压成 16x16 灰度，比平均差；对不上就是没画到屏幕上。
+def matches_card?(local_card)
+  return nil unless File.exist?(local_card) && File.exist?(LOCAL_CAPTURE)
+
+  a = gray_grid(local_card)
+  b = gray_grid(LOCAL_CAPTURE)
+  return nil if a.nil? || b.nil?
+
+  (a.zip(b).sum { |x, y| (x - y).abs } / a.size).round(1)
+end
+
+# 出成原始灰度字节再读：txt: 的写法在不同版本里不一样，之前按「(n,n,n)」解析灰度图时读到的全是
+# 空——于是两条曲线都成了全 0，差异算出来是 0，把载入中的黑屏也判成「一致」（这条已经踩过）。
+def gray_grid(path)
+  IO.binread(path) # 先确认文件在，不然给出 nil 让调用别看差值
+  bytes = IO.popen(['magick', path, '-colorspace', 'gray', '-resize', '16x16!', '-depth', '8', 'gray:-'],
+                   err: File::NULL, &:read)
+  return nil unless $?.success? && bytes.bytesize >= 256
+
+  bytes.bytes[0, 256]
+end
 
 def dark_enough?
   return false unless File.exist?(LOCAL_CAPTURE)
@@ -95,6 +126,36 @@ def sentence(st, world)
   end
 end
 
+def zh_font
+  return nil unless system('fc-list -V >/dev/null 2>&1')
+
+  lines = IO.popen(['fc-list', ':lang=zh'], err: File::NULL, &:read).lines.map { |l| l.split(':').first.to_s.strip }
+  # 挑字形完整的常规体：薄体（45 Light 这类）在 72px + 电视缩放后糊成一团（实测画出来像重影）。
+  lines.find { |f| f =~ /霞鹜|文楷|仿宋|黑体|Songti|PingFang|Hiragino|Heiti/ } || lines.first
+end
+
+# 用本地图形代替设备端界面：布局与措辞照 LAYERING §4，字号按 BOX-A 的观看距离取大（F9）。
+def card(st, world)
+  line1 = sentence(st, world)
+  due = st['due']
+  line2 = due ? "还差 #{due['deficit']['amount']} #{due['deficit']['unit']} · #{due['mode'] == 'focused' ? '这一组答完就记为已完成' : '有一组题待做，现在做吗？'}" :
+              st['fallbackReason'] ? '本机没有按约定请求到暂停，已改为不打断观看的提示。' : '只有角标与状态句，不打断观看。'
+  badge = "#{st['tier']} · #{due ? '待做' : '无到期项'}"
+  font = zh_font
+  abort '本机找不到带中文的字体，画出来会是方块——不拿方块当显示结果。' unless font
+
+  cmd = ['magick', '-size', '1920x1080', "xc:#101014", '-font', font,
+         '-fill', '#f2f2f5', '-pointsize', '72', '-annotate', '+140+460', line1,
+         '-pointsize', '46', '-fill', '#a8a8bc', '-annotate', '+140+570', line2,
+         '-pointsize', '40', '-fill', '#f2f2f5', '-annotate', '+1640+132', badge,
+         '-stroke', '#5a5a6e', '-strokewidth', '2', '-fill', 'none',
+         '-draw', 'roundrectangle 1596,86,1880,152 12,12',
+         '-pointsize', '34', '-fill', '#7c7c92', '-stroke', 'none', '-annotate', '+140+980',
+         "落层 #{st['tier']} · 强度天花板 #{st['tierCeiling']}", LOCAL_IMAGE]
+  system(*cmd, err: File::NULL)
+  abort '本地图形没画出来（magick 失败）——不拿失败当显示。' unless $?.success? && File.exist?(LOCAL_IMAGE)
+end
+
 def font_face(args)
   return '' if args[:font] == false
 
@@ -137,6 +198,18 @@ def page(st, world, css = '')
   HTML
 end
 
+# 谁认领这类内容：resolve-activity --brief 的最后一行是「包名/组件」，问不到再用 query-activities。
+def who_handles(args, mime)
+  out, ok = adb(args, 'shell', 'cmd', 'package', 'resolve-activity', '--brief',
+               '-a', 'android.intent.action.VIEW', '-d', "file:///probe.#{mime.split('/').last}", '-t', mime)
+  pkg = out.lines.last.to_s[/\A([\w.]+)\//, 1] if ok
+  return pkg if pkg
+
+  q, ok2 = adb(args, 'shell', 'cmd', 'package', 'query-activities',
+               '-a', 'android.intent.action.VIEW', '-d', "file:///probe.#{mime.split('/').last}", '-t', mime)
+  ok2 ? q[/packageName=([\w.]+)/, 1] : nil
+end
+
 args, rest = parse_args(ARGV)
 given, when_ = round_for(args, rest)
 world = World.new(given)
@@ -146,60 +219,73 @@ world.apply(when_)
 st = world.commit_state
 puts JSON.pretty_generate(st)
 
-css = font_face(args)
-html = page(st, world, css)
-file = Tempfile.new(['youban-status', '.html'])
-file.write(html)
-file.close
+# 电视会自己进屏保：屏保也是深色画面，先戳醒，免得把屏保当成「画出来了」（实测踩过）。
+adb(args, 'shell', 'input', 'keyevent', '82')
 
-_out, ok = adb(args, 'push', file.path, REMOTE)
+html_viewer = who_handles(args, 'text/html')
+image_viewer = who_handles(args, 'image/png')
+if html_viewer
+  # 同一台机器上常装两个浏览器：Chromium 按同源策略挡掉 file:// 页面里的字体引用，整页变方块；
+  # 系统自带那个不挡。指名它，并在结论里说清是谁画的这一屏。
+  local = Tempfile.new(['youban-status', '.html'])
+  local.write(page(st, world, font_face(args)))
+  local.close
+  remote, mime, local_path = REMOTE, 'text/html', local.path
+  viewer = html_viewer
+elsif image_viewer
+  card(st, world)
+  remote, mime, local_path = REMOTE_IMAGE, 'image/png', LOCAL_IMAGE
+  viewer = image_viewer
+else
+  abort "这台设备既不认领 text/html 也不认领 image/*：免安装的呈现通路不存在，要在这台设备上看结论只能装设备端 APK。\n"         '（BOX-B 就是这一类：自带 htmlviewer 不接 file:// 的 HTML，见 facts/DEVICES.md#F15）'
+end
+
+_out, ok = adb(args, 'push', local_path, remote)
 abort "推不到设备：#{_out.strip}（设备是否在线？adb devices 里有没有它）" unless ok
 
 if args[:force_stop]
   focus, = adb(args, 'shell', 'dumpsys', 'window')
-  pkg = focus[/mCurrentFocus=.*?\s([\w.]+)\//, 1]
-  if pkg
-    adb(args, 'shell', 'am', 'force-stop', pkg)
-    puts "先关掉前台的 #{pkg}：不关就会看到上一轮留下的页面（F12 的老教训）"
+  front = focus[/mCurrentFocus=.*?\s([\w.]+)\//, 1]
+  # 只关显示它的那个应用：把电视桌面关掉没道理，还会把整个界面折腾一遍（实测过）。
+  if front == viewer
+    adb(args, 'shell', 'am', 'force-stop', front)
+    puts "先关掉前台的 #{front}：不关会看到上一轮留下的那一屏（F12 的老教训）"
     sleep 2 # 立刻 start 会和冷启动抢时序，拿到的是白页（实测见过）
   end
 end
-launch = ['shell', 'am', 'start', '-a', 'android.intent.action.VIEW',
-          '-d', "file://#{REMOTE}", '-t', 'text/html']
-# 同一台机器上常装两个浏览器：Chromium 会按同源策略挡掉 file:// 页面里的字体引用，整页变方块；
-# 系统自带那个不挡。装得下就指名它，并在结论里说清是谁画的这一屏。
-list_out, = adb(args, 'shell', 'pm', 'list', 'packages')
-browser = %w[com.android.browser com.android.htmlviewer].find { |pkg| list_out.include?(pkg) }
-if browser
-  launch += ['-p', browser]
-  puts "指名由 #{browser} 显示（Chromium 会挡 file:// 的字体引用，中文会变方块）"
-end
-# 「受理了」不等于「画出来了」：冷启动的浏览器会先给一张白页（实测见过），所以这里等的是画面本身。
-launch << '-W' # -W 等启动完成再返回，免得和冷启动抢时序
-_out, ok = adb(args, *launch)
-abort "设备没能受理这个打开请求：#{_out.strip}\n这条链在真机上还没验证过，不用截图假装已显示。" unless ok
-if args[:force_stop]
-  focus, = adb(args, 'shell', 'dumpsys', 'window')
-  puts "前台窗口：#{focus[/mCurrentFocus=.*?\s([\w.]+)\//, 1] || '看不出来'}"
-end
 
-# 页面底色是深灰，白页的平均亮度接近 255：拿它当「确实画出来了」的判据（F12 同一条纪律）。
-drawn = nil
+puts "通路：#{mime} 交给 #{viewer}"
+launch = ['shell', 'am', 'start', '-W', '-a', 'android.intent.action.VIEW',
+          '-d', "file://#{remote}", '-t', mime, '-p', viewer]
+_out, ok = adb(args, *launch)
+abort "设备没受理这个打开请求：#{_out.strip}\n这条链在这台设备上还没走通，不用截图假装已显示。" if !ok || _out =~ /unable to resolve/
+
+# 三道控制：前台窗口是这个应用、画面不白、截屏和本地那张卡对得上（载入中的黑屏会被第三条挡掉）。
+shown = drawn = diff = nil
 10.times do
+  focus, = adb(args, 'shell', 'dumpsys', 'window')
+  shown = focus.include?(viewer)
   FileUtils.rm_f(LOCAL_CAPTURE)
   adb(args, 'shell', 'screencap', '-p', CAPTURE)
   adb(args, 'pull', CAPTURE, LOCAL_CAPTURE)
   drawn = dark_enough?
-  break if drawn
+  diff = local_path == LOCAL_IMAGE ? matches_card?(LOCAL_IMAGE) : nil
+  @diff_ok = diff && diff < DIFF_MAX
+  break if shown && drawn && (diff.nil? || @diff_ok)
 
   sleep 1
 end
-abort '页面没有画出来（一直是白页）：这条链在这台设备上没走通，不用截图假装成功。' unless drawn
+abort "前台窗口不是 #{viewer}：这一屏不是我们推的那页，不用它当证据。" unless shown
+abort '画面还是白的：这条链在这台设备上没走通，不用截图假装成功。' unless drawn
+if diff
+  abort "屏幕上的内容和本地这张卡对不上（平均差 #{diff} ≥ #{DIFF_MAX}）：可能还停在载入画面，不用它当证据。" if diff >= DIFF_MAX
+
+  puts "截屏与本地卡的灰度平均差 #{diff}（阈值 #{DIFF_MAX}）"
+end
 
 if args[:shot]
-  adb(args, 'shell', 'cp', CAPTURE, '/sdcard/Download/youban-status.png')
-  _out, ok = adb(args, 'pull', '/sdcard/Download/youban-status.png', args[:shot])
-  puts(ok ? "截图：#{args[:shot]}" : "截图失败：#{_out}")
+  FileUtils.cp(LOCAL_CAPTURE, args[:shot])
+  puts "截图：#{args[:shot]}"
 end
-puts "已推到 #{args[:serial] || '默认设备'}：#{REMOTE}（呈现通路演练，不是 M3 的界面）"
+puts "已在 #{args[:serial] || '默认设备'} 上显示（呈现通路演练，不是 M3 的界面）"
 puts "注意：#{@font_note}" if @font_note

@@ -28,7 +28,8 @@ YoubanTV/
 │   ├── check-fixtures.sh      # 数据侧词汇门：断言键与取值必须落在契约与 vocab 里
 │   ├── run-fixtures.rb        # 夹具执行器：跑 model/，逐条判真假；不认识的键记「未支持」
 │   ├── tv-status.rb           # 把一轮 given/when 跑成内核的 CommitState：电视端将来读的那一份
-│   ├── tv-present.rb          # 把这份结论推到真机上看一眼：**呈现通路演练**，不是 M3 的界面（`facts/DEVICES.md#F14`）
+│   ├── tv-present.rb          # 把这份结论推到真机上看一眼：**呈现通路演练**，不是 M3 的界面
+│   │                          # 通路按设备上「谁认领这类内容」自动选（网页或图片），并用像素比对自证（`facts/DEVICES.md#F14`、`#F15`）
 │   ├── probe-gate.sh          # 实测数据一致性门：样本 ↔ 门槛 ↔ facts 措辞（D43）
 │   ├── probe-record.rb        # 实测样本录入器：只登记事实并当场算出结论，不做推断
 │   └── f12-adb-probe.sh       # F12 现场跑：以画面时间码判定暂停是否真生效，带两道控制（D44）

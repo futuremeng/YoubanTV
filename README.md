@@ -81,7 +81,7 @@
 | [`model/`](model/) | 决策表的可执行规范模型（账本、当日方案、约定引擎、执行面、能力登记表、待确认清单、信号源与成组）——生产内核 Kotlin 与之逐条对齐 |
 | [`tools/run-fixtures.rb`](tools/run-fixtures.rb) | 夹具执行器：把 `given`/`when` 喂给模型再判 `expect`；不认识的键一律记「未支持」，不静默跳过 |
 | `ruby tools/tv-status.rb fixtures/commit.yaml COMMIT-04` | 把一轮 `given`/`when` 跑成内核的 `CommitState` JSON —— 电视端将来读的就是这一份（M1.4） |
-| `ruby tools/tv-present.rb <夹具> <ID> --serial=…` | 把这份结论推到真机上看一眼：**呈现通路演练**，不是设备端界面；它自己验画面有没有画出来，白页就报错（`facts/DEVICES.md#F14`） |
+| `ruby tools/tv-present.rb <夹具> <ID> --serial=…` | 把这份结论推到真机上看一眼：**呈现通路演练**，不是设备端界面；通路按「谁认领这类内容」自动选，并用前台窗口 + 像素比对自证，对不上就报错（`facts/DEVICES.md#F14`、`#F15`） |
 | [`fixtures/FORMAT.md`](fixtures/FORMAT.md) | 夹具格式与断言词汇：一条断言只回答一个问题，词汇单一来源 [`fixtures/vocab.yaml`](fixtures/vocab.yaml) |
 
 ## 状态

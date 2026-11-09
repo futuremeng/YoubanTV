@@ -133,5 +133,22 @@
   然后看截图；对照 `adb shell pm list packages | grep browser`（这台机器上同时装了 Chromium，
   它会按同源策略挡掉 `file://` 页面里的字体引用）。
 - 结论：**网页这条路只够验证「判定 → 落层 → 这一层该说什么」这条链，不能当设备端界面**；
-  M3 的界面必须是 device/ 的原生 UI（用系统字体，不走这条路）。电视端（BOX-B）这条路没测：
-  今晚它不在线，`adb connect 192.168.1.44:5555` 挂不上。
+  M3 的界面必须是 device/ 的原生 UI（用系统字体，不走这条路）。电视端见下一条（BOX-B 连网页都不接）。
+
+## F15 这台电视不接任何网页：免安装的呈现只能走图片，而且黑屏会骗过亮度检查
+
+- 现象（2026-11-09，BOX-B，Konka Android TV 9652 / Android 9）：
+  `cmd package resolve-activity -a VIEW -t text/html` 解不到任何组件——自带的
+  `com.giant.htmlviewer` 不接 `file://` 的 HTML；系统字体里也没有 `DroidSansFallback.ttf`，
+  只有 `DroidSans*.ttf` + `NotoColorEmoji.ttf`，所以就算能开网页也是方块。
+  能接的是 `com.bytedance.giant.gallery`（`image/png` ✓ 已解到）。
+- 三个坑都实测踩过：① 电视会自己进屏保，屏保是深色画面，光看「画面变暗」会把屏保当成显示成功；
+  ② 相册载入时是一屏黑 + 转圈，同样过不了「变暗」这一条；③ 灰度比对如果按 `txt:` 的
+  `(n,n,n)` 格式解析灰度图，读回来全是空 → 差值恒为 0 → 黑屏也判「一致」。现在按
+  `-depth 8 gray:-` 的原始字节读，并把这条踩坑写在代码注释里。
+- 复核：`ruby tools/tv-present.rb fixtures/layer.yaml LAYER-07 --serial=<电视> --shot=/tmp/x.png`
+  （它会打印「通路：image/png 交给 com.bytedance.giant.gallery」和灰度平均差；对不上就直接报错）。
+  对照 `adb shell cmd package resolve-activity --brief -a android.intent.action.VIEW -t text/html`。
+- 结论：在这台电视上，**免安装的呈现通路只有一条：本地图形 + 相册打开**；它验证的是
+  「判定 → 落层 → 措辞」这条链，不是界面。要用原生界面必须装 APK → 需要 Android SDK
+  （今晚 `dl.google.com` 不可达）。字形要用常规体：`45 Light` 这类薄体在 72px + 电视缩放下糊成重影。
