@@ -45,6 +45,8 @@ COMMIT-04:                     # 顶层键必须是已定义的规格 id
 - **生效与受理**：`effective` `applied` `accepted` `allowed` `writable` `blocked`
 - **结构与同源**：`sameSource` `presentIn` `absent` `evidenceFrom` `capability` `egress` `checklist` `checklistStatus` `roles` `plan` `gate`
 
+断言的取值里可以直接写 `given` 里出现过的字段名，执行器把它换成这一轮的给定值——`ASK-07` 的 `questionPickedAt: dueAt` 问的就是「呈现时刻就是那个到点时刻」，不为此引入新语法。
+
 一条断言只回答一个问题。要写「A 且 B」就写两条；不要用 `xxxAndYyy` 复合键——那正是这批夹具此前的毛病（原有 249 个自由键，现在收敛到 46 个谓词）。
 
 ## 3. 否定断言

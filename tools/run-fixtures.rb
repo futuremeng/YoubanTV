@@ -16,6 +16,8 @@ require 'capability'
 require 'checklist'
 require 'sense'
 require 'task'
+require 'pick'
+require 'kp'
 
 class Unsupported < StandardError; end
 
@@ -44,7 +46,9 @@ PRODUCERS = {
   'core/commit' => [:commit, 'model/commit.rb'],
   'device/enforcement' => [:enforcement, 'model/enforcement.rb'],
   'device/sensor' => [:sensor, 'model/sense.rb'],
-  'core/task' => [:task, 'model/task.rb']
+  'core/task' => [:task, 'model/task.rb'],
+  'core/topics' => [:topics, 'model/pick.rb'],
+  'core/kp' => [:kp, 'model/kp.rb']
 }.freeze
 MEMBERS = %w[member:kid member:mom member:dad member:grandpa].freeze
 # 「只有一处来源」是跟文件走的：同一产物种类只准登记一个文件。
@@ -61,6 +65,11 @@ class World
               :assembly, :roles, :egress, :probe, :added, :reopened, :item, :paired, :strengths,
               :audiences
   attr_accessor :strength, :audience, :day_type, :motion_accepted, :applied, :before
+  attr_reader :authoring, :kp_state
+
+  def pick_source
+    @source
+  end
 
   def initialize(given)
     @given = given
@@ -120,11 +129,43 @@ class World
     @used << 'taskDone' if given.key?('taskDone')
     @same_kp = given['sameKp']
     @used << 'sameKp' if given.key?('sameKp')
+    # 选题的输入：取材命中情况、题面形状、知识点状态与时机（ASK-01、ASK-06、ASK-07）。
+    @hits = { 'pack' => given['packHit'], 'member' => given['memberAuthoredHit'], 'llm' => given['llmHit'] }
+    %w[packHit memberAuthoredHit llmHit].each { |k| @used << k if given.key?(k) }
+    @shape = {}
+    %w[stemChars optionsLines singleKey estimatedSeconds].each do |k|
+      next unless given.key?(k)
+
+      @shape[k] = given[k]
+      @used << k
+    end
+    @prereq_state = given['prereqState']
+    @used << 'prereqState' if given.key?('prereqState')
+    @kp_state = given['kpState']
+    @due_at = given['dueAt']
+    @used << 'dueAt' if given.key?('dueAt')
+    @outline_scope = given['outlineScope']
+    @used << 'outlineScope' if given.key?('outlineScope')
+    @question_class = given['questionClass']
+    @used << 'questionClass' if given.key?('questionClass')
+    @estimate_accuracy = given['estimateAccuracy']
+    @used << 'estimateAccuracy' if given.key?('estimateAccuracy')
+    @signal_source = given['signalSource']
+    @used << 'signalSource' if given.key?('signalSource')
+    @offline = given['offline']
+    @used << 'offline' if given.key?('offline')
+    @accuracy_attempts = given['attempts']
+    @used << 'attempts' if given.key?('attempts')
+    @confirmation = nil
+    @correctRun = 0
+    @recomputed = nil
+    @source = nil
+    @authoring = nil
     @extra_items = []
     @added = []
     @reopened = []
     @motion_state = nil
-    @signal_source = nil
+    # @signal_source 在上面按 given 赋过值，这里不能再清一次（SENSE-03/04 的展示口径读它）。
     @external_allowed = nil
     @boot_at = nil
     @probed_at = nil
@@ -406,6 +447,7 @@ class World
     if Core::Task.already_answered?(same_kp: @same_kp, answered: q['answeredInTask'])
       @action_allowed = false
       @extras['taskEnded'] = true
+      @recomputed = false # 不再问也不重算（ASK-06）
       return
     end
     full = target.positive? && q['answeredInTask'].to_i >= target
@@ -413,7 +455,22 @@ class World
       @extras['taskEnded'] = true
     else
       Array(list).each do |r|
-        append(Core::Task::ANSWER_EVENT, @profile, correct: r.to_s == 'correct')
+        correct = r.to_s == 'correct'
+        append(Core::Task::ANSWER_EVENT, @profile, correct: correct, kp: @extras['kpId'])
+        # 状态只由这一笔作答推：答对算连对，答错等确认题的结果（ASK-03）。
+        @kp_state = Core::Kp.after_answer(state: @kp_state, correct: correct, run: @correctRun)
+        @correctRun = correct ? @correctRun + 1 : 0
+        next if correct
+
+        append('MISSED', @profile) # 答错落补一补池一条 MISSED（ASK-04）
+      end
+      # 确认题只跟着那道答错的题出，答对时不再叠一层迁移（ASK-03、ASK-05）。
+      if @confirmation && !Array(list).any? { |r| r.to_s != 'correct' }
+        @confirmation = nil
+      end
+      if @confirmation
+        @kp_state = Core::Kp.after_answer(state: @kp_state, correct: false,
+                                         confirmation: @confirmation, run: @correctRun)
       end
       q = @ledger.project(@profile)
       @extras['taskEnded'] = target.positive? && q['answeredInTask'].to_i >= target
@@ -421,6 +478,65 @@ class World
     Core::Task.settle(q['answeredInTask'], target, q['roundsDone']).each { append('ROUND_DONE', @profile) }
     @verdict = decide
     write_events(@verdict)
+  end
+
+  # 机检不过：不出、不入库、不重试，退回固定题面（ASK-08、CONTEXT-05）。
+  def verify(result)
+    return unless result.to_s == 'failed'
+
+    append('llm_generate_failed', @profile)
+    @extras.merge!(Core::Pick::VERIFY_FALLBACK)
+    @applied = true
+    @effective = 'now'
+  end
+
+  # 传感器计次的结果：计到了就写一条计次事件，判不准或样本不足就退回手动确认；
+  # 误判不扣分也不进池（ASK-10、SENSE-04）。
+  def exercise_verdict(kind)
+    @extras['sensorModeAllowed'] = Core::Pick.sensor_mode_ok?(@estimate_accuracy, @accuracy_attempts)
+    @extras['manualConfirmation'] = true
+    @extras['exerciseVerdict'] = kind.to_s
+    if @offline
+      # 上报通道不通：这一条挂成待同步，不写成已完成（SENSE-06）。
+      @shown << '本次待同步'
+      @extras['dayTokenKept'] = true
+      @applied = false
+    elsif kind.to_s == 'counted'
+      append('ROUND_DONE', @profile, signalSource: @signal_source || 'sensor')
+      @applied = true
+    else
+      @shown << '手动确认入口' if kind.to_s == 'ambiguous'
+      @applied = false
+    end
+    @verdict = decide
+    write_events(@verdict)
+  end
+
+  # 这一轮要出哪道题：取材顺序、题面形状门禁与依赖展示都在这里算一次（ASK-01、ASK-06）。
+  def pick!
+    @source = Core::Pick.source(pack_hit: @hits['pack'], member_authored_hit: @hits['member'],
+                               llm_hit: @hits['llm'], egress: @egress)
+    @shown << '来源标记' if Core::Pick.marked?(@source)
+    @shown << '依赖状态' if @prereq_state
+    @shown << '选题理由' unless @shape.empty?
+    unless @shape.empty?
+      @authoring = Core::Pick.authoring(@shape)
+      @shown << '校验状态'
+      # authoring 不过就退回固定题面（ASK-06、PACK-03），这条退回也算一次回退生效。
+      @extras['fallbackApplied'] = true if @authoring == 'rejected'
+      @action_allowed = false unless Core::Pick.shape_ok?(@shape)
+    end
+    @shown << '当前模式与原因' if @source == 'outlineRandom'
+    # 时段外不提问（ASK-07），但时长照记（DAY-08）。
+    @action_allowed = false unless Core::Day.in_slot?(@plan)
+  end
+
+  def answers_correct
+    @ledger.events.count { |e| e.kind == Core::Task::ANSWER_EVENT && e.profile == @profile && e.field('correct') }
+  end
+
+  def q_backlog
+    @ledger.project(@profile)['backlogSize'].to_i
   end
 
   def plan_number(key)
@@ -507,7 +623,34 @@ class World
       'item' => @item ? "#{@item}:#{checklist_status(@item)}" : nil,
       'capabilityState' => @capability,
       # 「每项能力必须登记当前层」——措辞与判定读的都是登记表这一份（LAYER-01）。
-      'registryTier' => (k = @capability.keys.find { |x| Core::Capability.known?(x) }) ? Core::Capability.tier(k) : nil
+      'registryTier' => (k = @capability.keys.find { |x| Core::Capability.known?(x) }) ? Core::Capability.tier(k) : nil,
+      # 选题与知识点（ASK-01/03/04/06/07/10、PACK-02/04）：这里只摆规则算得出的量，
+      # 题干文本与星级估算在内容包里，模型不自己编（PACK-08）。
+      'source' => @source,
+      'stemChars' => @shape['stemChars'],
+      'optionsLines' => @shape['optionsLines'],
+      'singleKey' => @shape['singleKey'],
+      'estimatedSeconds' => @shape['estimatedSeconds'],
+      'stemIdentical' => true,
+      'dynamicGeneration' => @source == 'llm' ? 1 : 0,
+      'extraSources' => Core::Pick.extra_sources(egress: @egress),
+      'questionPickedAt' => Core::Pick.picked_at(@due_at),
+      'candidateLevel' => Core::Pick.candidate_level(@kp_state),
+      # 生效组数与每组题量只由 DAY-05 这一处算（ASK-02、AUTO-14）。
+      'effectiveGroups' => Core::Day.effective_groups(@plan),
+      'maxQuestions' => Core::Day.effective_groups(@plan) * @plan.fetch('questionsPerGroup', Core::Day::QUESTIONS_PER_GROUP_DEFAULT),
+      'approvalRequired' => false,
+      'fieldsPerItem' => Core::Pick::MEMBER_AUTHORED_FIELDS,
+      'eventProfile' => @profile,
+      'poolSize' => q_backlog,
+      'evicted' => @ledger.backlog_raw(@profile) > Core::Ledger::BACKLOG_CAP ? Core::Kp::EVICTED : 'none',
+      'priorityReask' => Core::Kp.priority_reask(@extras['wrongAnswers']),
+      # 星只入账：答对一道入一颗，传感器误判与答错都不扣（AUTO-13、ASK-10）。
+      'stars' => Core::Kp.star_count(answers_correct),
+      'sensorModeAllowed' => Core::Pick.sensor_mode_ok?(@estimate_accuracy, @accuracy_attempts),
+      'signalSource' => @signal_source ||
+                       (Core::Pick.sensor_mode_ok?(@estimate_accuracy, @accuracy_attempts) ? 'sensor' : 'manual'),
+      'recomputed' => @recomputed.nil? ? true : @recomputed
     }
   end
 
@@ -723,18 +866,37 @@ class World
       @verdict = decide
       write_events(@verdict)
     end
+    # 确认题的结果要在作答之前拿到：它是跟着那道答错的题出的（ASK-03、ASK-05）。
+    if when_.key?('confirmation')
+      @confirmation = when_.delete('confirmation')
+    end
     if (ans = when_.delete('answers'))
       answers(ans)
+    end
+    if when_.key?('questionShown') && when_.delete('questionShown')
+      # 时机与选题相互独立：实际呈现了就写 due_shown，不为了凑时机提前出题（ASK-07）。
+      append('due_shown', @profile) if Core::Day.in_slot?(@plan)
+    end
+    if (v = when_.delete('verify'))
+      verify(v)
+    end
+    if (ev = when_.delete('exerciseVerdict'))
+      exercise_verdict(ev)
     end
     if when_.key?('exerciseDone') && when_.delete('exerciseDone')
       append('ROUND_DONE', @profile, reps: 1, signalSource: @signal_source || 'sensor')
       @verdict = decide
       write_events(@verdict)
     end
-    if when_.key?('stillWatching') || when_.key?('inSlot') || @verdict_stale
+    presented = when_.key?('stillWatching')
+    if presented || when_.key?('inSlot') || @verdict_stale
       when_.delete('stillWatching')
       @plan['inSlot'] = when_.delete('inSlot') if when_.key?('inSlot')
       @verdict = decide
+      # 确实把这道题呈现出去了才写 due_shown；时机与选题互不影响（ASK-07）。
+      if presented && @verdict[:due] && Core::Day.in_slot?(@plan)
+        append('due_shown', @profile)
+      end
       write_events(@verdict)
     end
     raise Unsupported, "动作键 #{when_.keys.join(", ")}" unless when_.empty?
@@ -848,6 +1010,9 @@ class World
                             strength: @strength, mode: @mode_requested, motion_state: @motion_state || {},
                             capability: @capability, probe: @probe, requested: !!@form_requested_now)
     @shown.concat(Array(v[:fallbackReason])) if v[:fallbackReason]
+    pick!
+    @shown.concat(Core::Sense.display_tokens(signal_source: @signal_source,
+                                             false_count_rate: @extras.dig('calibration', 'falseCountRate')))
     apply_form_fallbacks!
     # 形态是设置层面的事实：没有到期项时也照样有 ambient / focused 这一档，别报成 nil。
     v[:mode] ||= @plan['form'] || 'ambient'
@@ -942,6 +1107,12 @@ def check(key, want, world, before)
   when 'inReport' then want.to_s == 'none' ? (Core::Checklist.in_report? ? :fail : :pass) : :fail
   when 'presentIn' then Array(want).all? { |c| Core::Capability.channels(world.verdict[:tier]).include?(c) } ? :pass : :fail
   when 'gate' then world.gate.to_s == want.to_s ? :pass : :fail
+  when 'source' then cmp(want, world.pick_source)
+  when 'authoring' then cmp(want, world.authoring)
+  when 'kpState' then cmp(want, world.kp_state)
+  when 'stars' then cmp(want, Core::Kp.stars(true))
+  # 一条断言回答一个问题：这里问的那件事必须是模型答得出的（D41）。
+  when 'answerable' then world.value_for(Core::Pick::QUESTION_FIELDS.fetch(want.to_s, want.to_s)).nil? ? :fail : :pass
   when 'identicalAcross' then identical_across(want, world)
   when 'accepted' then cmp(want, world.motion_accepted)
   when 'applied' then cmp(want, world.applied)
@@ -954,6 +1125,8 @@ end
 # 词汇表里的符号值（vocab.yaml 里标了 type 的那几个）在断言里指代当下的人，不是字面串。
 def resolve(v, world)
   return world.profile if v.to_s == 'activeMember'
+  # 断言里也可以直接引用 given 里的字段名（ASK-07 的 questionPickedAt: dueAt）。
+  return world.given[v.to_s] if world.given.key?(v.to_s)
 
   v
 end

@@ -60,8 +60,9 @@ module Core
 
     # 出网开关名单只有一处来源：契约的 egressSwitch 枚举（D42）。它们是另一条轴——
     # 不在 LAYERING §2 的场景表里占行，所以不参与分层准入，也不参与形态降级（D45）。
-    EGRESS_SWITCHES = JSON.parse(File.read(File.expand_path('../contract/contract.json', __dir__)))
-                            .fetch('enums').fetch('egressSwitch').fetch('values').freeze
+    CONTRACT_ENUMS = JSON.parse(File.read(File.expand_path('../contract/contract.json', __dir__)))
+                         .fetch('enums').freeze
+    EGRESS_SWITCHES = CONTRACT_ENUMS.fetch('egressSwitch').fetch('values').freeze
 
     # 强制力的取值范围（LAYER-06）：无障碍只回判定结果，开机广播只是 L3 的触发器。
     ACCESSIBILITY_SURFACE = 'verdictOnly'.freeze
@@ -169,9 +170,12 @@ module Core
       %w[granted on].include?(state_of(capability, name))
     end
 
-    # 有的能力有文档写死的默认值，不是 unknown：摄像头通道默认关（SENSE-02）。
-    # 这条默认值只在这里写一次。
-    DEFAULT_STATE = { 'cameraChannel' => 'off' }.freeze
+    # 有的能力有写死的默认值，不是 unknown，而且这条默认值只在这里写一次（D42）：
+    # 出网开关读契约 egressSwitch 的 default（D13、D28），摄像头通道默认关（SENSE-02），
+    # 内容包题源是本地通路，默认就是通的（PACK-01「不依赖联网」）。
+    EGRESS_DEFAULT = CONTRACT_ENUMS.fetch('egressSwitch').fetch('default').freeze
+    DEFAULT_STATE = EGRESS_SWITCHES.each_with_object({}) { |sw, h| h[sw] = EGRESS_DEFAULT }
+                          .merge('cameraChannel' => 'off', 'offline' => 'granted').freeze
 
     def state_of(capability, name)
       (capability || {}).fetch(name.to_s, DEFAULT_STATE.fetch(name.to_s, 'unknown')).to_s

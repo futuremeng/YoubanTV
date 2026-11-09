@@ -18,6 +18,9 @@ module Core
                               'moveFromMs' => 480 * 60_000, 'form' => 'ambient' }
     }.freeze
 
+    # 每组题量的默认值，与 DAY-05 的数字同源；组数与题量都是自管字段，面板只读（AUTO-14）。
+    QUESTIONS_PER_GROUP_DEFAULT = 2
+
     STRENGTH_TIER_CEILING = { 'accompanied' => 'L3', 'negotiated' => 'L2', 'selfManaged' => 'L1' }.freeze
 
     module_function

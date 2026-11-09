@@ -23,22 +23,28 @@ ASK-01:
 
 ASK-02:
   spec: [spec/ASK.md#ASK-02]
-  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true, kpState: shaky, prereqState: mastered }
+  # 有效题组沿用 DAY-05 的生效组数这一处算法，不在选题器里重算。
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true, kpState: shaky, prereqState: mastered,
+           moveFromMs: 3600000, graceMs: 1200000, minutesPerGroup: 15, groupsPerTask: 2 }
   cases:
     - name: 状态与依赖同时决定出题强度
       when: { mode: ambient }
-      expect: { value: { candidateLevel: 3, effectiveGroups: 4 }, shown: [依赖状态] }
+      # 生效组数 = max(自设组数, ceil((moveFrom − grace) ÷ 每组预计分钟))（DAY-05），这里算出 3。
+      expect: { value: { candidateLevel: 3, effectiveGroups: 3 }, shown: [依赖状态], sameSource: core/day }
     - name: 状态 unknown 时不判弱点
       given: { kpState: unseen, prereqState: mastered }
       when: { mode: ambient }
-      expect: { value: { candidateLevel: 1, effectiveGroups: 2 }, kpState: unseen }
+      # 有效题组只由剩余额度与作答预算算，不随知识点状态变（ASK-02）；状态只改出题强度。
+      expect: { value: { candidateLevel: 1, effectiveGroups: 3 }, kpState: unseen }
 
 ASK-03:
   spec: [spec/ASK.md#ASK-03]
   given: { profile: "member:kid", watchedMs: 2400000, inSlot: true }
   cases:
     - name: 默认出题走固定模板
-      given: { mode: ambient, kpState: shaky, prereqState: mastered }
+      # 题面的这些数字来自内容包里的模板，模型不自己编题面（PACK-08）。
+      given: { mode: ambient, kpState: shaky, prereqState: mastered,
+               stemChars: 78, optionsLines: 3, singleKey: true, estimatedSeconds: 60 }
       when: { mode: ambient }
       expect: { value: { dynamicGeneration: 0, stemIdentical: true, optionsLines: 3, singleKey: true, estimatedSeconds: 60 }, shown: [选题理由] }
 
@@ -48,14 +54,27 @@ ASK-04:
   cases:
     - name: 答错只入掌握账与补一补池
       when: { answers: [wrong], confirmation: correct }
-      expect: { events: [ANSWER], kpState: weak, delta: { backlogSize: 1 }, stars: credited, absent: [扣分机制] }
+      # 答错先出一道 basic 确认题；确认题答对落到 shaky（ASK-03 的迁移表，不是 weak）。
+      # 答错也不扣星：这一轮入账 0 颗，星数不会往下走（AUTO-13）。
+      expect: { events: [ANSWER], kpState: shaky, delta: { backlogSize: 1 }, stars: credited,
+                value: { stars: 0 }, absent: [扣分机制] }
     - name: 答对按掌握度入账
       when: { answers: [correct], confirmation: correct }
-      expect: { events: [ANSWER], kpState: mastered, delta: { backlogSize: 0 } }
+      # 一道答对不直接进 mastered：同点连对 3 题才算掌握（ASK-03），这里还在巩固。
+      expect: { events: [ANSWER], kpState: shaky, delta: { backlogSize: 0 }, stars: credited,
+                value: { stars: 1 } }
     - name: 错两次优先重问一次
       given: { kpState: weak, wrongAnswers: 2 }
       when: { mode: ambient }
       expect: { value: { priorityReask: 1 }, kpState: weak }
+    - name: 确认题也答错才落到 weak
+      when: { answers: [wrong], confirmation: wrong }
+      expect: { events: [ANSWER], kpState: weak, delta: { backlogSize: 1 } }
+    - name: 池满 20 道时最旧的题出池
+      given: { backlogSize: 20 }
+      when: { answers: [wrong], confirmation: correct }
+      # 池容量 20 道，达到容量后最旧的一条出池，池的条数不再涨（ASK-04）。
+      expect: { value: { poolSize: 20, evicted: oldest }, delta: { backlogSize: 0 } }
 
 ASK-05:
   spec: [spec/ASK.md#ASK-05]
@@ -125,12 +144,14 @@ ASK-08:
 
 ASK-09:
   spec: [spec/ASK.md#ASK-09]
-  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true, mode: ambient, kpState: shaky, prereqState: mastered }
+  # 题面的形状数字是包内模板声明的，对所有身份同一份（ASK-09、PACK-08）。
+  given: { profile: "member:kid", watchedMs: 2400000, inSlot: true, mode: ambient, kpState: shaky,
+           prereqState: mastered, stemChars: 78, optionsLines: 3, singleKey: true, estimatedSeconds: 60 }
   cases:
-    - name: 题干不超过 80 字
+    - name: 题干按包内模板给，不实时改写
       when: { mode: ambient }
-      expect: { value: { stemChars: 78 }, shown: [选题理由] }
-    - name: 选项不超过三行且唯一键
+      expect: { value: { stemChars: 78, stemIdentical: true }, shown: [选题理由] }
+    - name: 选项行数与预估用时按包内声明
       when: { mode: ambient }
       expect: { value: { optionsLines: 3, singleKey: true, estimatedSeconds: 60 } }
 
@@ -152,7 +173,8 @@ ASK-10:
     - name: 传感器误判不扣分
       given: { kpState: shaky, wrongAnswers: 1, signalSource: sensor }
       when: { exerciseVerdict: rejected }
-      expect: { kpState: shaky, unchanged: [stars, backlogSize] }
+      # 传感器误判既不动状态也不扣星：星还是那一笔一笔答对攒出来的（ASK-10、AUTO-13）。
+      expect: { kpState: shaky, unchanged: [stars, backlogSize], value: { stars: 0 } }
 
 PACK-01:
   spec: [spec/PACK.md#PACK-01]
@@ -181,7 +203,9 @@ PACK-03:
   given: { profile: "member:kid", inSlot: true, mode: ambient, stemChars: 78, optionsLines: 3, singleKey: true, estimatedSeconds: 60 }
   cases:
     - name: 自题走同一校验
-      given: { member: "member:mom", memberAuthoredHit: true }
+      # 自编题的题面形状与包里题走同一道 authoring 门禁，这里给的是合规形状（ASK-06）。
+      given: { member: "member:mom", memberAuthoredHit: true,
+               stemChars: 24, optionsLines: 1, singleKey: true, estimatedSeconds: 4 }
       when: { mode: ambient }
       expect: { authoring: passed, shown: [校验状态] }
     - name: 不合规题面退回
@@ -189,8 +213,10 @@ PACK-03:
       when: { mode: ambient }
       expect: { authoring: rejected, value: { fallbackApplied: true }, notShown: [成就页] }
     - name: 自题命中写事件
-      when: { memberAuthoredHit: true }
-      expect: { events: [ANSWER], value: { eventProfile: "member:mom" } }
+      given: { memberAuthoredHit: true }
+      when: { answers: [correct] }
+      # 事件记的是激活身份（D35、PROFILE-10）；题是谁作的另有来源标注，不改事件的归属。
+      expect: { events: [ANSWER], value: { eventProfile: "member:kid" } }
 
 PACK-04:
   spec: [spec/PACK.md#PACK-04]

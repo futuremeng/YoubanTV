@@ -27,6 +27,9 @@ module Core
 
   # 事件流 + 零点幂等。四量一律由事件累加得出，任何模块不得自行记账（DAY-02）。
   class Ledger
+    # 补一补池的容量：四量里的 backlogSize 封顶在这里，选题器读同一个数（ASK-04、PACK-04）。
+    BACKLOG_CAP = 20
+
     attr_reader :events
 
     def initialize(allowed_kinds:, day: 'd0')
@@ -61,6 +64,11 @@ module Core
       for_profile(profile).count { |e| e.kind == kind }
     end
 
+    # 未封顶的池条数：用来判断这一轮有没有把最旧的一条挤出池（ASK-04）。
+    def backlog_raw(profile)
+      @events.count { |e| e.kind == 'MISSED' && e.profile == profile }
+    end
+
     # 当日投影：四量 + 完成数 + 补一补。pauseMs 单列，来自已受理的 pause 动议（COMMIT-07）。
     # 补一补池跳日保留（DAY-06），故不受 day 过滤影响。
     def project(profile)
@@ -72,7 +80,8 @@ module Core
         'pauseMs' => settled.sum { |e| e.field('kind') == 'pause' ? e.field('pauseMs').to_i : 0 },
         'roundsDone' => count(profile, 'ROUND_DONE'),
         'answeredInTask' => count(profile, 'ANSWER'),
-        'backlogSize' => @events.select { |e| e.kind == 'MISSED' && e.profile == profile }.size
+        # 补一补池容量 20 道，达到容量后最旧的出池，所以这一量封顶在 20（ASK-04）。
+        'backlogSize' => [backlog_raw(profile), BACKLOG_CAP].min
       }
     end
 

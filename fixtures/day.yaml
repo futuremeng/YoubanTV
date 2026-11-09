@@ -91,11 +91,13 @@ DAY-04b:
 
 DAY-05:
   spec: [spec/DAY.md#DAY-05, spec/AUTONOMY.md#AUTO-14]
-  given: { profile: "member:kid", moveFromMs: 3600000, graceMs: 1200000, minutesPerGroup: 15, groupsPerTask: 2 }
+  given: { profile: "member:kid", moveFromMs: 3600000, graceMs: 1200000, minutesPerGroup: 15,
+           groupsPerTask: 2, questionsPerGroup: 2 }
   cases:
     - name: 生效组数取两者的较大值
       when: { mode: ambient }
-      expect: { value: { effectiveGroups: 4, maxQuestions: 8 } }
+      # 40 分钟 ÷ 每组预计 15 分钟向上取整是 3，比自设的 2 大；题量 = 3 组 × 每组 2 题。
+      expect: { value: { effectiveGroups: 3, maxQuestions: 6 } }
     - name: 生效组数只是当日进度上限
       when: { mode: ambient }
       expect: { absent: [grantMinutes], value: { poolSame: false }, shown: [进度] }

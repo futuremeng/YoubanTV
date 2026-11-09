@@ -48,6 +48,13 @@ module Core
       true
     end
 
+    # 计次的说法只描述即时身体效果，不给健康结论；有实测误计率时才按区间描述（SENSE-03）。
+    def display_tokens(signal_source:, false_count_rate: nil)
+      return [] unless signal_source.to_s == 'sensor'
+
+      ['即时身体效果的说法'] + (false_count_rate.is_a?(Numeric) ? ['计次误差区间'] : [])
+    end
+
     def self_test_ok?(selfTest)
       selfTest['attempts'].to_i >= SELF_TEST_ATTEMPTS &&
         selfTest['falseCountRate'].to_f <= FALSE_COUNT_MAX

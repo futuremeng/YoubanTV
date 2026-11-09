@@ -145,7 +145,8 @@ PROFILE-08:
     - name: LLM 题按出网开关，不按身份设卡
       given: { llmHit: true }
       when: { mode: ambient }
-      expect: { source: llm, egress: { aiQuestions: "off" }, allowed: false }
+      # 开关关着等于这一层落空，取材落到大纲随机（ASK-01 的回落），不是按身份加一道卡。
+      expect: { source: outlineRandom, egress: { aiQuestions: "off" }, value: { approvalRequired: false } }
     - name: 任何成员都可担任角色
       when: { roleChange: { role: keyHolder, action: grant, to: "member:kid" } }
       expect: { roles: { keyHolder: "member:kid" }, events: [ROLE_CHANGE] }
