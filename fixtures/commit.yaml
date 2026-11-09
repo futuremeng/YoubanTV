@@ -7,10 +7,10 @@ COMMIT-01:
       given: { profile: "member:kid", graceMs: 1800000, watchedMs: 1200000 }
       when: { inSlot: true }
       expect: { status: honored, due: null, value: { remainingMs: 600000 }, shown: [角标剩余], surface: [self], tier: L1 }
-    - name: 免题段边界即时转到期
+    - name: 免题段边界即时转到期（形态取当天默认档）
       given: { profile: "member:kid", graceMs: 1800000, watchedMs: 1800000 }
       when: { inSlot: true }
-      expect: { status: due, due: { kind: quiz, mode: ambient, deficit: questions, window: present } }
+      expect: { status: due, due: { kind: quiz, mode: focused, deficit: questions, window: present }, tier: L2 }
 
 COMMIT-02:
   spec: [spec/COMMIT.md#COMMIT-02, spec/LAYER.md#LAYER-07]
@@ -34,7 +34,7 @@ COMMIT-02:
 
 COMMIT-03:
   spec: [spec/COMMIT.md#COMMIT-03]
-  given: { profile: "member:kid", moveFromMs: 3600000, watchedMs: 3700000 }
+  given: { profile: "member:kid", allowanceMs: 3600000, moveFromMs: 2400000, watchedMs: 3000000 }
   cases:
     - name: 运动约定到期，ambient 由传感器端计次
       when: { mode: ambient, signalSource: sensor }
@@ -63,11 +63,12 @@ COMMIT-04:
         value: { overMs: 120000 }
         absent: [LockTask, fullScreenIntent]
         blocked: false
-    - name: 恰好等于约定线不算超时
+    - name: 恰好等于约定线即 overdue（边界归 COMMIT-04 的 ≥），零量不写 OVER
       given: { watchedMs: 3600000 }
       when: { stillWatching: true }
-      expect: { status: due, tier: L1.5 }
+      expect: { status: overdue, tier: L1.5, noEvents: [OVER], value: { overMs: 0 } }
     - name: 超时后加时动议受理，约定线后移
+      given: { watchedMs: 3720000 }
       when: { motion: { kind: extend, target: "member:kid", minutes: 15, accepted: true } }
       expect:
         status: due

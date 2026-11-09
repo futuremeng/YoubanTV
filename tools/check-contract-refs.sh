@@ -17,7 +17,7 @@ trap 'rm -f "$defined"' EXIT
   perl -ne 'print "$1\n" while /^\|\s*([A-Z]{3,7}-\d{2}[a-z]?)\s*\|/g' "$root"/spec/*.md; } | sort -u >"$defined"
 
 # 1. 契约与夹具引用的每个 id 都要有定义
-for f in "$root/contract/contract.json" "$root"/fixtures/*.yaml; do
+for f in "$root/contract/contract.json" "$root"/fixtures/*.yaml "$root"/model/*.rb "$root"/tools/*.rb; do
   [ -f "$f" ] || { say "缺少契约或夹具文件：$f"; continue; }
   for id in $(perl -ne 'print "$1\n" while /\b([A-Z]{3,7}-\d{2}[a-z]?)\b/g' "$f" | sort -u); do
     case "$id" in

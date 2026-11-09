@@ -76,6 +76,8 @@
 | [`fixtures/`](fixtures/) | 决策表与行为夹具：`COMMIT` / `DAY` / `PROFILE` / `ASK` / `ONBOARD` 每条至少一条断言 |
 | [`tools/check-contract-refs.sh`](tools/check-contract-refs.sh) | 契约与夹具的引用完整性门：规格 id、锚点、禁止字段、事件枚举（数据侧） |
 | [`tools/check-fixtures.sh`](tools/check-fixtures.sh) | 夹具词汇与结构门：断言键必须登记、取值必须落在契约枚举（数据侧） |
+| [`model/`](model/) | 决策表的可执行规范模型（账本、当日方案、约定引擎、执行面）——生产内核 Kotlin 与之逐条对齐 |
+| [`tools/run-fixtures.rb`](tools/run-fixtures.rb) | 夹具执行器：把 `given`/`when` 喂给模型再判 `expect`；不认识的键一律记「未支持」，不静默跳过 |
 | [`fixtures/FORMAT.md`](fixtures/FORMAT.md) | 夹具格式与断言词汇：一条断言只回答一个问题，词汇单一来源 [`fixtures/vocab.yaml`](fixtures/vocab.yaml) |
 
 ## 状态

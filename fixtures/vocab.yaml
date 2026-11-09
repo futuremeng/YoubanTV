@@ -171,6 +171,7 @@ fields:
   scopes: {type: list, values: [read, rules, content, grade, diagnostics, egress]}
   via: {type: symbol, values: [panel, device]}
   simulate: {type: boolean}
+  dayToken: {type: string, note: "当日 token；重启不产生新的"}
   presence: {type: enum, enum: presence}
   inviteTier: {type: enum, enum: inviteTier}
   tier: {type: enum, enum: tier}

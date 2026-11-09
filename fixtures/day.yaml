@@ -109,6 +109,14 @@ DAY-06:
     - name: 零点刷新只刷当日量
       when: { crossedMidnight: true }
       expect: { applied: true, value: { watchedMs: 0, overMs: 0, pauseMs: 0, roundsDone: 0 } }
+    - name: 同日重复调用幂等
+      given: { watchedMs: 2400000 }
+      when: { crossedMidnight: false }
+      expect: { applied: false, unchanged: [watchedMs, overMs, pauseMs, roundsDone] }
+    - name: 设备重启不得触发刷新
+      given: { watchedMs: 2400000 }
+      when: { rebooted: true }
+      expect: { applied: false, unchanged: [watchedMs], value: { dayTokenKept: true } }
     - name: 跨天跨重启的账保留
       given: { backlogSize: 3, wrongAnswers: 5, srsProgress: 2, pendingReview: 1, planVersion: 6 }
       when: { crossedMidnight: true }

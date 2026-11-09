@@ -23,6 +23,7 @@
 ### COMMIT-04 超时 = overdue，不阻断
 - 条件：`watched[p] ≥ allowance[p]` 且仍在观看
 - 输出：`status=overdue` + `OVER` 事件累加；呈现只有状态条
+- 边界取 `≥`：恰好等于约定线即 `overdue`；`overMs = 0` 时**不写** `OVER`（零量事件只是噪声）
 - 界面：L1.5 状态条「超出约定 <X> 分钟」；家庭协议页与周报里可见。措辞为状态句（`LAYER-09`）。
 
 ### COMMIT-05 达成即 honored

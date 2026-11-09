@@ -1,0 +1,96 @@
+# SPEC: COMMIT-11, DAY-01, DAY-04, DAY-04b, PROFILE-04
+# 账本：只追加的事件流 + 从事件算出的当日投影。判定不在这里（core/commit）。
+# 事件名与必填字段取自 contract/contract.json；这里不另立事件。
+require 'set'
+
+module Core
+  # 一条事件。契约要求每条都带 at / profile / device（enums.event.requiredFields）。
+  class Event
+    attr_reader :kind, :profile, :at, :device, :fields
+
+    def initialize(kind, profile:, at:, device: 'tv', **fields)
+      @kind = kind.to_s
+      @profile = profile
+      @at = at
+      @device = device
+      @fields = fields
+    end
+
+    def field(name)
+      @fields[name.to_sym] || @fields[name.to_s]
+    end
+
+    def to_h
+      { 'at' => at, 'profile' => profile, 'device' => device, 'kind' => kind }.merge(fields)
+    end
+  end
+
+  # 事件流 + 零点幂等。四量一律由事件累加得出，任何模块不得自行记账（DAY-02）。
+  class Ledger
+    attr_reader :events
+
+    def initialize(allowed_kinds:, day: 'd0')
+      @events = []
+      @allowed = Set.new(allowed_kinds.map(&:to_s))
+      @day = day
+    end
+
+    def append(kind, profile:, at:, device: 'tv', **fields)
+      kind = kind.to_s
+      raise ArgumentError, "契约里无定义的事件 #{kind}" unless @allowed.include?(kind)
+      raise ArgumentError, "profile 只能取 member:<id> 或 none（收到 #{profile}）" unless profile.to_s =~ /\A(member:.+|none)\z/
+
+      ev = Event.new(kind, profile: profile, at: at, device: device, day: @day, **fields)
+      @events << ev
+      ev
+    end
+
+    def for_profile(profile)
+      @events.select { |e| e.profile == profile && e.field('day') == @day }
+    end
+
+    def kinds(profile = nil)
+      (profile ? for_profile(profile) : @events.select { |e| e.field('day') == @day }).map(&:kind)
+    end
+
+    def sum_ms(profile, kind, field)
+      for_profile(profile).select { |e| e.kind == kind }.sum { |e| e.field(field).to_i }
+    end
+
+    def count(profile, kind)
+      for_profile(profile).count { |e| e.kind == kind }
+    end
+
+    # 当日投影：四量 + 完成数 + 补一补。pauseMs 单列，来自已受理的 pause 动议（COMMIT-07）。
+    # 补一补池跳日保留（DAY-06），故不受 day 过滤影响。
+    def project(profile)
+      scoped = for_profile(profile)
+      settled = scoped.select { |e| e.kind == 'MOTION_SETTLED' }
+      {
+        'watchedMs' => sum_ms(profile, 'WATCHED', 'ms'),
+        'overMs' => sum_ms(profile, 'OVER', 'ms'),
+        'pauseMs' => settled.sum { |e| e.field('kind') == 'pause' ? e.field('pauseMs').to_i : 0 },
+        'roundsDone' => count(profile, 'ROUND_DONE'),
+        'answeredInTask' => count(profile, 'ANSWER'),
+        'backlogSize' => @events.select { |e| e.kind == 'MISSED' && e.profile == profile }.size
+      }
+    end
+
+    # 零点刷新按 dayToken 幂等：同一 token 只滚一次；重启不产生新 token（DAY-06、DAY-07）。
+    # 刷的是「当日投影」，历史事件保留（DAY-06 的保留清单）。
+    def roll!(day_token)
+      return false if @day == day_token
+
+      @day = day_token
+      true
+    end
+
+    def day_token
+      @day
+    end
+
+    def day_rolled?(day_token)
+      @day == day_token
+    end
+  end
+end
