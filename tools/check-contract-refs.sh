@@ -13,13 +13,13 @@ say() { printf 'FAIL %s\n' "$1"; fail=1; }
 
 defined=$(mktemp)
 trap 'rm -f "$defined"' EXIT
-{ perl -ne 'print "$1\n" while /^### ([A-Z]{3,6}-\d{2}[a-z]?)/g' "$root"/spec/*.md;
-  perl -ne 'print "$1\n" while /^\|\s*([A-Z]{3,6}-\d{2}[a-z]?)\s*\|/g' "$root"/spec/*.md; } | sort -u >"$defined"
+{ perl -ne 'print "$1\n" while /^### ([A-Z]{3,7}-\d{2}[a-z]?)/g' "$root"/spec/*.md;
+  perl -ne 'print "$1\n" while /^\|\s*([A-Z]{3,7}-\d{2}[a-z]?)\s*\|/g' "$root"/spec/*.md; } | sort -u >"$defined"
 
 # 1. 契约与夹具引用的每个 id 都要有定义
 for f in "$root/contract/contract.json" "$root"/fixtures/*.yaml; do
   [ -f "$f" ] || { say "缺少契约或夹具文件：$f"; continue; }
-  for id in $(perl -ne 'print "$1\n" while /\b([A-Z]{3,6}-\d{2}[a-z]?)\b/g' "$f" | sort -u); do
+  for id in $(perl -ne 'print "$1\n" while /\b([A-Z]{3,7}-\d{2}[a-z]?)\b/g' "$f" | sort -u); do
     case "$id" in
       D[0-9]*|F[0-9]*) continue ;;
     esac
@@ -30,7 +30,7 @@ done
 # 2. fixtures 的顶层键必须是已定义条目
 for f in "$root"/fixtures/*.yaml; do
   [ -f "$f" ] || continue
-  for id in $(perl -ne 'print "$1\n" while /^([A-Z]{3,6}-\d{2}[a-z]?):/g' "$f"); do
+  for id in $(perl -ne 'print "$1\n" while /^([A-Z]{3,7}-\d{2}[a-z]?):/g' "$f"); do
     grep -qx "$id" "$defined" || say "$f 的顶层键 $id 没有定义"
   done
 done

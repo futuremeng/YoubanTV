@@ -33,6 +33,8 @@
 - 对别人状态的改变一律是**动议**：提一条，对方在自己的界面里一次受理才生效；没受理就不生效（D34、`AUTO-16`）。
 - 一台设备**一次只有一个人**用：电视端靠模式切换区分人，手机端各用各的（D35、`PROFILE-10`）。所以上一条
   天然是异步的——对方下次打开自己的界面时再受理；角色的交接也是本机里的这样两次确认。
+- 一台设备**一份待确认清单**：电视与手机各有固定项，新成员、新设备、角色交接、重启后自动多出几条；
+  没确认只把该项能力降到保守档，不阻断也不打分（[`docs/ONBOARDING.md`](docs/ONBOARDING.md)、`ONBOARD-05/06`）。
 
 题库、时长账本、答题记录都存在被控设备本机；联网只发生在监护人凭据（`keyHolder`）显式开启的四条路上
 （[`docs/PRIVACY.md`](docs/PRIVACY.md)）。
@@ -71,7 +73,7 @@
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | 实现切片 M1–M8：交付项、验收与依赖顺序 |
 | [`spec/`](spec/README.md) | 行为规格条目（代码里的 `SPEC:` 标签指向这里） |
 | [`contract/contract.json`](contract/contract.json) | 契约单一来源：主体与角色、scopes、端点、枚举、禁止字段与退役取值 |
-| [`fixtures/`](fixtures/) | 决策表与行为夹具：`COMMIT` / `DAY` / `PROFILE` / `ASK` 每条至少一条断言 |
+| [`fixtures/`](fixtures/) | 决策表与行为夹具：`COMMIT` / `DAY` / `PROFILE` / `ASK` / `ONBOARD` 每条至少一条断言 |
 | [`tools/check-contract-refs.sh`](tools/check-contract-refs.sh) | 契约与夹具的引用完整性门（数据侧） |
 
 ## 状态

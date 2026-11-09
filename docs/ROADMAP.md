@@ -9,7 +9,7 @@
 | # | 交付 | 验收 |
 |---|---|---|
 | 1.1 | `contract/contract.json` v1（**已入库**）：端点、schema、枚举、`principal: member:<id>` + `roles: [ruleEditor, keyHolder]`（D33）、`protocolVersion`；`Profile` 与 `audience` 字段；自管字段四项的**本人写入口**（`AUTO-14`）；动议端点 `POST /api/motions`（D34，含 `roleChange` / `coWatch`）；scopes 清单 `read/rules/content/grade/diagnostics/egress`（`control` 退役）；`forbiddenFields` 与 `retired` 段 | 面板与设备端由它生成；`make contract` 一条命令（**待生成器**）；schema 字段集与 `PROFILE-01` 一致；非本人的 scope 对自管字段只读；`roles` 不由 `audience` 推导（CI）；写入口的 `profile` 只能取当前激活身份或 `none`（CI，`PROFILE-10`）；`tools/check-contract-refs.sh` 已跑绿 |
-| 1.2 | 决策表夹具 `fixtures/{commit,day,profile,ask}.yaml`（**已入库**：`COMMIT` 11 / `DAY` 10 / `PROFILE` 10 / `ASK` 10 条目各 ≥1 条断言）：每条写成「输入（含身份与协商强度）→ 期望结论（`status` / `ruleId` / `deficit` / `mode` / 层）」 | 每条分支 ≥1 条；`COMMIT-01`、`COMMIT-07` 与 `COMMIT-11` 各含对应断言（冻结时长与 `pauseMs` 单列 / 恢复续算 / `profile=none` 不判定）；每条 `due` 断言同时给出**形态层与落层**（`ARCHITECTURE.md §9`）；**待夹具执行器**（`tools/`）
+| 1.2 | 决策表夹具 `fixtures/{commit,day,profile,ask,onboard}.yaml`（**已入库**：`COMMIT` 11 / `DAY` 10 / `PROFILE` 10 / `ASK` 10 / `ONBOARD` 10 条目各 ≥1 条断言）：每条写成「输入（含身份与协商强度）→ 期望结论（`status` / `ruleId` / `deficit` / `mode` / 层）」 | 每条分支 ≥1 条；`COMMIT-01`、`COMMIT-07` 与 `COMMIT-11` 各含对应断言（冻结时长与 `pauseMs` 单列 / 恢复续算 / `profile=none` 不判定）；每条 `due` 断言同时给出**形态层与落层**（`ARCHITECTURE.md §9`）；**待夹具执行器**（`tools/`）
 | 1.3 | `spec/ASK.md`、`spec/PACK.md`（含 `audience`、`presentationHints`） | 选题管线与内容包格式可照此实现 |
 | 1.4 | 内核输出结构定稿：`CommitState` + `tierFor(due)`（与 `LAYER-07` 的强度默认档合成落层） | 契约、`ARCHITECTURE.md §9`、`LAYERING.md §3`、夹具四处一致 |
 
@@ -26,12 +26,12 @@
 ## M3 · 设备端最小闭环
 
 `capability`（当前层 + 探针）、`enforcement` 的 **L1 + L1.5 + L2 + L3**（接口 `present(due, tier)`）、
-`store`（`profiles` + 带 `profile` 的事件）、`net`（主体 `member:<id>` + `roles`）、**身份选择器**、
+`store`（`profiles` + 带 `profile` 的事件）、`net`（主体 `member:<id>` + `roles`）、**身份选择器**、**清单页**（`onboard` 派生 + 首启引导前五项）、
 题目浮层（`focused` 请求暂停 / `ambient` 角标）、状态条、引导页。
 
 - 验收：一台电视盒子 + 一台手机跑通「选身份 → 免题段 → 约定到期出题（两种形式都能跑，暂停未响应自动转
   `ambient`）→ 计时 → 超时（记 `OVER` + 状态条）→ `pause` 动议受理后暂停（提示 + `pauseMs` 记账）→ 恢复 →
-  切换身份互不结转 → 未选身份不判定（`COMMIT-11`）→ 零点刷新按身份各算」；
+  切换身份互不结转 → 未选身份不判定（`COMMIT-11`）→ 零点刷新按身份各算 → 清单页能把未完成项逐条降级到位」；
   重启一次、改表一次、拔网一次；包体 ≤5MB；升级演练保留数据。
 - 生命周期与清理：`onStop` + 前台服务 + 开机重探。设备控制面在设备端只有媒体控制与悬浮窗两项。
 - L4 的取值在枚举里为空位；需要物理停止观看时由 L5 承担，配置入口在面板「设备」页。
@@ -41,7 +41,7 @@
 契约生成的客户端；规则三层 + 家庭协议（自管字段四项只显示与回看，无写入口，`AUTO-14`）；**计划模拟器**（`GET /api/simulate` 调内核同一份代码）；
 能力与层级视图（当前层 + 升降层历史）；**动议的历史与只读视图**（受理只发生在被请求方自己的界面，
 `AUTO-03`、`PROFILE-10`）；题库与内容包；自评结果的**查阅与修订**（`AUTO-15`）；
-成长记录；诊断；关于。角色与轮值的交接入口不在面板上（`AUTO-09`）。
+成长记录；诊断（含每台设备的**待确认清单**与完成度，`ONBOARDING.md §5`）；关于。角色与轮值的交接入口不在面板上（`AUTO-09`）。
 
 ## M5 · 内容包
 
@@ -79,7 +79,8 @@ Home Assistant 与只读令牌；L5 执行器（CEC / 智能插座 / 路由时�
 
 ## M7 · 装机与（未来的）发布
 
-现阶段是**私域装机**：内部 tag、家庭内安装、自家两台设备的真机验收、`NOTICE` 与
+现阶段是**私域装机**：内部 tag、家庭内安装、自家两台设备的真机验收（逐台把清单页的固定项跑完并回填
+`facts/DEVICES.md`）、`NOTICE` 与
 `THIRD_PARTY_NOTICES` 复核、从旧 fork 的导入向导（D3）。
 
 公开发布是独立切片，触发条件与前置事项见 `DECISIONS.md` 的 D30 与「转为公开前要补齐的事」
@@ -102,6 +103,6 @@ Home Assistant 与只读令牌；L5 执行器（CEC / 智能插座 / 路由时�
 在 M7 收口前交付。
 
 - D3 / D4 / D5 / D7 / D8 / D9 / D10 / D11 只阻塞对应里程碑。
-- D15 / D16 / D17 / D23 / D24 / D25 / D31 / D32 / D33 / D34 / D35 / D36 / D37 / D38 / D39 已定，直接落进 M1–M5.5；D26 / D27 / D28 落进 M8 与 M6。
+- D15 / D16 / D17 / D23 / D24 / D25 / D31 / D32 / D33 / D34 / D35 / D36 / D37 / D38 / D39 / D40 已定，直接落进 M1–M5.5；D26 / D27 / D28 落进 M8 与 M6。
 - F12 与 F13 **不再阻塞默认值**（D36）：`focused` 按探测响应率≥95% 逐机型抬档，探不到即 `ambient`；
   摄像头通道按首次标定的误计率门槛开启，未达标就停在加速度计节律 + 手动确认。两项探针在 M6 内交付。

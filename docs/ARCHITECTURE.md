@@ -11,7 +11,7 @@
 YoubanTV/
 ├── spec/                     # 行为规格，一条一个 id；代码里的 `SPEC:` 标签指向这里
 ├── contract/                 # 契约单一来源：端点 + schema + 枚举 + protocolVersion（已入库：contract.json v1）
-├── fixtures/                 # 决策表与行为夹具（已入库：commit.yaml、profile.yaml）
+├── fixtures/                 # 决策表与行为夹具（已入库：commit、day、profile、ask、onboard）
 ├── core/                     # 纯 Kotlin JVM，零 android 依赖
 ├── device/                   # Android 应用（同一套代码，tv / mobile 两种装配）
 │   └── src/main/java/com/youban/device/{enforcement,capability,ui,store,net,pack,grade,sense,presence,log}/
@@ -43,6 +43,7 @@ ask/       选题管线、知识点状态机、难度阶梯、取材顺序、去
 srs/       SM-2 简化式
 profile/   身份 = 内容绑定 + 默认值 + 呈现令牌（PROFILE-01）
 plan/      家庭协议与动议（MOTION / MOTION_SETTLED / MOTION_UNANSWERED / PLAN_SIGNED / PLAN_CHANGE / PROFILE_SWITCH / ROLE_CHANGE）
+onboard/   设备待确认清单的派生：从事件 + 能力登记表 + roles 现值算出条目与状态，自身不落账
 content/   qpack 解析、许可清单校验、题源标记
 verify/    求值：白名单语法 + 求值超时 + 回落文本比对
 grade/     自评与查阅修订：本人对照评分标准自评 → 星与掌握进度先入账 →（可选）AI 批 → 修订重算；按 opId 幂等
@@ -59,7 +60,7 @@ grade/     自评与查阅修订：本人对照评分标准自评 → 星与掌�
 |---|---|---|
 | `capability/` | 能力登记表：当前层、状态、证据、探测时间、TTL、升层与回退方法 | 探针在后台线程；取不到报 `unknown`；文案只读它 |
 | `enforcement/` | 呈现执行器：`Observer` / `Nudge` / `StatusBar` / `InAppAsk` / `OverlayAsk` / `External` | 统一接口 `present(due, tier) -> shown`；接口面只有呈现（`COMMIT-10`）；对他人状态的变更只能经已受理的动议（`AUTO-16`）；层可回退且保留数据；L5 开关留审计事件 |
-| `ui/` | 身份选择器、学习页、题目浮层、状态条、引导页、规则编辑验证、更新页 | 文案按层取（`LAYERING.md §4`）；当前身份常驻可见；「大字」是令牌切换；规则编辑验证只守约定字段的写入，不挡自管字段、查阅修订、计次与安装（`AUTO-14`、`AUTO-15`） |
+| `ui/` | 身份选择器、学习页、题目浮层、状态条、引导页、清单页、规则编辑验证、更新页 | 文案按层取（`LAYERING.md §4`）；当前身份常驻可见；「大字」是令牌切换；规则编辑验证只守约定字段的写入，不挡自管字段、查阅修订、计次与安装（`AUTO-14`、`AUTO-15`） |
 | `store/` | SQLite：`profiles` + `ledger_events`（含 `profile` 列）+ 按身份投影表 + `questions` + `outline_*` + `reviews` + `requests` + `kv` + `schema_meta` | WAL；建表语句单一来源、列名由 Row 的 `cells()` 提供；schema 变更走老库升级演练（F8） |
 | `net/` | 极简 HTTP/1.1 + 由契约生成的路由 + 配对与 scopes + 限流 | 主体 `member:<id>` + `roles`（`AUTO-10`）；`/api/me`、`/api/myPlan`、`/api/me/purge`、`/api/motions` 对所有成员同一语义 |
 | `pack/` | 内容包安装 / 卸载 / 统计、后台分批导入 | 逐行分批、每批一事务、重启不重导 |

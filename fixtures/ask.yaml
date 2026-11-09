@@ -94,7 +94,7 @@ ASK-07:
   spec: [spec/ASK.md#ASK-07, spec/AUTONOMY.md#AUTO-14]
   cases:
     - name: 选题管线不为时机提前或压后
-      when: { dueAt: 20:00 }
+      when: { dueAt: "20:00" }
       expect: { questionPickedAt: dueAt, shownEvent: due_shown, reorderedForTiming: false }
     - name: 每次任务题目数上限由本人调（默认 8）
       given: { selfSetCap: 5 }

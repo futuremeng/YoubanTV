@@ -77,6 +77,13 @@
     },
     {
       "method": "GET",
+      "path": "/api/checklist",
+      "auth": "read",
+      "x-note": "设备待确认清单：从事件 + 能力登记表 + roles 现值派生，自身不落账；设备端与面板同一份。",
+      "spec": ["ONBOARD-01", "ONBOARD-04"]
+    },
+    {
+      "method": "GET",
       "path": "/api/simulate",
       "auth": "read",
       "x-note": "计划模拟器，调用内核同一份决策代码（M4）。",
@@ -171,6 +178,21 @@
       "uiWords": { "accompanied": "陪伴式", "negotiated": "协商式", "selfManaged": "自管式" },
       "defaultTierOnDue": { "accompanied": "L3", "negotiated": "L2", "selfManaged": "L1" },
       "spec": ["AUTO-07", "LAYER-07"]
+    },
+    "checklistStatus": {
+      "values": ["pending", "done", "unknown", "notApplicable"],
+      "spec": ["ONBOARD-01", "ONBOARD-06"]
+    },
+    "checklistCategory": {
+      "values": ["auth", "probe", "agree", "egress", "role", "pack", "time", "device"],
+      "idForm": "<assembly>.<category>.<item>",
+      "assembly": ["tv", "mobile"],
+      "spec": ["ONBOARD-02", "ONBOARD-03"]
+    },
+    "checklistOwner": {
+      "forms": ["member:<id>", "role:ruleEditor", "role:keyHolder", "system"],
+      "x-note": "system 条目由后台探针自动完成，没有人需要勾选；成员与角色条目的受理只在对方自己的界面。",
+      "spec": ["ONBOARD-04"]
     },
     "presence": { "values": ["alone", "co-present", "co-watch"], "spec": ["SENSE-07", "COMMITMENTS-§4b"] }
   },
