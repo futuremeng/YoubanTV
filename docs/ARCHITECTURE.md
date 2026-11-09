@@ -10,7 +10,8 @@
 ```
 YoubanTV/
 ├── spec/                     # 行为规格，一条一个 id；代码里的 `SPEC:` 标签指向这里
-├── contract/                 # 契约单一来源：端点 + schema + 枚举 + protocolVersion
+├── contract/                 # 契约单一来源：端点 + schema + 枚举 + protocolVersion（已入库：contract.json v1）
+├── fixtures/                 # 决策表与行为夹具（已入库：commit.yaml、profile.yaml）
 ├── core/                     # 纯 Kotlin JVM，零 android 依赖
 ├── device/                   # Android 应用（同一套代码，tv / mobile 两种装配）
 │   └── src/main/java/com/youban/device/{enforcement,capability,ui,store,net,pack,grade,sense,presence,log}/
@@ -19,13 +20,15 @@ YoubanTV/
 ├── packs/starter-cc0/        # 自创种子题库源，产出 .qpack，不打进 APK
 ├── tools/                    # 契约生成器、qpack 打包器、决策表夹具执行器、发版与可复现校验、adb 冒烟
 ├── docs/                     # 用户与运维文档 + 实机事实
-└── Makefile                  # make check = 契约 + 决策表 + 棘轮 + 字号 + 包校验 + 血统扫描
+└── Makefile                  # make check = 契约（含 `tools/check-contract-refs.sh`）+ 决策表 + 棘轮 + 字号 + 包校验 + 血统扫描
 ```
 
 每个源文件头部一行 `// SPEC: COMMIT-04`。CI 已实现的静态检查五项：上游标识只出现在
 `PROVENANCE.md` / `NOTICE` / `NAMING.md §3` 登记的位置；`SPEC:` 引用的条目存在；新增出网地址先登记；
 内核不含执行手段与包名；跨身份写入路径不存在（写入口的 `profile` 只能取当前激活身份或 `none`，
-`PROFILE-10`）。**还差一道未实现**：契约级条目至少被一处实现与一处测试引用（M1 落地）。
+`PROFILE-10`；契约与夹具的引用完整性由 `tools/check-contract-refs.sh` 守（数据侧已实现：契约与夹具
+里引用的每个条目都必须存在，契约不得出现禁止字段与退役取值，事件枚举与 `PRODUCT.md §3` 一致）。
+**还差一道未实现**：契约级条目至少被一处实现与一处测试引用（需代码，M1 落地）。
 
 ## 2. 内核（core）
 
@@ -106,7 +109,8 @@ grade/     自评与查阅修订：本人对照评分标准自评 → 星与掌�
   自管字段四项经 `PUT /api/myPlan` 由本人写入（`AUTO-14`），`rules` scope 对它们只读。
   事件带 `device` 字段，用于同一身份跨设备的计时合并。
 - 配对密钥绑定**设备 / 面板凭据**（只授予访问），不随角色轮值转移；出网开关绑定 `keyHolder` 角色（`AUTO-10`）。
-  密钥 → 短时令牌（scope + TTL）；改密码或重启令全部令牌失效，配对后密码只用于签发。
+  密钥 → 短时令牌（scope + TTL）；长令牌**绑定设备 / 面板凭据**，角色从 `roles` 读而不从令牌推导；
+  变更出网开关需当场再认证（D38）。改密码或重启令全部令牌失效，配对后密码只用于签发。
 - 免验证端点只有 `/api/hello`，字段：型号、协议版本、是否已配对、能力摘要。
 - 共在面端点：`/api/cowatch`（安排与邀请）、`/api/messages`（家人原话，文本 + 时间戳，来源标注到人）。
   跨城信令由家庭自架的可选端点转发密文与时间戳，本项目不提供托管服务。

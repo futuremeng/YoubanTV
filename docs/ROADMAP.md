@@ -8,8 +8,8 @@
 
 | # | 交付 | 验收 |
 |---|---|---|
-| 1.1 | `contract/contract.json` v1：端点、schema、枚举、`principal: member:<id>` + `roles: [ruleEditor, keyHolder]`（D33）、`protocolVersion`；`Profile` 与 `audience` 字段；自管字段四项的**本人写入口**（`AUTO-14`）；动议端点 `POST /api/motions`（D34）；scopes 清单`read/rules/content/grade/diagnostics/egress`（`control` 退役） | 面板与设备端由它生成；`make contract` 一条命令；schema 字段集与 `PROFILE-01` 一致；非本人的 scope 对自管字段只读；`roles` 不由 `audience` 推导（CI）；写入口的 `profile` 只能取当前激活身份或 `none`（CI，`PROFILE-10`） |
-| 1.2 | 决策表夹具 `fixtures/{commit,day,profile,ask}.yaml`：把 `spec/COMMIT.md`、`DAY.md`、`PROFILE.md`、`ASK.md` 的每条分支写成「输入（含身份与协商强度）→ 期望结论（`status` / `ruleId` / `deficit` / `mode` / 层）」 | 每条分支 ≥1 条；`COMMIT-01`、`COMMIT-07` 与 `COMMIT-11` 各含对应断言（冻结时长与 `pauseMs` 单列 / 恢复续算 / `profile=none` 不判定）；每条 `due` 断言同时给出**形态层与落层**（`ARCHITECTURE.md §9`） |
+| 1.1 | `contract/contract.json` v1（**已入库**）：端点、schema、枚举、`principal: member:<id>` + `roles: [ruleEditor, keyHolder]`（D33）、`protocolVersion`；`Profile` 与 `audience` 字段；自管字段四项的**本人写入口**（`AUTO-14`）；动议端点 `POST /api/motions`（D34，含 `roleChange` / `coWatch`）；scopes 清单 `read/rules/content/grade/diagnostics/egress`（`control` 退役）；`forbiddenFields` 与 `retired` 段 | 面板与设备端由它生成；`make contract` 一条命令（**待生成器**）；schema 字段集与 `PROFILE-01` 一致；非本人的 scope 对自管字段只读；`roles` 不由 `audience` 推导（CI）；写入口的 `profile` 只能取当前激活身份或 `none`（CI，`PROFILE-10`）；`tools/check-contract-refs.sh` 已跑绿 |
+| 1.2 | 决策表夹具 `fixtures/{commit,day,profile,ask}.yaml`（**已入库**：`COMMIT` 11 / `DAY` 10 / `PROFILE` 10 / `ASK` 10 条目各 ≥1 条断言）：每条写成「输入（含身份与协商强度）→ 期望结论（`status` / `ruleId` / `deficit` / `mode` / 层）」 | 每条分支 ≥1 条；`COMMIT-01`、`COMMIT-07` 与 `COMMIT-11` 各含对应断言（冻结时长与 `pauseMs` 单列 / 恢复续算 / `profile=none` 不判定）；每条 `due` 断言同时给出**形态层与落层**（`ARCHITECTURE.md §9`）；**待夹具执行器**（`tools/`）
 | 1.3 | `spec/ASK.md`、`spec/PACK.md`（含 `audience`、`presentationHints`） | 选题管线与内容包格式可照此实现 |
 | 1.4 | 内核输出结构定稿：`CommitState` + `tierFor(due)`（与 `LAYER-07` 的强度默认档合成落层） | 契约、`ARCHITECTURE.md §9`、`LAYERING.md §3`、夹具四处一致 |
 
@@ -75,7 +75,7 @@ Home Assistant 与只读令牌；L5 执行器（CEC / 智能插座 / 路由时�
   摄像头通道关闭时抓包与文件扫描都无画面相关数据。
 - 依赖：M2（`commit`）与 M3（capability）；只有「作为电视端的传感器端」一项依赖 M6（`SENSE-06`），
   其余可与 M4 并行。
-- F13 未回填时，摄像头通道保持默认关，交付内容为加速度计节律 + 手动确认。
+- F13 未回填时，摄像头通道保持默认关，交付内容为加速度计节律 + 手动确认；开启只看首次标定的自检门槛（D36）。
 
 ## M7 · 装机与（未来的）发布
 
@@ -102,6 +102,6 @@ Home Assistant 与只读令牌；L5 执行器（CEC / 智能插座 / 路由时�
 在 M7 收口前交付。
 
 - D3 / D4 / D5 / D7 / D8 / D9 / D10 / D11 只阻塞对应里程碑。
-- D15 / D16 / D17 / D23 / D24 / D25 / D31 / D32 / D33 / D34 / D35 已定，直接落进 M1–M5.5；D26 / D27 / D28 落进 M8 与 M6。
-- F12（各机型暂停响应率）阻塞 `focused` 的默认值选择（影响 M3 的默认档与 `LAYER-07`）；
-  F13（手机端姿态计次误计率）阻塞摄像头通道的默认值。两者都在 M6 之前完成。
+- D15 / D16 / D17 / D23 / D24 / D25 / D31 / D32 / D33 / D34 / D35 / D36 / D37 / D38 / D39 已定，直接落进 M1–M5.5；D26 / D27 / D28 落进 M8 与 M6。
+- F12 与 F13 **不再阻塞默认值**（D36）：`focused` 按探测响应率≥95% 逐机型抬档，探不到即 `ambient`；
+  摄像头通道按首次标定的误计率门槛开启，未达标就停在加速度计节律 + 手动确认。两项探针在 M6 内交付。

@@ -1,0 +1,129 @@
+# 当日账与时间完整性夹具（M1.2 的一部分）；取值域以 contract/contract.json 为准。
+# 每条给出「输入（含身份与协商强度）→ 期望结论」；层一栏指落层后的呈现档。
+
+DAY-01:
+  spec: [spec/DAY.md#DAY-01]
+  cases:
+    - name: 超出约定线即 OVER + overdue
+      given: { profile: "member:kid", dayType: schoolday, allowanceMs: 3600000, strength: negotiated }
+      when: { watchedMs: 3900000 }
+      expect: { status: overdue, events: [OVER], overMs: 300000, tier: L1.5 }
+    - name: 未选身份只落账不判定
+      given: { profile: none }
+      when: { watchedMs: 1200000 }
+      expect: { status: honored, due: null, eventProfile: none, tier: L1.5 }
+
+DAY-02:
+  spec: [spec/DAY.md#DAY-02]
+  cases:
+    - name: 四量只在 core/day 一处算出
+      expect:
+        computedIn: [core/day]
+        readersSee: sameProjection        # 其他模块读同一投影
+        derived: [watchedMs, roundsDone, overMs, pauseMs]
+
+DAY-03:
+  spec: [spec/DAY.md#DAY-03, spec/LAYER.md#LAYER-07]
+  cases:
+    - name: 上学日默认档（探测达标）
+      given: { audience: child, dayType: schoolday, pauseProbe: { responseRate: 0.97 } }
+      expect: { allowanceMs: 3600000, graceMs: 1800000, moveFromMs: 3600000, mode: focused, tier: L2 }
+    - name: 同一份默认档在探测未达标时落 ambient
+      given: { audience: child, dayType: schoolday, pauseProbe: { responseRate: 0.8 } }
+      expect: { mode: ambient, reasonShown: true, tier: L1.5 }
+    - name: 探测未知（首启尚未跑探针）
+      given: { audience: child, pauseProbe: unknown }
+      expect: { mode: ambient, probeScheduled: true, blockingDefaults: false }
+    - name: 大人行的 grace=allowance 即默认不出题
+      given: { audience: grown-up }
+      expect: { quizIssued: false, selfManagedMayLowerGrace: true }
+
+DAY-04:
+  spec: [spec/DAY.md#DAY-04]
+  cases:
+    - name: 完成只写事件，不写任何发放事件
+      when: { taskDone: true, exerciseRounds: 2 }
+      expect:
+        events: [DONE, ROUND_DONE]
+        grantLikeEvents: absent           # forbiddenFields 在契约里无定义
+        roundsDone: 2
+    - name: 白天调大约定线即时重算
+      given: { actor: ruleEditor, strength: accompanied }
+      when: { planChange: { allowanceMs: { from: 3600000, to: 5400000 } }, accepted: true }
+      expect: { recalculatedToday: true, event: PLAN_CHANGE }
+    - name: 调小自次日生效
+      given: { actor: ruleEditor, strength: accompanied }
+      when: { planChange: { allowanceMs: { from: 5400000, to: 3600000 } }, accepted: true }
+      expect: { effectiveFrom: nextDay, event: PLAN_CHANGE }
+
+DAY-04b:
+  spec: [spec/DAY.md#DAY-04b]
+  cases:
+    - name: 切换身份不结转，各身份四量各自保持
+      when: { switch: { from: "member:kid", to: "member:mom" } }
+      expect:
+        events: [PROFILE_SWITCH]
+        kidWatchedMs: unchanged
+        momWatchedMs: unchanged
+        carriedOver: 0
+    - name: 零点刷新按身份逐行执行，宽紧同一套代码
+      expect: { rowsPerProfile: true, singleRefreshPath: true }
+
+DAY-05:
+  spec: [spec/DAY.md#DAY-05, spec/AUTONOMY.md#AUTO-14]
+  cases:
+    - name: 生效组数取本人自设与下限的较大者
+      given: { selfSetGroups: 2, moveFromMs: 5400000, graceMs: 1800000, minutesPerRound: 15 }
+      expect: { effectiveGroups: 4 }       # ceil((5400000-1800000)/900000)=4
+    - name: 组数是上限，不是时长发放
+      when: { roundsDone: 4 }
+      expect: { grantedMs: absent, progressShown: true }
+    - name: 跨零点自然归零
+      when: { crossedMidnight: true }
+      expect: { roundsDone: 0, backlogKept: true }
+
+DAY-06:
+  spec: [spec/DAY.md#DAY-06]
+  cases:
+    - name: 刷新清单与保留清单各自唯一
+      expect:
+        refreshed: [watchedMs, overMs, pauseMs, grace, groupsToday]
+        kept: [backlogPool, wrongAnswerCount, srsProgress, pendingReview, taskProgress, ledgerHistory]
+
+DAY-07:
+  spec: [spec/DAY.md#DAY-07, spec/AUTONOMY.md#AUTO-04]
+  cases:
+    - name: 墙上时间往回跳不重放当日
+      when: { wallClockDelta: -3600000 }
+      expect: { replayed: false, dayTokenKept: true }
+    - name: 往前跳无单调佐证则不滚动
+      when: { wallClockDelta: 86400000, monotonicDeltaMs: 1000 }
+      expect: { rolledToNewDay: false }
+    - name: 往前跳有单调佐证才滚动到新一天
+      when: { wallClockDelta: 86400000, monotonicDeltaMs: 86400000 }
+      expect: { rolledToNewDay: true }
+    - name: 零点前 5 分钟内的收紧顺延（D37）
+      when: { tightenAt: "23:57", signed: true }
+      expect: { effectiveAt: nextDayMidnight }
+    - name: 已受理的当日偏移不算收紧
+      when: { motion: { kind: extend, accepted: true } }
+      expect: { effectiveImmediately: true, tighteningComparison: false }
+
+DAY-08:
+  spec: [spec/DAY.md#DAY-08]
+  cases:
+    - name: 时段在约定线之前参与判定
+      given: { slots: { mode: onlyWithinSlots } }
+      when: { nowOutsideSlot: true, watchedMs: 600000 }
+      expect: { status: honored, shownInstead: nextAvailableTime }
+    - name: 仅时段内需要答题时，时段外照常计时
+      given: { slots: { mode: quizWithinSlots } }
+      when: { nowOutsideSlot: true, watchedMs: 600000 }
+      expect: { watchedRecorded: true, quizIssued: false }
+
+DAY-09:
+  spec: [spec/DAY.md#DAY-09]
+  cases:
+    - name: 模拟器与设备执行同源
+      when: { simulate: sameInputAsDevice }
+      expect: { sameCodePath: true, contractTestRequired: true, divergence: none }

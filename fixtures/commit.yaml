@@ -1,0 +1,219 @@
+# 决策表与行为夹具（M1.1 的一部分；由 tools/ 的夹具执行器在 make check 里跑）
+# 每个顶层键对应一条规格条目，`spec:` 反向指回规格原文；断言只写行为与数字，不写实现细节。
+# 取值域以 contract/contract.json 为准，出现契约外的字段即测试红。
+
+COMMIT-04:
+  spec: [spec/COMMIT.md#COMMIT-04, docs/PRODUCT.md#§3]
+  given: { profile: "member:kid", allowanceMs: 3600000, status: due }
+  cases:
+    - name: 超时只记 overdue，不阻断观看
+      when: { watchedMs: 3720000, stillWatching: true }
+      expect:
+        status: overdue
+        events: [OVER]
+        tier: L1.5
+        blockingAction: none          # 契约里无阻断手段（COMMIT-10）
+        wording: statusSentence       # LAYER-09
+    - name: 恰好等于约定线不算超时
+      when: { watchedMs: 3600000, stillWatching: true }
+      expect: { status: due, tier: L1.5 }
+    - name: 超时后加时动议受理，约定线后移
+      when: { watchedMs: 3720000, motion: { kind: extend, minutes: 15, accepted: true } }
+      expect:
+        status: due
+        dayOffsetMs: 900000
+        events: [MOTION, MOTION_SETTLED, PLAN_CHANGE]
+        grantedMinutes: absent        # 只偏移约定线，不发放时长（AUTO-13）
+
+COMMIT-11:
+  spec: [spec/COMMIT.md#COMMIT-11, spec/PROFILE.md#PROFILE-04]
+  given: { profile: none }
+  cases:
+    - name: 未选身份不判定
+      when: { session: { watchedMs: 1800000 } }
+      expect:
+        status: honored
+        due: null
+        eventProfile: none            # 仍落账，但不做判定
+        tier: L1.5
+        quizIssued: false
+        exerciseInvite: false
+        coWatchInvite: false
+    - name: 选定身份后按该身份规则起算，不结转空转段
+      when: { switchTo: "member:kid", previousNoneMs: 1800000 }
+      expect: { eventProfile: "member:kid", inheritedWatchedMs: 0 }
+
+AUTO-15:
+  spec: [spec/AUTONOMY.md#AUTO-15]
+  cases:
+    - name: 主观题自评先入账，不依赖他人参与
+      given: { activatedAs: "member:kid", aiGrading: off }
+      when: { subjectiveAnswer: submitted, selfGrade: pass }
+      expect:
+        stars: credited
+        mastery: updated
+        gradedBy: self
+        pendingReview: false
+    - name: 改判只改账目判定，不改 status 算法
+      when: { revision: { by: "member:mom", verdict: fail, reason: "步骤缺第二步" } }
+      expect:
+        events: [REVISION]
+        stars: recalculated
+        status: unchanged             # status 只按事件与约定算
+        visibleOn: [self, panel]
+    - name: 「先批完才入账」这类开关不存在
+      expect: { fieldInContract: absent, scopeGrantsNoGate: grade }
+    - name: 设备更新由激活身份触发，他人只能查阅与回退
+      when: { updateAvailable: true, actor: "member:mom" }
+      expect: { installedBy: activeMember, remoteInstall: false, rollback: audited }
+
+AUTO-16:
+  spec: [spec/AUTONOMY.md#AUTO-16, spec/AUTONOMY.md#AUTO-03]
+  cases:
+    - name: 未受理的动议不生效
+      when: { motion: { kind: pause, target: "member:dad" }, unansweredFor: 24h }
+      expect:
+        events: [MOTION, MOTION_UNANSWERED]
+        applied: false
+        visibleOn: [requester, target]
+    - name: 受理才生效，生效后只走 L1.5 状态句
+      when: { motion: { kind: pause, target: "member:dad" }, accepted: true }
+      expect: { tier: L1.5, requestsPlayerPause: false, notification: none, pauseMs: recorded }
+    - name: 单方面控制他人的 API 不存在
+      expect:
+        enforcementSurface: [present]
+        apiExists: { pauseOnOtherProfile: false }   # CI 门，与 COMMIT-10 同一道
+    - name: 婉拒后同类动议冷却 30 分钟
+      when: { decline: true, retryAfterMs: 1799999 }
+      expect: { accepted: false, reason: cooldown }
+    - name: 动议不能命令外部设备断电
+      when: { motion: { kind: slotChange, accepted: true } }
+      expect: { l5Invoked: false }                  # L5 只由已签署的时段规则触发
+
+COMMIT-01:
+  spec: [spec/COMMIT.md#COMMIT-01]
+  cases:
+    - name: 免题段内不出题，角标显示剩余
+      given: { profile: "member:kid", graceMs: 1800000 }
+      when: { watchedMs: 1200000 }
+      expect: { status: honored, due: null, quizIssued: false, tier: L1, remainingShown: 600000 }
+    - name: 免题段边界即时转 due
+      when: { watchedMs: 1800000 }
+      expect: { status: due, dueKind: quiz }
+
+COMMIT-02:
+  spec: [spec/COMMIT.md#COMMIT-02, spec/LAYER.md#LAYER-07]
+  given: { profile: "member:kid", graceMs: 1800000, moveFromMs: 3600000, strength: negotiated }
+  cases:
+    - name: 做题约定到期，ambient 走角落浮层
+      when: { watchedMs: 2400000, mode: ambient }
+      expect:
+        due: { kind: quiz, mode: ambient, deficit: questions, window: present }
+        tier: L1.5
+        ruleIdPresent: true
+        nextAction: quiz
+    - name: focused 先请求暂停，答完恢复
+      when: { watchedMs: 2400000, mode: focused, pauseResponse: ok }
+      expect: { tier: L2, playerPaused: true, resumedAfterAnswer: true }
+    - name: 暂停未响应自动转 ambient 并说明当前模式
+      when: { watchedMs: 2400000, mode: focused, pauseResponse: timeout }
+      expect: { modeShown: ambient, reasonShown: true, tier: L1.5, retried: false }
+
+COMMIT-03:
+  spec: [spec/COMMIT.md#COMMIT-03]
+  given: { profile: "member:kid", moveFromMs: 3600000 }
+  cases:
+    - name: 运动约定到期，ambient 由传感器端计次
+      when: { watchedMs: 3700000, mode: ambient, signalSource: sensor }
+      expect: { due: { kind: exercise, deficit: reps }, nextAction: exercise, tier: L1.5 }
+    - name: 手动确认走同一端点，由本人确认
+      when: { mode: focused, signalSource: manual, actor: "member:kid" }
+      expect: { endpoint: /api/exercise, roundsDoneDelta: 1, grantedMs: absent }
+    - name: 满一组只入账
+      when: { roundsDoneTarget: 3, roundsDone: 3 }
+      expect: { status: honored, events: [ROUND_DONE] }
+
+COMMIT-05:
+  spec: [spec/COMMIT.md#COMMIT-05]
+  cases:
+    - name: 约定全部满足即 honored，只入账星与掌握
+      when: { quizDone: true, exerciseDone: true }
+      expect:
+        status: honored
+        events: [DONE, ROUND_DONE]
+        stars: credited
+        mastery: updated
+        unlocked: absent
+        unspentMs: absent
+        grantMinutes: absent
+
+COMMIT-06:
+  spec: [spec/COMMIT.md#COMMIT-06, docs/COMMITMENTS.md#§3]
+  given: { strength: selfManaged }
+  cases:
+    - name: 未达成的后果只有四类
+      when: { taskDeadlinePassed: true }
+      expect:
+        events: [MISSED]
+        backlogPoolDelta: 1
+        agendaItemNextDay: true
+        statusBar: overdue
+        otherConsequences: none
+        visibleIn: ownWeeklyReport        # 自管强度下只出现在自己的周报
+    - name: 新增后果必须先写进 COMMITMENTS §3
+      expect: { docGate: required }
+
+COMMIT-07:
+  spec: [spec/COMMIT.md#COMMIT-07, spec/AUTONOMY.md#AUTO-16]
+  cases:
+    - name: 受理后冻结倒数，暂停段单列
+      given: { motion: { kind: pause, target: "member:dad" }, acceptedBy: "member:dad" }
+      when: { pausedForMs: 600000 }
+      expect: { pauseMs: 600000, watchedMs: unchanged, tier: L1.5, resumedFrom: frozenValue }
+    - name: 对自己的会话可即时暂停
+      given: { actor: "member:kid", target: self }
+      expect: { motionRequired: false, pauseMs: recorded }
+    - name: 对他人未经受理不生效
+      given: { motion: { kind: pause, target: "member:mom" }, accepted: false }
+      expect: { applied: false, event: MOTION_UNANSWERED }
+
+COMMIT-08:
+  spec: [spec/COMMIT.md#COMMIT-08, spec/AUTONOMY.md#AUTO-04]
+  cases:
+    - name: 未签署的计划不生效
+      when: { planVersion: 7, signed: false }
+      expect: { effective: false, runningVersion: 6, events: [] }
+    - name: 双方签署后生效并写事件
+      when: { planVersion: 7, by: [self, counterparty] }
+      expect: { effective: true, events: [PLAN_SIGNED], versionInEveryEvent: true }
+    - name: 规则字段变动另写 PLAN_CHANGE
+      when: { allowanceChanged: true }
+      expect: { events: [PLAN_CHANGE] }
+
+COMMIT-09:
+  spec: [spec/COMMIT.md#COMMIT-09]
+  cases:
+    - name: 每个 due 四件套齐全，缺一即红
+      expect:
+        dueFields: [ruleId, deficit, nextAction, window]
+        uiComputesVerdict: false
+        uiComposesVerdictText: false
+    - name: 每次呈现写 due_shown
+      when: { questionShown: true }
+      expect: { events: [due_shown], answerable: 这道题是什么时候问的 }
+
+COMMIT-10:
+  spec: [spec/COMMIT.md#COMMIT-10, spec/AUTONOMY.md#AUTO-16]
+  cases:
+    - name: 控制面接口只有 present()
+      expect:
+        enforcementSurface: [present]
+        forbiddenApis: [LockTask, DeviceAdmin, performGlobalAction, fullScreenIntent, FLAG_SECURE, mediaSessionHijack]
+        presentInCoreOrDevice: false
+        tierL4: reservedEmpty
+    - name: 只有 L5 能改变观看状态，且需已配对
+      when: { l5Trigger: signedSlotRule, paired: true }
+      expect: { allowed: true }
+    - name: 动议或未配对时不能启动 L5
+      when: { l5Trigger: motion, paired: false }
+      expect: { allowed: false }

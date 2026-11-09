@@ -62,7 +62,7 @@
 | [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) | 模块划分、技术选型、契约、质量门槛 |
 | [`docs/PRIVACY.md`](docs/PRIVACY.md) | 每项数据的存放与去向、出网清单、系统能力与取值范围 |
 | [`docs/NAMING.md`](docs/NAMING.md) | 定名与标识表、界面用词表、待核事项 |
-| [`docs/DECISIONS.md`](docs/DECISIONS.md) | D1–D25 决策与状态、未决技术问题 |
+| [`docs/DECISIONS.md`](docs/DECISIONS.md) | D1–D39 决策与状态、实测与探测项 |
 | [`docs/facts/DEVICES.md`](docs/facts/DEVICES.md) | 实机事实（现象 + 复核命令 + 结论） |
 | [`docs/PROVENANCE.md`](docs/PROVENANCE.md) | 血统与出处：与上游项目的关系、启发来源与致谢 |
 | [`docs/MOBILE.md`](docs/MOBILE.md) | 手机端（陪伴端）：三个能力面、共在功能、跨设备计时、范围之外 |
@@ -70,11 +70,15 @@
 | [`docs/research/MOBILE-COMPANION.md`](docs/research/MOBILE-COMPANION.md) | 手机端与陪伴端的证据整理：提示时机、促成人际接触、体感与姿态的边界 |
 | [`docs/ROADMAP.md`](docs/ROADMAP.md) | 实现切片 M1–M8：交付项、验收与依赖顺序 |
 | [`spec/`](spec/README.md) | 行为规格条目（代码里的 `SPEC:` 标签指向这里） |
+| [`contract/contract.json`](contract/contract.json) | 契约单一来源：主体与角色、scopes、端点、枚举、禁止字段与退役取值 |
+| [`fixtures/`](fixtures/) | 决策表与行为夹具：`COMMIT` / `DAY` / `PROFILE` / `ASK` 每条至少一条断言 |
+| [`tools/check-contract-refs.sh`](tools/check-contract-refs.sh) | 契约与夹具的引用完整性门（数据侧） |
 
 ## 状态
 
-重写进行中。现阶段**私域**：仓库私有，产物只装在自己家的设备上，没有公开下载、没有托管服务、
-没有第三方统计。将来是否公开是独立决策，条件见 [`docs/DECISIONS.md`](docs/DECISIONS.md) 的 D29 / D30。
+重写进行中：契约与夹具已入库（M1.1 / M1.2 的数据部分），代码尚未开始。现阶段**私域**：不分发、
+没有公开下载与托管服务、没有第三方统计。将来是否公开是独立决策，条件见
+[`docs/DECISIONS.md`](docs/DECISIONS.md) 的 D29 / D30。
 
 代码采用 Apache-2.0（见 `LICENSE`），第三方与内容许可见 `THIRD_PARTY_NOTICES.md`；许可选择与是否
 公开无关。实现切片见 [`docs/ROADMAP.md`](docs/ROADMAP.md)，当前进度是文档与规格基线。

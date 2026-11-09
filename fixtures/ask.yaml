@@ -1,0 +1,132 @@
+# 选题管线与知识点夹具（M1.2 的一部分）；知识点词表与状态迁移以 contract.json 的 knowledgeState 为准。
+
+ASK-01:
+  spec: [spec/ASK.md#ASK-01]
+  cases:
+    - name: 三层依次回落
+      given: { packHit: false, memberAuthoredHit: false, llmHit: true }
+      expect: { source: llm, badge: 未校验 }
+    - name: 三层都落空按大纲随机
+      given: { packHit: false, memberAuthoredHit: false, llmHit: false }
+      expect: { source: outlineRandom, badge: none }
+    - name: 取材范围只来自该身份的内容绑定
+      expect: { readsOtherProfilePacks: false }
+
+ASK-02:
+  spec: [spec/ASK.md#ASK-02]
+  cases:
+    - name: 越界的题不出现也不提示
+      given: { outlineScope: { subjects: [math], levels: [3] } }
+      when: { candidateLevel: 5 }
+      expect: { shown: false, hintShown: false }
+    - name: 范围切换留痕
+      when: { outlineScopeChanged: true }
+      expect: { events: [PLAN_CHANGE] }
+
+ASK-03:
+  spec: [spec/ASK.md#ASK-03, docs/PRODUCT.md#§5]
+  cases:
+    - name: 同点连对 3 题入 mastered
+      when: { answers: [correct, correct, correct], sameKnowledgePoint: true }
+      expect: { state: mastered }
+    - name: 答错后确认题对入 shaky
+      when: { answers: [wrong, confirmationCorrect] }
+      expect: { state: shaky, confirmation: basic }
+    - name: 答错后确认题错入 weak 并沿硬先修向下找
+      when: { answers: [wrong, confirmationWrong] }
+      expect: { state: weak, confirmation: basic, prereqWalk: alongHardEdges }
+    - name: 状态迁移只由答题事件触发
+      when: { midnightPassed: true, manualSet: false }
+      expect: { stateChanged: false }
+    - name: ruleEditor 改动留痕且不改算法
+      when: { revision: { by: ruleEditor } }
+      expect: { events: [PLAN_CHANGE], visibleOn: [self, panel] }
+    - name: 前置未掌握不阻塞后续题
+      given: { prereqState: weak }
+      expect: { blocked: false, dependencyShownInPanel: true }
+
+ASK-04:
+  spec: [spec/ASK.md#ASK-04, spec/AUTONOMY.md#AUTO-14]
+  cases:
+    - name: 错两次降 2 星
+      when: { answers: [wrong, wrong] }
+      expect: { starsDelta: -2, retroactiveOnPastQuestions: false }
+    - name: 连对三次升 1 星
+      when: { answers: [correct, correct, correct] }
+      expect: { starsDelta: 1, retroactiveOnPastQuestions: false }
+    - name: 补一补池容量 20，超容量出最旧的题
+      when: { wrongAnswers: 21 }
+      expect: { poolSize: 20, evicted: oldest }
+    - name: 是否先补完由本人设，他人只能提动议
+      given: { actor: "member:mom", strength: accompanied }
+      expect: { writePathExists: false, motionAllowed: true, forcedSwitch: absent }
+
+ASK-05:
+  spec: [spec/ASK.md#ASK-05]
+  cases:
+    - name: 主动放弃直接置 180 天
+      when: { abandoned: true }
+      expect: { cooldownDays: 180 }
+    - name: 答错 ≥3 次延长至 30 天
+      when: { wrongCount: 3 }
+      expect: { cooldownDays: 30 }
+    - name: 默认冷却 3 天
+      when: { wrongCount: 1 }
+      expect: { cooldownDays: 3 }
+    - name: 同知识点同任务内最多 2 题
+      when: { sameKnowledgePoint: true, confirmation: once }
+      expect: { maxQuestions: 2, confirmationsPerTask: 1 }
+
+ASK-06:
+  spec: [spec/ASK.md#ASK-06, spec/LAYER.md#LAYER-07]
+  cases:
+    - name: ambient 硬要求不满足即不能标 ambient
+      when: { stemChars: 34, modeRequested: ambient }
+      expect: { authoringGate: rejected, fallsBackTo: focused }
+    - name: 满足硬要求的 ambient 题落 L1.5 浮层
+      when: { stemChars: 28, optionsLines: 2, singleKey: true, estimatedSeconds: 5, class: prediction }
+      expect: { authoringGate: passed, tier: L1.5 }
+    - name: 未声明 supports 的题按 focused 处理
+      given: { supports: absent }
+      expect: { mode: focused }
+
+ASK-07:
+  spec: [spec/ASK.md#ASK-07, spec/AUTONOMY.md#AUTO-14]
+  cases:
+    - name: 选题管线不为时机提前或压后
+      when: { dueAt: 20:00 }
+      expect: { questionPickedAt: dueAt, shownEvent: due_shown, reorderedForTiming: false }
+    - name: 每次任务题目数上限由本人调（默认 8）
+      given: { selfSetCap: 5 }
+      when: { answeredInTask: 5 }
+      expect: { taskEnded: true, capWritePath: /api/myPlan }
+
+ASK-08:
+  spec: [spec/ASK.md#ASK-08]
+  cases:
+    - name: 机检不过不出不入库
+      when: { llmGenerated: true, verify: failed }
+      expect: { shown: false, stored: false, event: llm_generate_failed }
+    - name: 落草稿区必须带来源
+      when: { llmGenerated: true, verify: passed, saved: draft }
+      expect: { source: [model, at, promptSource, adopted] }
+
+ASK-09:
+  spec: [spec/ASK.md#ASK-09, spec/PROFILE.md#PROFILE-02]
+  cases:
+    - name: 同一道题对所有身份是同一道题
+      given: { audiences: [child, senior], knowledgePoint: kp-42 }
+      expect: { stemIdentical: true, verifyIdentical: true, branchOnAudience: false }
+    - name: 进度与冷却各自独立，大纲语义共享
+      expect: { cooldownIndependent: true, sharedOutlineId: true, masteryViewStackable: true }
+
+ASK-10:
+  spec: [spec/ASK.md#ASK-10, spec/CONTEXT.md#CONTEXT-03]
+  cases:
+    - name: 上下文只作提示词素材，不越大纲范围
+      given: { companionContext: titleOnly, aiQuestions: on }
+      expect: { scopeCrossed: false, egressHost: keyHolderConfigured, badge: 依据来源 }
+    - name: 不得取其它身份的数据与应用名
+      expect: { crossProfileContent: false, appNameList: absent, screenshotDescription: absent }
+    - name: 取材按包内 audience 与身份绑定取交集
+      expect: { intersection: true }
