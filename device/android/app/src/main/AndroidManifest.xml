@@ -1,0 +1,44 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 电视端（tv 装配）最小闭环壳层：M3。
+     呈现按 docs/LAYERING.md §4 那一处规则；这里不出现连续、成就、催促（docs/PRODUCT.md §2）。
+     输入通路是这层存在的理由：遥控器按键在这里落到设备上（facts/DEVICES.md#F16）。 -->
+<manifest xmlns:android="http://schemas.android.com/apk/res/android"
+    package="com.youban.tv"
+    android:versionCode="1"
+    android:versionName="0.1-m3">
+
+    <uses-sdk android:minSdkVersion="19" android:targetSdkVersion="28" />
+    <uses-feature android:name="android.software.leanback" android:required="false" />
+    <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
+
+    <!-- L2 悬浮层要这个；L1/L1.5 不需要（LAYERING §2）。装完默认不开，由面板授予。 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <application
+        android:allowBackup="false"
+        android:label="@string/app_label">
+        <activity
+            android:name=".MainActivity"
+            android:exported="true"
+            android:launchMode="singleTask">
+            <intent-filter>
+                <action android:name="android.intent.action.MAIN" />
+                <category android:name="android.intent.category.LEANBACK_LAUNCHER" />
+                <category android:name="android.intent.category.LAUNCHER" />
+            </intent-filter>
+            <intent-filter>
+                <action android:name="com.youban.VIEW" />
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        <receiver
+            android:name=".StateReceiver"
+            android:exported="true">
+            <intent-filter>
+                <action android:name="com.youban.STATE" />
+            </intent-filter>
+        </receiver>
+    </application>
+</manifest>
