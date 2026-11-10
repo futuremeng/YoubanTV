@@ -39,6 +39,7 @@ public class MainActivity extends Activity {
     /** 遥控器按键落在这儿：设备测试从 adb 读回它，验「按键真的到了设备」。 */
     static final String INPUT_NAME = "youban-input.json";
     static final String PROFILE_NAME = "youban-profile.txt";
+    static final String PROBE_NAME = "youban-probe.json"; // 上一次到前台是什么时候：证据不过期那一条的凭据（ONBOARD-07）
     /** 公共目录做兜底：装了存储权限的开发机可以 adb push 到那儿直接看效果。 */
     static final String PUBLIC_DIR = "/sdcard/Download";
 
@@ -97,6 +98,7 @@ public class MainActivity extends Activity {
         } catch (Exception ignored) {
             // 注册不上也照常渲染：这一屏的来源还可以是 push 的那个文件。
         }
+        recordProbe();
         render();
     }
 
@@ -228,6 +230,16 @@ public class MainActivity extends Activity {
                 + "\",\"fields\":{\"version\":" + version + "}}");
         setupPlan = null;
         render();
+    }
+
+    /**
+     * 每一次到前台都记一次探针时间：这是「证据不过期」那一条的凭据（ONBOARD-07）。
+     * 开机不单独跑——开机后的第一次到前台就是那一次重跑，所以清单里不许有 BOOT_COMPLETED，
+     * 也不许有后台常驻（契约 devicePermissions 那一处、装包清单门）。
+     */
+    private void recordProbe() {
+        write(path(this, PROBE_NAME, true), "{\"at\":" + System.currentTimeMillis()
+                + ",\"monoMs\":" + android.os.SystemClock.elapsedRealtime() + "}");
     }
 
     /**

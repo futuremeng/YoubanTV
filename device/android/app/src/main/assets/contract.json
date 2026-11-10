@@ -1165,5 +1165,55 @@
       "switchHint": "←→ 选另一档 · 确认键切过去 · 返回不切",
       "switchDo": "切换身份"
     }
+  },
+  "devicePermissions": {
+    "x-note": "电视端这一台设备上声明了哪些权限，只有这一处说得清：装包清单里的每一条都要在这里有交代，声明比实现多就是白要权限（docs/ONBOARDING.md §4、LAYERING §2）。",
+    "rows": [
+      {
+        "permission": "android.permission.SYSTEM_ALERT_WINDOW",
+        "use": "L2 那一张卡的悬浮层",
+        "declared": false,
+        "implemented": false,
+        "note": "浮层还没做，就先不声明；做的那天再声明，装完默认不开、由面板授予（LAYERING §2）。",
+        "spec": [
+          "LAYER-02",
+          "ONBOARD-06"
+        ]
+      },
+      {
+        "permission": "android.permission.FOREGROUND_SERVICE",
+        "use": "不需要：没有任何后台常驻",
+        "declared": false,
+        "implemented": false,
+        "note": "声明了它就是给自己留一条后台常驻的路——这条产品不许有（PRIVACY §2、PRODUCT §2）。",
+        "spec": [
+          "ONBOARD-06"
+        ]
+      },
+      {
+        "permission": "android.permission.RECEIVE_BOOT_COMPLETED",
+        "use": "不需要：开机不自启",
+        "declared": false,
+        "implemented": false,
+        "note": "开机后不自己起界面，也不在后台重探；重探发生在下一次被打开时（facts/DEVICES.md#F3）。",
+        "spec": [
+          "ONBOARD-06"
+        ]
+      }
+    ],
+    "never": [
+      "开机自启界面",
+      "后台常驻服务",
+      "前台服务常驻采集",
+      "没有实现却先声明的权限"
+    ],
+    "manifest": {
+      "allowBackup": "false：不把这一台设备上的账与约定备份到别处（PRIVACY §1）",
+      "service": "不许有 <service>：没有任何东西在后台跑",
+      "bootReceiver": "不许有 BOOT_COMPLETED 的 receiver：开机不自启（F3）"
+    },
+    "spec": [
+      "ONBOARD-06"
+    ]
   }
 }

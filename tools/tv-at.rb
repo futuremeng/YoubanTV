@@ -85,6 +85,15 @@ end
 # 设备一手事实：DAY-07 要的那三项（探测时刻、墙钟差、单调钟差）只能从设备上读，模型不自己造。
 # 这里在 Mac 侧存一份「上次见到的最大墙上时间」只为调试对比；真机上这件事由设备端自己持久化。
 def device_facts(args)
+  facts = device_facts_body(args)
+  # 设备上「上一次到前台」的时间也在事实里：证据不过期那一条靠它，不靠开机广播（ONBOARD-07、F25）。
+  raw = shell(args, "cat #{APK_FILES}/youban-probe.json").gsub(/\r/, '')[/\{.*\}/]
+  facts['deviceProbedAt'] = raw ? JSON.parse(raw)['at'] : nil
+  facts['deviceProbeAgeS'] = raw ? ((Time.now.to_f * 1000 - JSON.parse(raw)['at'].to_f) / 1000).round : nil
+  facts
+end
+
+def device_facts_body(args)
   unless online?(args)
     puts "设备不通：#{args[:serial] || '默认设备'} 不在线（adb devices 里有它吗？电视是否睡了？）"
     return nil
@@ -107,12 +116,14 @@ def device_facts(args)
   facts['wallClockDeltaMs'] = prev['wallMs'] ? (wall - prev['wallMs'].to_i) * 1000 : 0
   facts['monotonicDeltaMs'] = prev['monotonicUpS'] ? (facts['monotonicUpS'] - prev['monotonicUpS']) * 1000 : 0
   facts['wallMs'] = [wall, prev['wallMs'].to_i].max # 「见过的最大墙上时间」：回跳就靠它判（DAY-07）
-  # 输入通路：这台设备上没有任何组件认领我们的状态更新，遥控器按键也就没人接。
-  rcv, = adb(args, 'shell', 'cmd', 'package', 'query-receivers',
-             '-a', 'com.youban.STATE')
-  facts['inputChannel'] = rcv =~ /Receiver List is empty/ || !rcv.include?('com.youban') ? 'none（需要 device/ 的原生 APK）' : 'apk'
+  # 输入通路看装没装：装了 APK 才有接按键的组件；没装就是免安装那条路，按键没人接（F16→F17）。
+  facts['inputChannel'] = shell(args, "pm list packages #{APK_PACKAGE}").include?(APK_PACKAGE) ? 'apk' : 'none'
   puts JSON.pretty_generate(facts.reject { |k,| k == 'wallMs' })
-  puts "输入通路：#{facts['inputChannel']}——遥控器按键现在没人接，这一轮的换页只能从 Mac 侧走 adb。"
+  if facts['inputChannel'] == 'apk'
+    puts '输入通路：apk——遥控器按键由装着的这层接；按键→事件→内核重算由 input/key/setup/switch 四道自检各验一条。'
+  else
+    puts "输入通路：#{facts['inputChannel']}——这台设备上没装那层壳，遥控器按键没人接，换页只能从 Mac 侧走 adb（F16）。"
+  end
   FileUtils.mkdir_p(File.dirname(FACTS_CACHE)) if args[:keep_facts]
   File.write(FACTS_CACHE, JSON.pretty_generate(facts)) if args[:keep_facts]
   facts

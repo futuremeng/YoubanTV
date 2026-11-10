@@ -35,8 +35,10 @@
 
 ### ONBOARD-07 授权或固件变化后自动重开
 厂商固件可能在重启时静默清掉悬浮窗授权（事实 F1）；系统更新与媒体应用更新同样使旧探测证据失效。
-`capability` 登记表的探针在 `onBoot` 与 `onResume` 重跑，证据的 `probedAt` 早于最近一次重启或更新的条目
+`capability` 登记表的探针在每一次到前台（`onResume`）重跑，证据的 `probedAt` 早于最近一次重启或更新的条目
 自动回到 `pending`，`unknown` 则保持 `unknown`。这类重开不写事件，也不发通知。
+**`onBoot` 这一路不靠开机广播**：开机后的第一次到前台就是那一次重跑。装包清单里不许有 `BOOT_COMPLETED`，
+也不许有后台常驻与前台服务——声明与实现是否一致由装包清单门逐条核对（契约 `devicePermissions`）。
 
 ### ONBOARD-08 出网类条目
 出网开关（AI 批、AI 出题、伴看上下文、诊断导出、Home Assistant）的条目由 `keyHolder` 确认，

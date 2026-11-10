@@ -158,6 +158,7 @@ end
 
 # 电视端设备清单只许引用夹具用例，不许自带期望（D46：期望只留夹具那一份）。
 ruby tools/check-tv-list.rb
+ruby tools/check-manifest.rb
 # 双内核对齐：Ruby 那份是规范，Kotlin 是它的搬运工。红了就是某一处判定只在一边有（D42）。
 # 要先 sh tools/build-core.sh；编不出来就红，不许悄悄当通过。
 ruby tools/align-core.rb | tail -1
