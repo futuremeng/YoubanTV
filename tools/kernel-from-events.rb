@@ -11,6 +11,8 @@ def kernel_from_events(events_json)
 
     e = JSON.parse(line)
     fields = { ms: e.dig('fields', 'ms').to_i, pauseMs: e.dig('fields', 'pauseMs').to_i }
+    kind = e.dig('fields', 'kind')
+    fields[:kind] = kind if kind # 动议是哪一种也要进账：受理了的「延一延」不是暂停（COMMIT-07）
     w.send(:append, e['kind'].to_sym, e['profile'].to_s, **fields.compact)
   end
   w.commit_state

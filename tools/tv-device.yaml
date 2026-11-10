@@ -31,6 +31,8 @@ probes:
     why: 遥控器那一下确认键要落到设备上——这条通了 M3 才有输入通路（F17）
   - probe: text
     why: 这一屏句子的码位必须是真汉字（不许 U+FFFD）（F17）
+  - probe: key
+    why: 确认键要落进事件账并让设备上的内核重算——落一条回执不算（AGREE-11、D34）
   - probe: apk
     why: 装到设备上的包必须是这份编译产物——装了旧包会伪装成「内核少实现一条」（F20）
   - probe: glyphs

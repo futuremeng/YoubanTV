@@ -85,6 +85,28 @@ module Core
       }
     end
 
+    # 受理了的暂停是一条账上的事实，不是这一轮报上来的参数（COMMIT-07）：
+    # 设备端只带账本，暂停段的冻结就得能从账里推出来——两端同一条规则，别一边推一边不推。
+    def accepted_pause(profile)
+      settled = for_profile(profile).select { |e| e.kind == 'MOTION_SETTLED' && e.field('kind').to_s == 'pause' }
+      return nil if settled.empty?
+
+      { 'pause' => true, 'pauseMs' => settled.sum { |e| e.field('pauseMs').to_i } }
+    end
+
+    # 有没有一条还没人受理的动议：提过、没受理、之后也没落定，才算挂着（AUTO-03、D34）。
+    # 这一条只在设备端有用——确认键能生效的唯一前提是「这会儿真挂着一条要受理的动议」（AGREE-11）。
+    def pending_motion(profile)
+      scoped = for_profile(profile)
+      open_ = scoped.select { |e| e.kind == 'MOTION_UNANSWERED' }
+      closed = scoped.select { |e| e.kind == 'MOTION_SETTLED' }
+      left = open_.reject { |e| closed.any? { |s| s.field('kind') == e.field('kind') } }
+      return nil if left.empty?
+
+      last = left.last
+      { 'kind' => last.field('kind').to_s }
+    end
+
     # 零点刷新按 dayToken 幂等：同一 token 只滚一次；重启不产生新 token（DAY-06、DAY-07）。
     # 刷的是「当日投影」，历史事件保留（DAY-06 的保留清单）。
     def roll!(day_token)

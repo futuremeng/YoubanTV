@@ -62,7 +62,10 @@ object Main {
             probeOk = job["probeOk"] as? Boolean,
             requested = job["requested"] as? Boolean ?: false,
             // 有没有一份签过的约定：比对器带过来；没带就看账里的 PLAN_SIGNED（AGREE-01）。
-            signed = job["signed"] as? Boolean ?: ledger.events.any { it.kind == "PLAN_SIGNED" }
+            signed = job["signed"] as? Boolean ?: ledger.events.any { it.kind == "PLAN_SIGNED" },
+            pending = (job["pendingMotion"] as? Map<*, *>)?.let { m ->
+                LinkedHashMap<String, Any>().also { o -> m.forEach { (kk, vv) -> o[kk.toString()] = vv as Any } }
+            }
         )
         return state
     }

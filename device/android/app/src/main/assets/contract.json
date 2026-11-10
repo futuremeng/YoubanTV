@@ -670,7 +670,8 @@
       "surface",
       "fallbackReason",
       "text",
-      "panels"
+      "panels",
+      "pendingMotion"
     ],
     "dueFields": [
       "kind",
@@ -777,7 +778,8 @@
       "进度": "今天 {done}/{target} 组",
       "选择身份的提示": "还没有选身份",
       "约定未立": "约定：未签·按默认"
-    }
+    },
+    "pendingMotion": "有没有一条还没人受理的动议（AUTO-03、D34）。设备端的确认键唯一能生效的前提就是这个非空：非空就写 MOTION_SETTLED，空就什么都不写——按键不许变成回执、签到或第二次提醒。"
   },
   "agreement": {
     "x-note": "约定怎么立、谁签哪一条、什么生效——这一节是那份约定的单一来源（spec/AGREE.md、docs/AGREEMENT.md）。装机后第一次打开要做的就是把这份约定立起来；其它条目都是可选的（ONBOARDING §4）。",

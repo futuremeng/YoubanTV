@@ -128,7 +128,79 @@ public class MainActivity extends Activity {
             return super.onKeyDown(code, event);
         }
         record(key);
+        // 按键不许变成回执、签到或第二次提醒（契约 commitState.pendingMotion 那句）。
+        // 它唯一能生效的前提：内核说这会儿真挂着一条要受理的动议（AGREE-11、D34）。
+        settle(key);
+        render();
         return true;
+    }
+
+    /**
+     * 受理这一步落进事件账：写 MOTION_SETTLED，把那条动议带的时间量原样带过去（COMMIT-07）。
+     * 理由这一句是「用遥控器受理」——遥控器打不出字，写明来源比编一句理由诚实（AUTO-03）。
+     * 没挂着动议的时候，这里什么都不写：婉拒与未受理在账上是同一件事（D34）。
+     */
+    private void settle(String key) {
+        if (!"accept".equals(key)) {
+            return;
+        }
+        String pending = pendingMotion();
+        if (pending == null) {
+            return;
+        }
+        StringBuilder line = new StringBuilder("{\"kind\":\"MOTION_SETTLED\",\"profile\":\"").append(profile())
+                .append("\",\"fields\":{\"kind\":\"").append(pending).append("\",\"reason\":\"用遥控器受理\"");
+        String extra = pendingAmount(pending);
+        if (extra != null) {
+            line.append(',').append(extra);
+        }
+        append(path(this, EVENTS_NAME, true), line.append("}}").toString());
+    }
+
+    /** 内核算出来的那份结论里，挂着要受理的动议是哪一种（子对象，不看屏上那句话，也不自己判）。 */
+    private String pendingMotion() {
+        String json = stateJson();
+        String needle = "\"pendingMotion\":{\"kind\":\"";
+        int at = json.indexOf(needle);
+        if (at < 0) {
+            return null;
+        }
+        int from = at + needle.length();
+        int close = json.indexOf('"', from);
+        return close < 0 ? null : json.substring(from, close);
+    }
+
+    /** 那条动议提了多少毫秒就按多少受理：从账里最后一条同种动议原样带过来。 */
+    private String pendingAmount(String kind) {
+        String events = read(path(this, EVENTS_NAME, false));
+        if (events == null) {
+            return null;
+        }
+        String found = null;
+        for (String line : events.split("\\n")) {
+            if (line.contains("\"kind\":\"MOTION\"") && line.contains("\"" + kind + "\"")) {
+                for (String key : new String[] {"pauseMs", "ms", "minutes"}) {
+                    String v = numberAfter(line, key);
+                    if (v != null) {
+                        found = "\"" + key + "\":" + v;
+                    }
+                }
+            }
+        }
+        return found;
+    }
+
+    private static String numberAfter(String text, String key) {
+        int at = text.indexOf("\"" + key + "\":");
+        if (at < 0) {
+            return null;
+        }
+        int from = at + key.length() + 3;
+        int end = from;
+        while (end < text.length() && text.charAt(end) >= '0' && text.charAt(end) <= '9') {
+            end++;
+        }
+        return end > from ? text.substring(from, end) : null;
     }
 
     private void record(String key) {

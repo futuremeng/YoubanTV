@@ -60,6 +60,8 @@ Dir[File.join(ROOT, 'fixtures', '*.yaml')].sort.each do |path|
         'requested' => args[:requested],
         # 有没有一份签过的约定是这一轮的输入：不带过去就是两边喂的输入不同（AGREE-01）。
         'signed' => w.plan_signed?,
+        # 挂着一条要受理的动议是这一轮的输入：设备端的确认键能不能生效就靠它（AGREE-11）。
+        'pendingMotion' => w.ledger_pending_motion,
         'probeOk' => args[:probe].nil? ? nil : Core::Capability.focused_default_ok?(args[:probe]),
         # 这一轮做了零点刷新就得告诉内核，否则两边喂的输入不同（DAY-06）。
         # 墙钟与单调钟的原始量一起送过去：滚不滚这一天归内核判（DAY-07），比对器不许替它决定。

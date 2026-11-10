@@ -661,6 +661,10 @@ class World
     end
   end
 
+  def ledger_pending_motion
+    @ledger.pending_motion(@profile)
+  end
+
   def derived_values
     {
       # 层与能力（LAYER-01/05/06/12）
@@ -1070,7 +1074,7 @@ class World
   end
 
   def commit_state
-    Core::Commit.state(**decide_args, signed: plan_signed?)
+    Core::Commit.state(**decide_args, signed: plan_signed?, pending: @ledger.pending_motion(@profile))
   end
 
   private
@@ -1198,7 +1202,7 @@ class World
   # 内核的入参只在这里拼一次：判定与 CommitState 用的是同一份（M1.4）。
   def decide_args
     { profile: @profile, plan: @plan, q: @ledger.project(@profile), strength: @strength,
-      mode: @mode_requested, motion_state: @motion_state || {}, capability: @capability,
+      mode: @mode_requested, motion_state: @motion_state || @ledger.accepted_pause(@profile) || {}, capability: @capability,
       probe: @probe, requested: !!@form_requested_now }
   end
 

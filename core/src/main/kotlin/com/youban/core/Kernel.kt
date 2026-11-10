@@ -45,8 +45,16 @@ object Kernel {
         val pauseMs = settled.sumOf { it.fields["pauseMs"] ?: 0 }
         // 有没有一份签过的约定：设备端看账里的 PLAN_SIGNED；比对器把这一轮的方案状态直接带过来（AGREE-01）。
         val hasSignature = signed ?: ledger.events.any { it.kind == "PLAN_SIGNED" }
+        // 挂着一条要受理的动议：提过、没受理、之后也没落定（AUTO-03、D34）。设备端的确认键只看这个。
+        val unanswered = ledger.events.filter { it.kind == "MOTION_UNANSWERED" && it.profile == profile }
+        val settledKinds = ledger.events.filter { it.kind == "MOTION_SETTLED" && it.profile == profile }
+            .map { motionKind[it] ?: it.fields["kind"]?.toString() }
+        val pending = unanswered.lastOrNull()?.let { e ->
+            val kind = motionKind[e] ?: e.fields["kind"]?.toString()
+            if (kind != null && settledKinds.contains(kind)) null else mapOf("kind" to (kind ?: ""))
+        }
         return Json.write(Commit.state(profile, plan, ledger.project(profile), strength, mode, paused, pauseMs,
-            signed = hasSignature))
+            signed = hasSignature, pending = pending))
     }
 
     /** 事件账里每条动议的种类（fields.kind）：Ledger 的 fields 只存数字，种类另记在这儿。 */

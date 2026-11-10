@@ -39,6 +39,19 @@ def parse_args(argv)
   o
 end
 
+# 广播用参数数组送，不拼成一整条字符串：拼字符串会被两道 shell 吃掉 `{},"`（F20 那一坑）。
+def broadcast(args, extra)
+  IO.popen(['adb', '-s', args[:serial].to_s, 'shell', 'am', 'broadcast', '-n', "#{APK_PACKAGE}/.StateReceiver",
+            '-a', 'com.youban.STATE', *extra], err: %i[child out], &:read).to_s
+end
+
+def device_state(args)
+  raw = shell(args, "cat #{APK_FILES}/youban-state-out.json").gsub(/\r\n?/, '')[/\{.*\}/]
+  raw && JSON.parse(raw)
+rescue JSON::ParserError
+  nil
+end
+
 def adb(args, *cmd)
   full = (['adb'] + (args[:serial] ? ['-s', args[:serial]] : []) + cmd).shelljoin
   [`#{full} 2>&1`, $?.success?]
@@ -237,9 +250,56 @@ def probe_apk(args)
   end
 end
 
+# 按键 → 事件 → 设备上的内核重算：这条是 M3 里「按键进了账」那半边的验收。
+# 只看账里多了一行不够——得看结论跟着变了，而且变得跟规范模型一样（D50）。
+def probe_key(args)
+  # 广播之间留一点间隔：这几条是并发的，账是追加式的，挤在一起会丢（F20）。
+  return [false, '没装 com.youban.tv：先 sh device/android/build-apk.sh && adb install -r'] if
+    shell(args, "pm list packages #{APK_PACKAGE}").strip.empty?
+
+  profile = 'member:kid'
+  shell(args, "am force-stop #{APK_PACKAGE}")
+  shell(args, "rm -f #{APK_FILES}/#{EVENTS_FILE}")
+  # 先起应用再广播：被 force-stop 的应用处在 stopped 状态，广播会被直接丢掉（F20 那一坑）。
+  shell(args, 'input keyevent 82')
+  shell(args, "am start -n #{APK_PACKAGE}/.MainActivity")
+  sleep 2
+  broadcast(args, %w[--es kind WATCHED --es profile] + [profile] + %w[--el ms 1800000])
+  broadcast(args, %w[--es kind MOTION --es profile] + [profile] + %w[--es fieldKind pause --el pauseMs 900000])
+  broadcast(args, %w[--es kind MOTION_UNANSWERED --es profile] + [profile] + %w[--es fieldKind pause])
+  sleep 3
+  before = device_state(args)
+  return [false, '按键前设备没出结论'] unless before
+  return [false, "按键前不该是空的：pendingMotion=#{before['pendingMotion'].inspect}"] unless
+    before.dig('pendingMotion', 'kind').to_s == 'pause'
+
+  shell(args, 'input keyevent 23') # 确认键：这一步要落进账，不是落一条回执
+  sleep 2
+  after = device_state(args)
+  return [false, '按键后设备没重算出结论'] unless after
+
+  ledger = shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}")
+  unless ledger.include?('"kind":"MOTION_SETTLED"')
+    return [false, '确认键没落进事件账——按键不许只落回执']
+  end
+  if after['pendingMotion']
+    return [false, "受理之后还挂着一条要受理的动议：#{after['pendingMotion'].inspect}"]
+  end
+  unless after['status'].to_s == 'honored' && after['tier'].to_s == 'L1.5'
+    return [false, "受理后结论没跟着变：#{after['status']} · #{after['tier']}"]
+  end
+
+  mine = KernelFromEvents.call(ledger)
+  fields = JSON.parse(File.read(File.join(ROOT, 'contract/contract.json')))['commitState']['fields']
+  diff = fields.reject { |k| JSON.parse(JSON.generate(mine[k] || mine[k.to_sym])) == after[k] }
+  return [false, "按键之后的结论与规范模型不同：#{diff.join(', ')}"] unless diff.empty?
+
+  [true, "确认键落账→内核重算：受理前挂着 pause，受理后 #{after['status']} · #{after['tier']}，"         "#{fields.size} 个字段与规范模型逐位相同"]
+end
+
 PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text),
            'glyphs' => method(:probe_glyphs), 'state' => method(:probe_state),
-           'apk' => method(:probe_apk) }.freeze
+           'apk' => method(:probe_apk), 'key' => method(:probe_key) }.freeze
 
 args = parse_args(ARGV)
 if args[:facts]

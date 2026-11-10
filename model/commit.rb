@@ -32,7 +32,7 @@ module Core
 
     # 内核输出的形状：字段名就是契约 commitState.fields 那一行，电视端读的是这一份（M1.4）。
     def state(profile:, plan:, q:, strength: 'negotiated', mode: nil, motion_state: {}, capability: {},
-              probe: nil, requested: false, signed: true)
+              probe: nil, requested: false, signed: true, pending: nil)
       v = decide(profile: profile, plan: plan, q: q, strength: strength, mode: mode,
                  motion_state: motion_state, capability: capability, probe: probe, requested: requested)
       {
@@ -49,7 +49,8 @@ module Core
         'surface' => v[:surface],
         'fallbackReason' => v[:fallbackReason],
         'text' => text_of(v, q, plan),
-        'panels' => panels_of(v, q, plan) + (signed ? [] : [PANELS.fetch('约定未立')])
+        'panels' => panels_of(v, q, plan) + (signed ? [] : [PANELS.fetch('约定未立')]),
+        'pendingMotion' => pending
       }
     end
 
@@ -62,16 +63,18 @@ module Core
     PANELS = COMMIT_STATE.fetch('panels')
 
     # 常驻提示条与角标上那些小条：名字在 shown 里，句子在这张表里，数量从事件账的量来填。
+    # 常驻栏只装契约里有句子模板的那几条（commitState.panels）。
+    # 卡在 L2 那张卡上的段落（约定 / 该做的事 / 窗口期，LAYER-02）不是常驻栏，别把它们印成裸名字。
     def panels_of(v, q, plan)
       value = v[:value] || {}
-      Array(v[:shown]).map do |name|
+      Array(v[:shown]).select { |name| PANELS.key?(name) }.map do |name|
         case name
         when '角标剩余' then PANELS.fetch(name).sub('{minutes}', ((value['remainingMs'].to_i / 60_000.0).ceil).to_s)
         when '超出约定分钟数' then PANELS.fetch(name).sub('{minutes}', ((value['overMs'].to_i / 60_000.0).ceil).to_s)
         when '进度'
           PANELS.fetch(name).sub('{done}', q['answeredInTask'].to_i.to_s)
                        .sub('{target}', (Day.effective_groups(plan) * plan.fetch('groupsPerTask', 1).to_i).to_s)
-        else PANELS.fetch(name, name)
+        else PANELS.fetch(name)
         end
       end
     end

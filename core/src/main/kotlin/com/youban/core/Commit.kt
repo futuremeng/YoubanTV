@@ -74,7 +74,8 @@ object Commit {
         caps: CapabilityView? = null,
         probeOk: Boolean? = null,
         requested: Boolean = false,
-        signed: Boolean = true
+        signed: Boolean = true,
+        pending: Map<String, Any?>? = null
     ): Map<String, Any?> {
         val watched = q["watchedMs"] ?: 0
         val out = linkedMapOf<String, Any?>(
@@ -194,7 +195,8 @@ object Commit {
         caps: CapabilityView? = null,
         probeOk: Boolean? = null,
         requested: Boolean = false,
-        signed: Boolean = true
+        signed: Boolean = true,
+        pending: Map<String, Any?>? = null
     ): Map<String, Any?> {
         val v = decide(profile, plan, q, strength, mode, paused, pauseMs, caps, probeOk, requested)
         return linkedMapOf<String, Any?>(
@@ -211,7 +213,8 @@ object Commit {
             "fallbackReason" to v["fallbackReason"],
             "text" to textOf(v, plan, q),
             "panels" to panelsOf(v, plan, q) +
-                if (signed) emptyList() else listOf((commitState["panels"] as Map<String, String>).getValue("约定未立"))
+                if (signed) emptyList() else listOf((commitState["panels"] as Map<String, String>).getValue("约定未立")),
+            "pendingMotion" to pending
         )
     }
 
@@ -219,15 +222,17 @@ object Commit {
     @Suppress("UNCHECKED_CAST")
     fun panelsOf(v: Map<String, Any?>, plan: Map<String, Any>, q: Map<String, Long>): List<String> {
         val panels = commitState["panels"] as Map<String, String>
+        val named = ((v["shown"] as? List<*>) ?: emptyList<Any?>())
+            .map { it.toString() }.filter { panels.containsKey(it) }
         val value = v["value"] as Map<String, Any?>
-        return (v["shown"] as List<String>).map { name ->
+        return named.map { name ->
             when (name) {
                 "角标剩余" -> panels.getValue(name).replace("{minutes}", minutes(value["remainingMs"]).toString())
                 "超出约定分钟数" -> panels.getValue(name).replace("{minutes}", minutes(value["overMs"]).toString())
                 "进度" -> panels.getValue(name)
                     .replace("{done}", q.getOrDefault("answeredInTask", 0).toString())
                     .replace("{target}", (Day.effectiveGroups(plan) * Day.num(plan.getOrDefault("groupsPerTask", 1))).toString())
-                else -> panels.getOrDefault(name, name)
+                else -> panels.getValue(name)
             }
         }
     }
