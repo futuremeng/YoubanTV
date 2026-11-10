@@ -193,7 +193,6 @@ fields:
   via: {type: symbol, values: [panel, device]}
   simulate: {type: boolean}
   dayToken: {type: string, note: "当日 token；重启不产生新的"}
-  presence: {type: enum, enum: presence}
   inviteTier: {type: enum, enum: inviteTier}
   tier: {type: enum, enum: tier}
   offline: {type: boolean}
@@ -337,6 +336,9 @@ apiNames: [LockTask, DeviceAdmin, performGlobalAction, FLAG_SECURE, fullScreenIn
 
 # 概念级否定：这些机制在产品里不存在，用 absent 引用
 conceptNames: [先批完才入账, 扣分机制, 阻断观看, 红点递进催促, 时长兑换, 按身份的功能开关,
+  # 这三样划出范围（AUTO-17、D79）：登记在这里是为了让「它不存在」这类断言有名字可指。
+  共看安排与共看邀请, 在场提示, 家人原话送达, presence, coWatch, cowatch,
+  'POST /api/cowatch', 'POST /api/messages',
   成就系统, 连击, 徽章, 签到, 排行, 称号, 代为受理, 第二本账, 仅写日志, 录制通路, 拍照通路]
 
 # 能力登记表的能力 id（docs/facts/DEVICES.md §3）

@@ -248,3 +248,27 @@ AUTO-16:
       given: { paired: true }
       when: { motion: { kind: slotChange, target: "member:kid", accepted: true }, l5: { by: motion, paired: true } }
       expect: { allowed: false, applied: true, absent: ["POST /api/l5"] }
+
+AUTO-17:
+  spec: [spec/AUTONOMY.md#AUTO-17, spec/SENSE.md#SENSE-06, spec/DAY.md#DAY-10, spec/PANEL.md#PANEL-01]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 设备之间没有消息通道，也没有共看那条端点
+      when: { mode: ambient }
+      expect:
+        absent: ["POST /api/cowatch", "POST /api/messages"]
+
+    - name: 动议种类里没有共看邀请
+      when: { mode: ambient }
+      expect:
+        absent: [coWatch]
+
+    - name: 在场形态这一档不再有取值表
+      when: { mode: ambient }
+      expect:
+        absent: [presence]
+
+    - name: 面板的页表里没有共看那一页
+      when: { mode: ambient }
+      expect:
+        absent: [cowatch]

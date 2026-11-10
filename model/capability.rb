@@ -49,10 +49,8 @@ module Core
       'planSigning' => { tier: 'L2', scenes: [7] },
       'slotRules' => { tier: 'L2', scenes: [3] },
       'exerciseCount' => { tier: 'L2', scenes: [6, 17] },
-      'coWatch' => { tier: 'L1', scenes: [18] },
       'diagnostics' => { tier: 'L0', scenes: [10] },
       'updateCheck' => { tier: 'L1', scenes: [12] },
-      'presenceHint' => { tier: 'L1', scenes: [19] },
       'profileSwitch' => { tier: 'L1.5', scenes: [16] },
       'checklist' => { tier: 'L1', scenes: [20] }
     }.freeze

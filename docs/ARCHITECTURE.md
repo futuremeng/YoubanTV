@@ -19,7 +19,7 @@ YoubanTV/
 │   # ——一处规则只写一次，见 D42、D45、D46
 ├── core/                     # 纯 Kotlin JVM，零 android 依赖
 ├── device/                   # Android 应用（同一套代码，tv / mobile 两种装配）
-│   └── src/main/java/com/youban/device/{enforcement,capability,ui,store,net,pack,grade,sense,presence,log}/
+│   └── src/main/java/com/youban/device/{enforcement,capability,ui,store,net,pack,grade,sense,log}/
 ├── panel/                    # 家庭面板：Vite + TS，客户端与 DTO 由 contract 生成，产物不入库
 ├── sensor/                   # 传感器端（手机的传感器角色复用同一份代码）
 ├── packs/starter-cc0/        # 自创种子题库源，产出 .qpack，不打进 APK
@@ -85,7 +85,6 @@ grade/     自评与查阅修订：本人对照评分标准自评 → 星与掌�
 | `pack/` | 内容包安装 / 卸载 / 统计、后台分批导入 | 逐行分批、每批一事务、重启不重导 |
 | `grade/` | 待查阅队列、OpenAI 兼容与 Ollama provider、超时与重试预算、数据披露记录 | 自评与 AI 批先入账（`gradedBy=self|ai`，`AUTO-15`）；修订写 `REVISION` 附理由并重算；密钥只在设备，配置读取只返回「是否已配置」 |
 | `sense/` | 节律计次、标定与自检、误计率区间 | 三条信号源归一为节律输入；姿态关键点只在内存（`SENSE-01/02`） |
-| `presence/` | 共看安排与邀请、在场提示、原话送达 | 文本与时间戳；跨城走可选自架信令端点 |
 | `log/` | 本机环形日志、开机时间线、脱敏导出 | 字段经脱敏；崩溃由本机 handler 记录 |
 
 进程模型：一个前台服务承载判定循环与计时；Activity 画结论；跨进程状态经存储共享。
@@ -133,7 +132,7 @@ grade/     自评与查阅修订：本人对照评分标准自评 → 星与掌�
   密钥 → 短时令牌（scope + TTL）；长令牌**绑定设备 / 面板凭据**，角色从 `roles` 读而不从令牌推导；
   变更出网开关需当场再认证（D38）。改密码或重启令全部令牌失效，配对后密码只用于签发。
 - 免验证端点只有 `/api/hello`，字段：型号、协议版本、是否已配对、能力摘要。
-- 共在面端点：`/api/cowatch`（安排与邀请）、`/api/messages`（家人原话，文本 + 时间戳，来源标注到人）。
+- 共在面**没有端点**：共看、在场提示、原话送达这三样不做（`AUTO-17`、D79）；`/api/cowatch` 与 `/api/messages` 登记在 `retired.endpoints`。
   跨城信令由家庭自架的可选端点转发密文与时间戳，本项目不提供托管服务。
 - 写端点幂等（`opId`）；自评、AI 批与修订按 `opId` 去重。`protocolVersion` 覆盖主体与端点变更。
 

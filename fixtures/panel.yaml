@@ -8,7 +8,7 @@ PANEL-01:
       expect: { pageRefsUnresolved: 0 }
     - name: 那张表不新增功能，只是同一本账的视图
       given: { profile: 'member:kid' }
-      expect: { value: { panelPages: 13, pageAnswersStated: true } } # 「这段时间的账」那一页进来之后是 13 页（REPORT-01）
+      expect: { value: { panelPages: 12, pageAnswersStated: true } } # 「伴看」那一页划出范围之后是 12 页（AUTO-17、D79）
 
 PANEL-02:
   spec: [PANEL-02]

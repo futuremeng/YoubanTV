@@ -33,7 +33,9 @@ CODE_SOURCE = Dir[File.join(root, 'model/*.rb')].map { |f| File.read(f) }
 NOTES = Set.new(%w[x-note note spec description reserved forbiddenFields retired])
 def definition_text(node)
   case node
-  when Hash then node.reject { |k, _| NOTES.include?(k) }.map { |_, v| definition_text(v) }.join('|')
+  # 键名也算定义面：以前只收值，于是「presence 这个枚举名不存在」这类断言永远绿——
+  # 枚举加回去、名字仍然不在文本里。登记处（NOTES 那些键）的键名仍然排除。
+  when Hash then node.reject { |k, _| NOTES.include?(k) }.map { |k, v| "#{k}|#{definition_text(v)}" }.join('|')
   when Array then node.map { |v| definition_text(v) }.join('|')
   else node.to_s
   end

@@ -184,31 +184,6 @@
       "spec": [
         "COMMIT-03"
       ]
-    },
-    {
-      "method": "POST",
-      "path": "/api/cowatch",
-      "auth": "member",
-      "x-note": "共看时段与邀请；邀请即 kind=coWatch 的动议。",
-      "spec": [
-        "AUTO-03",
-        "MOBILE-§2"
-      ]
-    },
-    {
-      "method": "POST",
-      "path": "/api/messages",
-      "auth": "member",
-      "body": [
-        "text",
-        "at",
-        "author"
-      ],
-      "x-note": "家人原话原样送达，来源标注到人。",
-      "spec": [
-        "MOBILE-§2",
-        "LAYER-09"
-      ]
     }
   ],
   "enums": {
@@ -284,8 +259,7 @@
         "slotChange",
         "planChange",
         "dataExport",
-        "roleChange",
-        "coWatch"
+        "roleChange"
       ],
       "quotaPerMemberPerDay": {
         "pause": 3,
@@ -296,8 +270,7 @@
         "slotChange": 1,
         "planChange": null,
         "dataExport": null,
-        "roleChange": null,
-        "coWatch": null
+        "roleChange": null
       },
       "extendMaxMinutes": 15,
       "spec": [
@@ -481,18 +454,6 @@
         "ONBOARD-04"
       ]
     },
-    "presence": {
-      "values": [
-        "alone",
-        "co-present",
-        "co-watch"
-      ],
-      "spec": [
-        "SENSE-07",
-        "COMMITMENTS-§4b"
-      ],
-      "x-note": "在场形态；邀请频率见 inviteTier，两者不得混用。"
-    },
     "egressSwitch": {
       "values": [
         "aiQuestions",
@@ -529,7 +490,7 @@
         ]
       },
       "dailyCap": 6,
-      "x-note": "打扰档位：决定邀请频率，与 presence（在场形态：独自 / 共在 / 共看）是两件事，不得合并成一个字段。数字改动要留变更条目（SENSE-07）。",
+      "x-note": "打扰档位：决定邀请频率，（「在场形态」那一档已划出范围，AUTO-17：这一档不再与任何设备协同字段挂钩）。数字改动要留变更条目（SENSE-07）。",
       "spec": [
         "spec/SENSE.md#SENSE-07",
         "docs/COMMITMENTS.md#§4b"
@@ -710,7 +671,8 @@
       "control"
     ],
     "endpoints": [
-      "POST /api/requests"
+      "POST /api/cowatch",
+      "POST /api/messages"
     ],
     "events": [
       "REQUEST",
@@ -728,6 +690,12 @@
     },
     "spec": [
       "GATE-别名退役"
+    ],
+    "motionKinds": [
+      "coWatch"
+    ],
+    "values": [
+      "presence"
     ]
   },
   "commitState": {
@@ -1365,7 +1333,7 @@
     ]
   },
   "sense": {
-    "x-note": "体感这一层的数字只有这一处答（SENSE-07）：邀请频率与打扰上限改这些数字要走变更条目，不在界面里、不在断言里各写一遍。在场形态 presence 与邀请无关。",
+    "x-note": "体感这一层的数字只有这一处答（SENSE-07）：邀请频率与打扰上限改这些数字要走变更条目，不在界面里、不在断言里各写一遍。在场形态那一档已划出范围（AUTO-17）。",
     "invite": {
       "x-note": "档位决定频率；quiet 不主动邀请；拒绝只对本档生效（本档内不再邀请），不改档位也不减次数。",
       "tiers": {
@@ -1512,7 +1480,7 @@
     }
   },
   "motion": {
-    "x-note": "动议这一层的数字与生效时机只在这一处答（DAY-07、AUTO-03、AUTO-16）。",
+    "x-note": "共看之外的动议共用这一条端点；受理由被请求方在自己的界面完成。共看邀请不做（AUTO-17、D79）。",
     "tightening": {
       "kinds": [
         "planChange"
@@ -1542,7 +1510,6 @@
       "slotChange": "时段微调（当天内）",
       "planChange": "改规则",
       "dataExport": "导出数据",
-      "coWatch": "共看邀请",
       "roleChange": "角色的移交与收回",
       "unknown": "那一种动议"
     },
@@ -1633,11 +1600,6 @@
         "id": "devices",
         "title": "设备",
         "answers": "每台设备的待确认清单、降级说明与 L5 协同配置"
-      },
-      {
-        "id": "cowatch",
-        "title": "伴看",
-        "answers": "共看安排与邀请、伴看上下文开关"
       },
       {
         "id": "about",
