@@ -129,6 +129,8 @@ object Kernel {
             out["do"] = step["do"] as Any
             out["asks"] = asks
             out["note"] = step["note"]
+            // 「按默认的那一步去哪儿改」也在契约那一步上（AGREE-13）：界面上不另编一句。
+            out["where"] = step["where"]
             out["fields"] = asks.map { id ->
                 val f = fields.getValue(id)
                 val choices = (f["choices"] as List<*>).map { ch ->
@@ -165,7 +167,9 @@ object Kernel {
         lines.add(ui["header"].toString().replace("{step}", (index + 1).toString())
             .replace("{total}", total.toString()).replace("{do}", at["do"].toString()))
         if (at["note"] != null) {
-            lines.add(ui["noteOnly"].toString().replace("{note}", at["note"].toString()))
+            // 按默认那一行必须写明去哪儿改；契约没写 where 就是这条没做完，屏幕上不留空话（AGREE-13）。
+            val where = at["where"]?.let { ui["defaultsWhere"].toString().replace("{where}", it.toString()) } ?: ""
+            lines.add(ui["noteOnly"].toString().replace("{note}", at["note"].toString()) + where)
         } else if (at["id"] != null) {
             lines.add(ui["field"].toString().replace("{label}", at["label"].toString())
                 .replace("{value}", at["valueLabel"].toString()))
@@ -174,7 +178,7 @@ object Kernel {
             lines.add((if (signed) ui["signing"] else ui["sign"]).toString().replace("{version}", version.toString()))
         }
         return Json.write(linkedMapOf<String, Any?>(
-            "title" to at["do"], "lines" to lines, "field" to at["id"],
+            "title" to at["do"], "lines" to lines, "field" to at["id"], "where" to at["where"],
             "foot" to if (at["id"] == null) ui["leave"] as Any else ui["hint"] as Any,
             "last" to (index + 1 == total)
         ))
@@ -188,14 +192,14 @@ object Kernel {
             val asks = (step["asks"] as? List<*> ?: emptyList<Any?>()).map { it.toString() }
             if (asks.isEmpty()) {
                 out += linkedMapOf<String, Any?>(
-                    "do" to step["do"], "note" to step["note"], "id" to null,
+                    "do" to step["do"], "note" to step["note"], "where" to step["where"], "id" to null,
                     "label" to null, "valueLabel" to step["do"]
                 )
             } else {
                 (step["fields"] as List<*>).forEach { f ->
                     val field = f as Map<*, *>
                     out += linkedMapOf<String, Any?>(
-                        "do" to step["do"], "note" to null, "id" to field["id"],
+                        "do" to step["do"], "note" to null, "where" to null, "id" to field["id"],
                         "label" to field["label"], "valueLabel" to field["valueLabel"]
                     )
                 }

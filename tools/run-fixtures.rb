@@ -19,6 +19,7 @@ require 'task'
 require 'pick'
 require 'kp'
 require 'write'
+require 'agreement'
 
 class Unsupported < StandardError; end
 
@@ -52,7 +53,9 @@ PRODUCERS = {
   'core/kp' => [:kp, 'model/kp.rb'],
   'core/write' => [:write, 'model/write.rb'],
   # 计次（节律→一次）是另一件产物，与体感传感器同一份文件（SENSE-01）。
-  'device/counter' => [:counter, 'model/sense.rb']
+  'device/counter' => [:counter, 'model/sense.rb'],
+  # 首启那六步的屏内容是一处产物；设备端 Kotlin 由 tools/align-core.rb 逐屏比（AGREE-05）。
+  'core/agreement' => [:agreement, 'model/agreement.rb']
 }.freeze
 MEMBERS = %w[member:kid member:mom member:dad member:grandpa].freeze
 # 「只有一处来源」是跟文件走的：同一产物种类只准登记一个文件。
@@ -1274,6 +1277,16 @@ class World
     @extras['defaultsOnly'] = !signed && @plan_signed != true
     @extras['signaturePending'] = !@pending_version.nil? && @plan_signed != true
     @extras['agreementStep'] = @agreement_step
+    # 「这一步按默认，去哪儿改」由模型那一处答（契约 agreement.firstRun.where）：
+    # 没给 agreementStep 就没答这条——直接炸，不退成一个看着合理的空值（D67 那一条的同一家族）。
+    if @agreement_step
+      at = Core::Agreement.screen_index_for_step(@agreement_step)
+      screen = Core::Agreement.setup_screen(@plan, at, 1, @plan_signed)
+      where = screen['where']
+      @extras['defaultsWhere'] = where
+      # 屏上有没有写明去哪儿改：要选的步骤不问这个（它给的是现值，不是默认）✓
+      @extras['whereStated'] = !where.nil?
+    end
     # 别人的那一组约定不受这一份的收紧影响（AGREE-08）：拿开局快照比，不看这一份改了什么。
     @extras['otherProfileUnchanged'] = @plans.reject { |k, _| k == @profile }
                                        .all? { |k, pl| @plan_snapshot[k] == pl }
@@ -1687,6 +1700,8 @@ def check(key, want, world, before)
   when 'defaultsOnly' then cmp(want, world.derived['defaultsOnly'])
   when 'signaturePending' then cmp(want, world.derived['signaturePending'])
   when 'agreementStep' then cmp(want, world.derived['agreementStep'])
+  when 'defaultsWhere' then cmp(want, world.derived['defaultsWhere'])
+  when 'whereStated' then cmp(want, world.derived['whereStated'])
   when 'otherProfileUnchanged' then cmp(want, world.derived['otherProfileUnchanged'])
   else
     # 模型答得出的键（derived/extras）走通用比较：这些值一律由模型算出来，

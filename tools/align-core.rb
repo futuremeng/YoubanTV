@@ -9,6 +9,7 @@
 require 'json'
 require 'yaml'
 require_relative 'run-fixtures'
+require_relative '../model/agreement'
 
 ROOT = File.expand_path('..', __dir__)
 CLASSES = File.join(ROOT, 'core/build/classes')
@@ -108,8 +109,42 @@ Tempfile.open(['youban-align', '.json']) do |f|
     end
   end
 
+  # 首启那六步的屏内容也在这儿比：那一套以前只有 Kotlin 一份，Ruby 这边是补上的（AGREE-05）。
+  # 六步摊出来的每一屏，两边各算一次：抬头/那一行/脚下那句/是不是最后一屏，逐字比。
+  screen_diffs = []
+  [['{}', '空方案'], ['{"audience":"grown-up"}', '换成大人那一档']].each do |plan_json, tag|
+    index = 0
+    loop do
+      mine_s = Core::Agreement.setup_screen(JSON.parse(plan_json), index, 1, false)
+      job = { 'contract' => File.join(ROOT, 'contract/contract.json'),
+              'plan' => JSON.parse(plan_json), 'step' => index, 'version' => 1 }
+      Tempfile.open(['youban-screen', '.json']) do |g|
+        g.write(JSON.generate(job)); g.flush
+        raw = IO.popen(['java', '-cp', "#{CLASSES}:#{STDLIB}", 'com.youban.core.Main',
+                        '--setup', '--file', g.path], &:read)
+        unless $?.success?
+          warn raw.to_s.lines.last(4).join
+          die('Kotlin 首启那一屏跑挂了')
+        end
+        theirs_s = JSON.parse(raw.to_s.lines.last.to_s.strip)
+        %w[title lines field foot last].each do |k|
+          a = mine_s[k]
+          bq = theirs_s[k]
+          screen_diffs << "#{tag} 第#{index + 1}屏 #{k}: Ruby #{a.inspect} / Kotlin #{bq.inspect}" if a != bq
+        end
+      end
+      break if mine_s['last'] || (index += 1) > 12
+    end
+  end
+
+  if screen_diffs.any?
+    puts "Kotlin 内核对齐：首启那一套 #{screen_diffs.size} 处不一致"
+    screen_diffs.first(8).each { |d| puts "  #{d}" }
+    exit 1
+  end
+
   if diffs.empty?
-    puts "Kotlin 内核对齐：通过（#{cases.size} 个 case × #{FIELDS.size} 个字段逐位相同）"
+    puts "Kotlin 内核对齐：通过（#{cases.size} 个 case × #{FIELDS.size} 个字段逐位相同 · 首启每一屏逐字相同）"
   else
     puts "Kotlin 内核对齐：#{diffs.size} 处不一致 / #{cases.size} 个 case"
     diffs.first(12).each { |d| puts "  #{d}" }

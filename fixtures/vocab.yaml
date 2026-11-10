@@ -211,6 +211,8 @@ predicates:
   # —— 约定怎么立（spec/AGREE.md）。这几条目前模型没实现，执行器会记成「未支持」，不许默默通过。
   planForProfile: {type: kv} # 切到这个身份之后生效的那一组约定
   agreementStep: {type: number} # 首启六步走到第几步
+  defaultsWhere: {type: string} # 按默认那一步去哪儿改（契约 agreement.firstRun.where，AGREE-05）
+  whereStated: {type: boolean} # 这一屏有没有把「去哪儿改」写在屏上：要选的步骤不问这个
   defaultsOnly: {type: boolean} # 这一屏的条目是否全部来自默认值（还没签）
   signaturePending: {type: boolean} # 是不是停在「待对方签署」
   otherProfileUnchanged: {type: boolean} # 另一组的约定有没有被这一份的收紧改掉

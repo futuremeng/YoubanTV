@@ -39,6 +39,17 @@ AGREE-06:
       when: {planChange: {version: 7}}
       expect: {status: honored, signaturePending: true, effective: never}
 
+AGREE-05:
+  spec: [AGREE-05, DAY-08, PROFILE-01]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 时段那一步按默认，屏上写明去哪儿改
+      given: { agreementStep: 4 }
+      expect: { whereStated: true, defaultsOnly: true, nextAction: agreement }
+    - name: 要选的那一步不问「去哪儿改」：它给的是现值
+      given: { agreementStep: 3 }
+      expect: { whereStated: false }
+
 AGREE-08:
   spec: [AGREE-08]
   given: {profile: "member:kid", watchedMs: 600000}

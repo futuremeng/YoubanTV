@@ -32,6 +32,8 @@
 运动段起点）→ 时段与免题段 → 委托强度 → 双方签署。一步一项，一步都不 blocker：
 每一步都可以「先用默认」（`agreement.firstRunEscape`）。六步走完写 `PLAN_SIGNED(v1)`；
 中途退出也允许，此时按 AGREE-06 的状态跑。
+**按默认的那一步必须写明去哪儿改**（`agreement.firstRun[].where` + `agreement.ui.defaultsWhere`）：
+屏上不许只留「按默认」三个字——看不清去哪儿改的默认，等于把选择悄悄收走。
 
 ### AGREE-06 「还没签」不是一个罪名
 未签署的版本不进运行版本、不写 `PLAN_SIGNED`（`COMMIT-08`、`AUTO-04`）；界面状态句说明

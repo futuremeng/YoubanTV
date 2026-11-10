@@ -353,12 +353,20 @@ def probe_setup(args)
   end
 
   pressed = 0
+  seen = []
   until shell(args, "grep -c PLAN_SIGNED #{APK_FILES}/#{EVENTS_FILE}").to_i.positive?
     break if pressed >= 12
 
     shell(args, 'input keyevent 23')
     pressed += 1
     sleep 1
+    # 每一屏上写了什么，屏幕上那些字全由设备上的内核给（AGREE-05）；这里只把它们收下来看一眼。
+    seen << shell(args, "cat #{APK_FILES}/youban-setup-screen.json").gsub(/\r\n?/, '')
+  end
+  ui = JSON.parse(File.read(File.join(ROOT, 'contract/contract.json')))['agreement']['ui']
+  defaults = ui['defaultsWhere'].sub('{where}', '')
+  unless seen.any? { |s| s.include?(defaults) && s.include?('按默认') }
+    return [false, "按默认那一步的屏上没写明去哪儿改（屏上应有 #{defaults.inspect}）：#{seen.last.to_s[0, 120]}"]
   end
   ledger = shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}")
   return [false, "按了 #{pressed} 次确认键，账里还是没有 PLAN_SIGNED"] unless ledger.include?('PLAN_SIGNED')

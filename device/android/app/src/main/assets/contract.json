@@ -1153,7 +1153,8 @@
         "asks": [
 
         ],
-        "note": "遥控器打不出名字：这一台先叫「这一台设备上的这一档」，名字在另一处改（PROFILE-01）。"
+        "note": "遥控器打不出名字：这一台先叫「这一台设备上的这一档」",
+        "where": "手机或另一台设备上的「这一档」那一页"
       },
       {
         "step": 2,
@@ -1191,7 +1192,8 @@
         "asks": [
 
         ],
-        "note": "时段表在电视遥控器上改不好：这一步按默认，写清楚去哪儿改（DAY-08）。"
+        "note": "时段表在电视遥控器上改不好",
+        "where": "手机上的「时段」那一页（电视遥控器上改不好）"
       },
       {
         "step": 5,
@@ -1260,7 +1262,7 @@
       ]
     },
     "ui": {
-      "header": "第 {step}/{total} 步 · {do}",
+      "header": "第 {step}/{total} 屏 · {do}",
       "field": "{label}：{value}",
       "hint": "←→ 改这一项 · 确认键下一步 · 返回上一步",
       "noteOnly": "这一步没有要选的 · {note}",
@@ -1270,7 +1272,8 @@
       "switchHeader": "换这一档 · {from} → {to}",
       "switchRow": "{profile} · {state} · {version}",
       "switchHint": "←→ 选另一档 · 确认键切过去 · 返回不切",
-      "switchDo": "切换身份"
+      "switchDo": "切换身份",
+      "defaultsWhere": " · 按默认 · 要改去{where}"
     }
   },
   "devicePermissions": {
