@@ -55,18 +55,10 @@ public class MainActivity extends Activity {
         sentence = (TextView) findViewById(R.id.sentence);
         badge = (TextView) findViewById(R.id.badge);
         foot = (TextView) findViewById(R.id.foot);
-        // 这台电视的系统字体里没有汉字（/system/fonts 只有拉丁与各非中文字脚本，见 F17），
-        // 所以随包带一个 OFL 的 Noto Sans SC 子集（60KB，字符集由构建脚本按界面文案裁出）。
-        try {
-            android.graphics.Typeface face = android.graphics.Typeface.createFromAsset(
-                    getAssets(), "fonts/youban-subset.otf");
-            sentence.setTypeface(face);
-            badge.setTypeface(face);
-            foot.setTypeface(face);
-        } catch (Exception e) {
-            // 带不上字体就用系统字体：会显成方块，脚注里说明，不拿方块当正常显示。
-            fontNote = "没带上汉字子集，这台设备画不出中文（F17）";
-        }
+        // 字形这一层现在不干预：这台机器上无论用系统族名、设备自带的 .otf/.ttc、还是随包带的字体，
+        // 屏幕上都是「每个字同一个字形」，而换一个字体那个字形跟着变——就是每个字都落到了那个字体的
+        // .notdef。也就是说：到达 TextView 的码位不是 dex 里那串汉字（dex 里的字节已逐字核过）。
+        // 下一步不靠像素猜：把这一屏句子的码位写到设备上，用 adb 读回来看（F17）。
         render();
     }
 
@@ -146,6 +138,21 @@ public class MainActivity extends Activity {
         return json != null ? json : read(PUBLIC_DIR + "/" + STATE_NAME);
     }
 
+    /**
+     * 诊断用：把这一屏句子的码位写下来（前 24 个）。
+     * 为什么要它：像素只能告诉我「每个字同一个字形」，告不了我到达 TextView 的是什么码位；
+     * 而本地的渲染器也不是中文的验收依据（F18）。诊断文件不是结论，修好就删。
+     */
+    private void dumpCodepoints(String s) {
+        StringBuilder sb = new StringBuilder("{\"len\":" + s.length() + ",\"cps\":[");
+        int n = Math.min(24, s.length());
+        for (int i = 0; i < n; i++) {
+            sb.append(i == 0 ? "" : ",").append(Integer.toHexString(s.charAt(i)));
+        }
+        sb.append("]}");
+        write(path(this, "youban-diag.json", true), sb.toString());
+    }
+
     private void render() {
         String json = stateJson();
         if (json == null) {
@@ -161,6 +168,7 @@ public class MainActivity extends Activity {
         String status = field(json, "status", "honored");
         String reason = field(json, "fallbackReason", "");
         sentence.setText(line(status, wording, json));
+        dumpCodepoints(sentence.getText().toString());
         badge.setText(tier + " · " + ("due".equals(status) ? "待做" : "无到期项"));
         foot.setText("落层 " + tier + " · 强度天花板 " + ceiling
                 + (reason.isEmpty() ? "" : " · " + reason)
@@ -196,6 +204,11 @@ public class MainActivity extends Activity {
         } catch (Exception e) {
             return null;
         }
+    }
+
+    /** 给 StateReceiver 用的入口：广播里带的结论要先落到文件（F17 那个坑）。 */
+    static void writeText(String path, String body) {
+        write(path, body);
     }
 
     private static void write(String path, String body) {

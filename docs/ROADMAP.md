@@ -38,9 +38,11 @@
 - **装上了的原生壳层**：`device/android/build-apk.sh`（不用 Gradle：aapt2 → javac → d8 → zip →
   zipalign → apksigner）打出 0.06 MB 的包，`adb install` 到电视上起得来，**遥控器按键已落到设备**
   （`input keyevent 23` → 应用私有目录里的 `youban-input.json`，`facts/DEVICES.md#F17`）。
-  还差三件才说得上 M3 完成：① 汉字渲染——这台设备系统字体没汉字，随包的 OFL 子集在主状态句那行
-  渲染成同一个字形，**未修好**；② 内核结论的来源接成事件存储，而不是 adb 推的文件；
-  ③ 设备测试清单里加「按键落到设备」这一步（现在只有手验，没进清单）。
+  还差三件才说得上 M3 完成：① 汉字渲染**通了**——真因是 TextView 只给 `textSize` 不给
+  `textAppearance` 时不接中文回退，另有编译期一条 `javac -encoding UTF-8`（`facts/DEVICES.md#F17`）；
+  个别字仍缺字形，属字体覆盖；② 内核结论的来源接成事件存储，而不是 adb 推的文件；
+  ③ 把「按键落到设备」和「屏上文案的码位与内核一致」（读 `youban-diag.json`）写进设备清单，
+  现在这两条只有手验。
 - **现在能用 adb 验的部分**（M3 的呈现半边）：`ruby tools/tv-at.rb --serial=…` 跑 `tools/tv-device.yaml`，
   每步内核侧（那一条夹具 0 失败 0 未支持）+ 设备侧（真机显示并自证）两道都过才算通过，两台设备各 8 步绿。
   **只有原生 APK 才能验的部分**：遥控器按键与受理（现在设备上没有任何组件认领我们的状态更新，

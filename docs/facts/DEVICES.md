@@ -171,44 +171,30 @@
 - 结论：**adb 能承担调试与设备测试**——判定 → 落层 → 措辞 → 呈现这条链每一步都要自证；
   但它替代不了界面：输入、按键受理、焦点这些必须有原生 APK。M3 之前电视端的「测试」就是这条命令。
 
-## F17 装上原生壳层之后：遥控器按键真落到设备了；汉字**还是错**，但我此前给的病因是错的
+## F17 电视端汉字渲染：两条错话、两个真因，最后一屏终于画对了
 
-- **按键这条通了**（BOX-B / Android 9）：`adb install` 自签名 `youban-tv.apk`（0.02 MB）Success →
-  `am start -n com.youban.tv/.MainActivity` 后 `mCurrentFocus` 就是我们的组件 →
-  `adb shell input keyevent 23` → 设备上出现
-  `/sdcard/Android/data/com.youban.tv/files/youban-input.json` = `{"key":"accept","at":…,"monoMs":…}`。
-  F16 那句「输入通路是空的」从此只对免安装的通路成立。两个坑：应用写 `/sdcard/Download` 在 API 28
-  静默失败（看着像按键没接到，改 `getExternalFilesDir`）；这台电视的屏保会在活动起来后抢前台
-  （先 `keyevent 82`，确认 `mCurrentFocus` 是我们组件才截图）。
-- **更正我之前的两条错话**：
-  1. 「这台电视 `/system/fonts` 里没有汉字字形」——**错了**，那是 `ls | head -20` 看漏：机器上有
+- 现象（BOX-B / Android 9 与 PHONE-C / Android 7.1 都一样的症状）：界面上每个汉字都是**同一个字形**，
+  英文数字正常；换哪个字体，那个字形就跟着换——每个字都落到了该字体的 `.notdef`。
+- 排查记录（含两次我给自己下的假病因）：
+  1. **假病因一**「这台电视 `/system/fonts` 里没有汉字字形」——错的，`ls | head -20` 看漏：机器上有
      `NotoSansCJK-Regular.ttc`、`NotoSerifCJK-Regular.ttc`、`SourceHanSerifSC-Bold/Heavy.otf`。
-     旁证就在屏幕上：窗口标题「伴看板」（系统自己画的）一直是好的。F15 里那句同样的话也一并作废。
-  2. 「随包带的字体没生效」——也不是病因。真在编译期坏过一次：**`javac` 少了 `-encoding UTF-8`**，
-     界面文案里的中文常量全变成同一个字符（`javap`/class 里可查），已修（`build-apk.sh` 里写了原因）。
-- **仍未修好**：修完编码之后，界面上每个汉字还是同一个 last-resort 字形，而系统标题栏同样中文却正常。
-  排查到哪：源文件里每个字都是不同的码位（脚本点过 ✓）→ class 里常量正确 ✓ → 换设备自带字体
-  (`createFromFile /system/fonts/NotoSansCJK-Regular.ttc`) 这一步我改坏了没验成。
-  下一步照这条走：要么显式 `fontFamily` 指向设备那套 CJK，要么 `Typeface.createFromFile` 那个 .ttc，
-  并且**只能在设备上验**（见 F18）。不许按「已能显示中文」记账。
-
-
-- 实测（2026-11-10，BOX-B，Konka Android TV 9652 / Android 9）：
-  - `adb install` 自签名的 `youban-tv.apk`（0.06 MB）成功；`am start -n com.youban.tv/.MainActivity`
-    起来后 `mCurrentFocus` 就是 `com.youban.tv/com.youban.tv.MainActivity`；
-    `adb shell input keyevent 23`（确认键）之后设备上出现
-    `/sdcard/Android/data/com.youban.tv/files/youban-input.json` = `{"key":"accept","at":…,"monoMs":…}`
-    ——**F16 说的「输入通路是空的」从今天起只对免安装的通路成立**。
-  - 两个坑：① 应用直接写 `/sdcard/Download` 写不进去（API 28 没声明存储权限），看起来就像按键没被接到；
-    换到 `getExternalFilesDir(null)` 就有了，公共目录只作兜底。② 这台电视的屏保
-    （`com.smartisanos.screensaver`）会在活动起来之后抢走前台，截图截到的是屏保的钟；
-    所以先 `keyevent 82`（必要时再 `220`），确认 `mCurrentFocus` 是我们的组件，才允许截图。
-  - **汉字仍不对**：这台设备 `/system/fonts` 里没有汉字字形（拉丁与各非中文字脚本一大堆），随包带的
-    OFL 子集字体（170 字 / 60 KB）在角标与脚注那两行正常，主状态句那一行每个字渲染成同一个字形——
-    **没修好，不许按「已能显示中文」记账**；下一轮要查子集 cmap 与那一行文本的对应关系。
-- 复核：`sh device/android/build-apk.sh && adb -s <电视> install -r device/android/out/youban-tv.apk`
-  → `adb -s <电视> shell am start -n com.youban.tv/.MainActivity` → `adb -s <电视> shell input keyevent 23`
-  → `adb -s <电视> shell cat /sdcard/Android/data/com.youban.tv/files/youban-input.json`。
+     旁证一直在屏幕上：窗口标题「伴看板」（系统自己画的）始终是对的。F15 里同样那句一并作废。
+  2. **真因一（编译期）**：`javac` 少了 `-encoding UTF-8`，源文件里的中文常量在编译期就成了另一个字符。
+     已修（`build-apk.sh` 里写明原因），这一条修完症状仍在。
+  3. **假病因二**「随包带的字体没生效」——也不对。随包带 `.otf`/`.ttf`、指设备自带的 `.otf`/`.ttc`、
+     用 `Typeface.createFromFile`/`createFromAsset`，四种都试过，症状一模一样。
+  4. **真因二（呈现层）**：TextView 只写 `android:textSize`、不写 `android:textAppearance` 时，
+     这条链不接中文回退。**改成 `android:textAppearance="?android:attr/textAppearanceLarge"`（及 Small）
+     之后，同一台电视上「今天已按约定使用完。」九个字逐字画对了**（码位与屏上一字一位对上）。
+- 不再靠像素猜的抓手（留在应用里）：`render()` 把这一屏句子的码位写到
+  `/sdcard/Android/data/com.youban.tv/files/youban-diag.json`，`adb shell cat` 直接读——
+  上面那次读到 `{"len":9,"cps":[4eca,5929,5df2,6309,7ea6,5b9a,4f7f,7528,3002]}`，
+  与源文案逐位相同，所以那阵子「每个字同一个字形」不是文本坏了，是字形映射。
+- 还剩一小条：个别字仍缺字形（角标「无到期项」少画了一个字），属字体覆盖，不是这条链的塌法。
+- 复核：`sh device/android/build-apk.sh && adb -s <设备> install -r device/android/out/youban-tv.apk`
+  → `am start -n com.youban.tv/.MainActivity` → `am broadcast -n com.youban.tv/.StateReceiver -a com.youban.STATE --es state '<CommitState JSON>'`
+  → 截图 + `cat .../youban-diag.json`。**注意**：广播必须带 `-n`，且 `StateReceiver` 要先把 extra 落到文件
+  （之前它只 `startActivity`、把 extra 丢了——那一晚反复对比截图对不上就是这个坑）。
 
 ## F18 本地 ImageMagick 出图不是中文显示的验收依据
 

@@ -15,6 +15,12 @@ public class StateReceiver extends BroadcastReceiver {
 
     @Override
     public void onReceive(Context context, Intent intent) {
+        // 这里必须把结论落到文件再拉起界面：之前只 startActivity 不存 extra，广播发得再多次
+        // 屏幕上也不变——那一晚反复对比截屏对不上，就是这个坑。
+        String json = intent.getStringExtra("state");
+        if (json != null) {
+            MainActivity.writeText(MainActivity.path(context, MainActivity.STATE_NAME, true), json);
+        }
         Intent forward = new Intent(context, MainActivity.class);
         forward.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK | Intent.FLAG_ACTIVITY_CLEAR_TOP);
         context.startActivity(forward);
