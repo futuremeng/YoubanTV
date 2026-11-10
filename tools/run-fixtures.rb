@@ -90,6 +90,14 @@ class World
     @used << 'via' if given.key?('via')
     @token_scopes = given['scopes']
     @used << 'scopes' if given.key?('scopes')
+    # 邀请那一档、这一档拒绝过没有、今天第几条——这三样是邀请那一条判定的输入（SENSE-07）。
+    @invite_tier = given['inviteTier']
+    @used << 'inviteTier' if given.key?('inviteTier')
+    @invite_declined = given['inviteDeclined']
+    @used << 'inviteDeclined' if given.key?('inviteDeclined')
+    @invitations_today = given['invitationsToday'] || 0
+    @used << 'invitationsToday' if given.key?('invitationsToday')
+    @notify_suppressed = false
     @used << 'profile' if given.key?('profile')
     @strength = given['strength'] || 'negotiated'
     @used << 'strength' if given.key?('strength')
@@ -258,6 +266,7 @@ class World
     # 事件带版本是写入时的义务（DAY-07）：夹具里种进去那几条也一样要带，不然查账分不出改表前后。
     @ledger.events.each { |e| e.fields[:version] ||= @running_version }
     apply_calibration!
+    refresh_invite!
     @verdict = decide
     snapshot
   end
@@ -570,6 +579,19 @@ class World
 
   # 标定记录是摄像头计数唯一说了算的证据：从没标过（attempts 0）就照默认档关着；
   # 标过但没过线，这条通路就是 unknown，不能当它可用（SENSE-02、SENSE-04）。
+  # 邀请这一条只由 Core::Sense.invite 答（SENSE-07）；这一轮的动作若说不推，就不推（D34）。
+  # 以前这里是三处 @extras['notify'] = 'none'——那是把「不推」当常量写，邀请那一档从来没被答过。
+  def refresh_invite!
+    inv = Core::Sense.invite(tier: @invite_tier, declined: @invite_declined, today: @invitations_today)
+    @invite_view = inv
+    @extras['notify'] = inv['notify'] unless @notify_suppressed
+    inv.each { |k, v| @extras[k] = v unless k == 'notify' }
+  end
+
+  def invite_view
+    @invite_view || refresh_invite! && @invite_view
+  end
+
   def apply_calibration!
     rec = @extras['calibration']
     return unless rec.is_a?(Hash) && rec['attempts'].to_i.positive? && !Core::Sense.self_test_ok?(rec)
@@ -1082,7 +1104,7 @@ class World
     if when_.key?('deadlinePassed') && when_.delete('deadlinePassed')
       append('MISSED', @profile)
       @extras['inReport'] = 'ownWeekly'
-      @extras['notify'] = 'none'
+      @notify_suppressed = true # 这一轮的动作不许推第二条：只有这一处说「不推」（D34）
       @shown << 'overdue 状态条'
       @applied = true
       @effective = 'now'
@@ -1313,7 +1335,7 @@ class World
     append('MOTION', @profile, kind: kind, target: spec['target'] || @profile)
     unless @motion_accepted
       # 没受理什么都不发生（D34），也就没有第二条提醒。
-      @extras['notify'] = 'none'
+      @notify_suppressed = true
       append('MOTION_UNANSWERED', @profile, kind: kind)
       # 没受理的动议不是黑名单：在双方界面上各显示一条，面板有只读视图（AUTO-03、COMMIT-07）。
       @extras['visibleOn'] = %w[self panel]
@@ -1334,7 +1356,7 @@ class World
     end
     append('MOTION_SETTLED', @profile, **settled)
     # 受理了也不额外推一条：动议条目在面板留一条记录、只显示一次，那属于呈现，不属于提醒（D34、AUTO-16）。
-    @extras['notify'] = 'none'
+    @notify_suppressed = true
     @extras['visibleOn'] = %w[panel]
     case kind
     when 'extend'

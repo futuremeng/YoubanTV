@@ -1253,5 +1253,32 @@
     "spec": [
       "ONBOARD-06"
     ]
+  },
+  "sense": {
+    "x-note": "体感这一层的数字只有这一处答（SENSE-07）：邀请频率与打扰上限改这些数字要走变更条目，不在界面里、不在断言里各写一遍。在场形态 presence 与邀请无关。",
+    "invite": {
+      "x-note": "档位决定频率；quiet 不主动邀请；拒绝只对本档生效（本档内不再邀请），不改档位也不减次数。",
+      "tiers": {
+        "quiet": {
+          "intervalMinMs": null,
+          "intervalMaxMs": null,
+          "notify": "none"
+        },
+        "light": {
+          "intervalMinMs": 1800000,
+          "intervalMaxMs": 3000000,
+          "notify": "once"
+        },
+        "engaged": {
+          "intervalMinMs": 1200000,
+          "intervalMaxMs": 1800000,
+          "notify": "once"
+        }
+      },
+      "dailyCap": 6,
+      "spec": [
+        "SENSE-07"
+      ]
+    }
   }
 }

@@ -10,6 +10,31 @@ module Core
     SELF_TEST_ATTEMPTS = 20
     # 帧只在内存内逐帧处理：落盘只有计次事件，一帧也不留（SENSE-01）。
     FRAME_RETENTION_MS = 0
+    CONTRACT = JSON.parse(File.read(File.expand_path('../contract/contract.json', __dir__)))
+    INVITE = CONTRACT.fetch('sense').fetch('invite')
+
+    # 邀请这一条只由这一处答（SENSE-07）：档位决定频率，quiet 不主动邀请；
+    # 拒绝只让本档内不再邀请——不改档位、不减次数、也不参与任何「今天表现」的记录。
+    # 在场形态与它无关：presence 不进这里的任何一支。
+    def self.invite(tier:, declined: false, today: 0)
+      t = tier.to_s
+      row = INVITE.fetch('tiers').fetch(t) do
+        # 档位没登记就是没这条规则：不邀请，也不编一个频率出来。
+        return { 'inviteTier' => tier, 'notify' => 'none', 'inviteIntervalMinMs' => nil,
+                 'inviteIntervalMaxMs' => nil, 'dailyInviteCap' => INVITE['dailyCap'],
+                 'invitationsToday' => today.to_i, 'reason' => '这一档没有登记' }
+      end
+      capped = today.to_i >= INVITE.fetch('dailyCap').to_i
+      notify = if declined || capped || row.fetch('notify') == 'none'
+                 'none'
+               else
+                 'once'
+               end
+      { 'inviteTier' => t, 'notify' => notify,
+        'inviteIntervalMinMs' => row['intervalMinMs'], 'inviteIntervalMaxMs' => row['intervalMaxMs'],
+        'dailyInviteCap' => INVITE['dailyCap'], 'invitationsToday' => today.to_i,
+        'reason' => (declined ? '本档内已拒绝' : capped ? '到单日上限' : nil) }
+    end
     DISK_WRITES_PER_ROUND = 1
     # 计次入账只认「本人确认」这一条路（AUTO-14）；传感器计次不兑换时长（D24）。
     CONFIRMATION = 'self'.freeze
