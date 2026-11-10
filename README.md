@@ -93,3 +93,5 @@
 
 代码采用 Apache-2.0（见 `LICENSE`），第三方与内容许可见 `THIRD_PARTY_NOTICES.md`；许可选择与是否
 公开无关。实现切片见 [`docs/ROADMAP.md`](docs/ROADMAP.md)，当前进度是文档与规格基线。
+
+> Kotlin 内核对齐：`sh tools/build-core.sh && ruby tools/align-core.rb`——当前 40 处不一致，见 `docs/ROADMAP.md` 的 M2。

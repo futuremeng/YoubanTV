@@ -19,13 +19,21 @@ object Json {
     fun write(v: Any?): String = when (v) {
         null -> "null"
         is Boolean -> v.toString()
+        // 整数不能走下面那条 else：否则数字会被引号包成字符串，与 Ruby 那边对不上。
         is Double -> if (v == v.toLong().toDouble()) v.toLong().toString() else v.toString()
+        is Int, is Long, is Short, is Byte -> v.toString()
         is Map<*, *> -> v.entries.joinToString(",", "{", "}") { quote(it.key.toString()) + ":" + write(it.value) }
         is List<*> -> v.joinToString(",", "[", "]") { write(it) }
         else -> quote(v.toString())
     }
 
-    fun parse(text: String): Any? = Parser(text).also { it.skip() }.value().also { it.skip() }
+    fun parse(text: String): Any? {
+        val p = Parser(text)
+        p.skip()
+        val v = p.value()
+        p.skip()
+        return v
+    }
 
     private class Parser(val src: String) {
         var i = 0

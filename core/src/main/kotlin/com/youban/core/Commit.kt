@@ -168,7 +168,7 @@ object Commit {
                 "deficit" to (if (kind == "quiz") "questions" else "reps"), "window" to "present"),
             "events" to emptyList<String>(), "shown" to shown, "fallbackReason" to fallback,
             "value" to mapOf("ruleId" to "present", "watchedMs" to watched,
-                "playerPaused" to fallback == null, "resumedAfterAnswer" to fallback == null, "retried" to false)
+                "playerPaused" to (fallback == null), "resumedAfterAnswer" to (fallback == null), "retried" to false)
         )
     }
 
@@ -190,7 +190,7 @@ object Commit {
             "status" to v["status"],
             "activeProfile" to if (profile == "none") null else profile,
             "planVersion" to Day.num(plan.getOrDefault("planVersion", 1)),
-            "due" to dueShape(v),
+            "due" to dueShape(v, plan, q),
             "tier" to v["tier"],
             "tierCeiling" to v["tierCeiling"],
             "nextAction" to v["next_action"],
@@ -200,24 +200,32 @@ object Commit {
         )
     }
 
-    // due 的形状照契约 dueFields；绝对时刻由设备端时钟填，内核只给相对量与当下窗口。
+    /** 形状照契约 dueFields；绝对时刻由设备端时钟填，内核只给相对量与当下窗口。
+     * 欠量与 Ruby 那边同一公式（`model/commit.rb` 的 `due_shape`）：
+     * 做题看 `roundTarget − answeredInTask`，运动看 `exerciseRounds − roundsDone`，不为负。
+     * 两处各写一份就是 D46 要避免的事，改的时候两边同步（`tools/align-core.rb` 会卡住不同步）。
+     */
     @Suppress("UNCHECKED_CAST")
-    fun dueShape(v: Map<String, Any?>): Map<String, Any?>? {
+    fun dueShape(v: Map<String, Any?>, plan: Map<String, Any>, q: Map<String, Long>): Map<String, Any?>? {
         val due = v["due"] as Map<String, Any?>? ?: return null
         val value = v["value"] as Map<String, Any?>
+        val kind = due["kind"].toString()
+        val unit = if (kind == "quiz") "questions" else if (kind == "exercise") "reps" else "none"
+        val amount = when (kind) {
+            "quiz" -> maxOf(Day.num(plan.getOrDefault("roundTarget", 5)) - q.getOrDefault("answeredInTask", 0), 0)
+            "exercise" -> maxOf(Day.num(plan.getOrDefault("exerciseRounds", 1)) - q.getOrDefault("roundsDone", 0), 0)
+            else -> 0L
+        }
         return linkedMapOf<String, Any?>(
             "kind" to due["kind"],
             "mode" to due["mode"],
-            "deficit" to mapOf("kind" to due["deficit"], "unit" to due["deficit"], "amount" to amountOf(due, value)),
+            "deficit" to linkedMapOf("kind" to unit, "unit" to unit, "amount" to amount),
             "window" to mapOf("earliest" to due["window"], "latest" to due["window"]),
             "howToAsk" to if (due["mode"] == "focused") "requestPauseThenAnswer" else "badgeOnly",
             "ruleId" to (value["ruleId"] ?: "present"),
             "nextAction" to v["next_action"]
         )
     }
-
-    private fun amountOf(due: Map<String, Any?>, value: Map<String, Any?>): Long =
-        Day.num((value["quantities"] as? Map<*, *>)?.get("remaining")) // 由调用方需要时再填，内核不给假数
 
     private fun indexOf(tier: String) = TIER_ORDER.indexOf(tier)
 }

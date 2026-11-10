@@ -23,6 +23,14 @@
   `audience` 的分支位置限定为内容绑定与默认值两处（`PROFILE-02`）。
 - 内核依赖关系由构建脚本断言：`core` 只被 `device` / `panel` 依赖。
 
+
+**现在到哪一步**：`kotlinc 1.9.24` 跑通了——之前卡在 Maven 上那个裸 `kotlin-compiler.jar` 缺 intellij 依赖，
+换成 GitHub releases 的 `kotlin-compiler-1.9.24.zip`（完整发行版）就够了，`sh tools/build-core.sh` 一步编完。
+`core/` 编得出来、`Main` 能跑（支持 `--batch`，一次 JVM 跑一批任务），`tools/align-core.rb` 把两边逐字段比：
+**221 个 case × 10 个字段，当前 40 处不一致**，集中在两处——① 暂停冻结之后那档 `L1.5` Kotlin 里没有；
+② DAY-06「当日约定已满足 → honored」Kotlin 没实现。这 40 处就是 M2 剩下的全部距离。
+它**还没进 `tools/check-fixtures.sh`**（红了会被当噪声忽略），烧到 0 那天再进，之后是常设门。
+
 ## M3 · 设备端最小闭环
 
 `capability`（当前层 + 探针）、`enforcement` 的 **L1 + L1.5 + L2 + L3**（接口 `present(due, tier)`）、
