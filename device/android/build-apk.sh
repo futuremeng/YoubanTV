@@ -27,12 +27,27 @@ rm -rf "$work" && mkdir -p "$work/obj" "$work/res" "$work/apk" "$work/gen"
   --java "$work/gen" --auto-add-overlay "$work/res.zip"
 # -encoding UTF-8 不能省：不写就按平台默认编码读源文件，中文常量全变成同一个替换字符——
 # 屏幕上就是一排排一模一样的字，看着像「设备画不出中文」，其实是编译期就毁了（F17）。
-javac -source 8 -target 8 -encoding UTF-8 -bootclasspath "$jar" -d "$work/obj" -proc:none \
+core="$root/../../core/build/classes"
+stdlib=${KOTLIN_STDLIB:-}
+if [ -z "$stdlib" ]; then
+  for c in /tmp/kotlinc/lib/kotlin-stdlib.jar "$HOME/.cache/youban-kotlin/kotlin-stdlib.jar"; do
+    [ -f "$c" ] && stdlib=$c && break
+  done
+fi
+sh "$root/../../tools/build-core.sh"
+[ -f "$stdlib" ] || { echo "缺 kotlin-stdlib.jar：KOTLIN_STDLIB= 指一下（解压 kotlin-compiler-1.9.24.zip 就有）"; exit 1; }
+# javac 要能看见 Kotlin 内核的类（界面直接调 Kernel.state），所以 -cp 里带上内核与 stdlib。
+javac -source 8 -target 8 -encoding UTF-8 -bootclasspath "$jar" -cp "$core:$stdlib" -d "$work/obj" -proc:none \
   $(find "$root/app/src/main/java" "$work/gen" -name '*.java')
-"$bt/d8" --lib "$jar" --min-api 19 --output "$work/apk" $(find "$work/obj" -name '*.class')
+# 内核带着走：屏幕上那句结论要设备自己算出来，不是别人算好推上来的文件（M3 最后一件）。
+# 所以 Kotlin 内核和 kotlin-stdlib 要跟界面同一份 dex 里——kotlinc 编内核，d8 一起 dex。
+[ -d "$core" ] || sh "$root/../../tools/build-core.sh"
+[ -f "$stdlib" ] || { echo "缺 kotlin-stdlib.jar：KOTLIN_STDLIB= 指一下（解压 kotlin-compiler-1.9.24.zip 就有）"; exit 1; }
+"$bt/d8" --lib "$jar" --min-api 19 --release --output "$work/apk" "$stdlib" \
+  $(find "$work/obj" "$core" -name '*.class')
 # build-tools 里没有 zip 这个可执行文件（别把 $bt/zip 当工具用），用系统的。
 cp "$work/base.apk" "$work/app.apk"
-(cd "$work/apk" && zip -q -j "$work/app.apk" classes.dex)
+(cd "$work/apk" && zip -q -j "$work/app.apk" *.dex)
 # assets 只在需要随包带字体时才压进来。这台电视自带中文字形（F17），所以现在不带；
 # 真要带的时候必须带路径前缀，并且**在设备上验**，本地 ImageMagick 出图不算数（F18）。
 if [ -d "$root/app/src/main/assets" ]; then

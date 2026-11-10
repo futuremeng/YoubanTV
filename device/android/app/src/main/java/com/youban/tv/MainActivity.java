@@ -1,6 +1,7 @@
 package com.youban.tv;
 
 import android.app.Activity;
+import com.youban.core.Kernel;
 import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
@@ -25,7 +26,13 @@ import java.io.FileWriter;
  *   /sdcard/Download/youban-input.json
  */
 public class MainActivity extends Activity {
-    /** 内核结论落在这个文件里；设备端只读它，不自己算（D47）。 */
+    /** 事件账：设备端唯一的事实来源，一行一条 JSON。结论由这些事件现算，不存结论（D47）。 */
+    static final String EVENTS_NAME = "youban-events.jsonl";
+    /** 当日方案：形状同夹具里的 given.plan。这是约定，不是结论。 */
+    static final String PLAN_NAME = "youban-plan.json";
+    /** 契约随包带（assets/contract.json），第一次起来时解到应用目录给内核读那张层级表。 */
+    static final String CONTRACT_NAME = "contract.json";
+    /** 旧路径留着只作调试兜底：直接塞一份算好的结论进来看排版。屏幕上会标明这是调试来源。 */
     static final String STATE_NAME = "youban-state.json";
     /** 遥控器按键落在这儿：设备测试从 adb 读回它，验「按键真的到了设备」。 */
     static final String INPUT_NAME = "youban-input.json";
@@ -33,6 +40,7 @@ public class MainActivity extends Activity {
     static final String PUBLIC_DIR = "/sdcard/Download";
 
     private String fontNote = null;
+    private String debugSource = null;
     private TextView sentence;
     private TextView badge;
     private TextView foot;
@@ -40,9 +48,14 @@ public class MainActivity extends Activity {
     private final BroadcastReceiver stateReceiver = new BroadcastReceiver() {
         @Override
         public void onReceive(Context context, Intent intent) {
+            // 广播带的是**事件**，不是结论：设备自己拿事件跑内核（M3 最后一件）。
+            String event = intent.getStringExtra("event");
+            if (event != null) {
+                append(path(context, EVENTS_NAME, true), event);
+            }
             String json = intent.getStringExtra("state");
             if (json != null) {
-                write(path(context, STATE_NAME, true), json);
+                write(path(context, STATE_NAME, true), json); // 调试兜底，见 stateJson()
             }
             render();
         }
@@ -52,6 +65,7 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.status);
+        useBundledContract();
         sentence = (TextView) findViewById(R.id.sentence);
         badge = (TextView) findViewById(R.id.badge);
         foot = (TextView) findViewById(R.id.foot);
@@ -133,9 +147,37 @@ public class MainActivity extends Activity {
         return PUBLIC_DIR + "/" + name;
     }
 
+    /** 结论在设备上算出来：事件账 + 当日方案 → 内核。别人算好推上来的那份只当调试兜底。 */
     private String stateJson() {
+        String plan = read(path(this, PLAN_NAME, false));
+        if (plan == null) {
+            plan = read(PUBLIC_DIR + "/" + PLAN_NAME);
+        }
+        if (plan != null) {
+            try {
+                String events = read(path(this, EVENTS_NAME, false));
+                String local = Kernel.state(events == null ? "" : events, plan, profile(), strength(), null);
+                debugSource = null;
+                return local;
+            } catch (RuntimeException e) {
+                debugSource = "内核没跑起来：" + e.getClass().getSimpleName();
+                return null;
+            }
+        }
+        // 没有当日方案时退到调试来源：这一屏会在角标下面写明它是调试塞进来的，不是设备算的。
         String json = read(path(this, STATE_NAME, false));
+        debugSource = json != null ? "调试来源：adb 塞好的结论（不是设备算的）" : null;
         return json != null ? json : read(PUBLIC_DIR + "/" + STATE_NAME);
+    }
+
+    private String profile() {
+        String v = read(path(this, "youban-profile.txt", false));
+        return v != null && !v.trim().isEmpty() ? v.trim() : "member:kid";
+    }
+
+    private String strength() {
+        String v = read(path(this, "youban-strength.txt", false));
+        return v != null && !v.trim().isEmpty() ? v.trim() : "negotiated";
     }
 
     /**
@@ -172,6 +214,7 @@ public class MainActivity extends Activity {
         badge.setText(tier + " · " + ("due".equals(status) ? "待做" : "无到期项"));
         foot.setText("落层 " + tier + " · 强度天花板 " + ceiling
                 + (reason.isEmpty() ? "" : " · " + reason)
+                + (debugSource == null ? " · 结论来自设备上的内核" : " · " + debugSource)
                 + (fontNote == null ? "" : " · " + fontNote));
     }
 
@@ -188,6 +231,34 @@ public class MainActivity extends Activity {
             return "超出约定时间。今天已按约定使用完。";
         }
         return "今天已按约定使用。";
+    }
+
+    /** 契约随包带：内核要从那张表取层级，路径在设备上得自己落一份。 */
+    private void useBundledContract() {
+        try {
+            java.io.InputStream in = getAssets().open(CONTRACT_NAME);
+            java.io.ByteArrayOutputStream out = new java.io.ByteArrayOutputStream();
+            byte[] buf = new byte[8192];
+            int n;
+            while ((n = in.read(buf)) > 0) {
+                out.write(buf, 0, n);
+            }
+            in.close();
+            String dest = path(this, CONTRACT_NAME, true);
+            if (!new File(dest).exists()) {
+                new File(dest).getParentFile().mkdirs();
+                write(dest, new String(out.toByteArray(), "UTF-8"));
+            }
+            com.youban.core.Kernel.useContract(dest);
+        } catch (Exception e) {
+            fontNote = "契约没解出来：" + e.getClass().getSimpleName();
+        }
+    }
+
+    /** 事件只追加，不改写：这是设备端唯一的事实来源（D47）。 */
+    static void append(String path, String line) {
+        String old = read(path);
+        write(path, (old == null || old.isEmpty() ? "" : old) + line + "\n");
     }
 
     private static String read(String path) {

@@ -48,8 +48,10 @@
   （`input keyevent 23` → 应用私有目录里的 `youban-input.json`，`facts/DEVICES.md#F17`）。
   还差三件才说得上 M3 完成：① 汉字渲染**通了**——真因是 TextView 只给 `textSize` 不给
   `textAppearance` 时不接中文回退，另有编译期一条 `javac -encoding UTF-8`（`facts/DEVICES.md#F17`）；
-  个别字仍缺字形，属字体覆盖；② **内核结论的来源还是 adb 推的文件**——这一段要换成设备端事件存储
-  ＋设备上跑内核（`tools/build-core.sh` 已能把 Kotlin 内核编出来，下一步 d8 进 APK）。
+  个别字仍缺字形，属字体覆盖；② **设备上跑内核这一件正在做，还没成**：Kotlin 内核与 stdlib 已 d8 进
+  同一个 dex（APK 0.60 MB），事件账落在设备本地 `youban-events.jsonl`（广播带的是**事件**不是结论），
+  但 `Kernel.state()` 在设备上抛了异常，屏幕退回兜底句、`youban-diag.json` 没写出来——没跑通就是没跑通，
+  不许按「设备端已有内核」记账。下一步先把异常原文落到设备上的诊断文件再读回来。
   ③「按键落到设备」与「屏上文案的码位」已进设备清单（`tools/tv-device.yaml` 的 `probes:`，
   现在一条命令跑 8 步判定 + 2 步设备自检，两道全绿才算过）。
 - **现在能用 adb 验的部分**（M3 的呈现半边）：`ruby tools/tv-at.rb --serial=…` 跑 `tools/tv-device.yaml`，
