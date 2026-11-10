@@ -66,6 +66,7 @@ class World
               :audiences
   attr_accessor :strength, :audience, :day_type, :motion_accepted, :applied, :before
   attr_reader :authoring, :kp_state
+  attr_reader :motion_state, :mode_requested
 
   def pick_source
     @source

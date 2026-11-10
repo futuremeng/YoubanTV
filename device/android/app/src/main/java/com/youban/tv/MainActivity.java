@@ -147,7 +147,7 @@ public class MainActivity extends Activity {
         StringBuilder sb = new StringBuilder("{\"len\":" + s.length() + ",\"cps\":[");
         int n = Math.min(24, s.length());
         for (int i = 0; i < n; i++) {
-            sb.append(i == 0 ? "" : ",").append(Integer.toHexString(s.charAt(i)));
+            sb.append(i == 0 ? "" : ",\"").append(String.format("%04x", (int) s.charAt(i))).append(i == n - 1 ? "\"" : "\",\"");
         }
         sb.append("]}");
         write(path(this, "youban-diag.json", true), sb.toString());

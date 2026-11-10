@@ -14,6 +14,9 @@ package com.youban.core
  *    "events":[{"kind":"WATCHED","profile":"member:kid","fields":{"ms":2400000}}]}
  */
 object Main {
+    // 跨天要归零的量：看过的、超出的、暂停段、这一轮的做题与运动计数。
+    private val DAY_SCOPED = setOf("WATCHED", "OVER", "MOTION_SETTLED", "ANSWER", "ROUND_DONE")
+
     @JvmStatic
     fun main(args: Array<String>) {
         val text = readInput(args)
@@ -29,8 +32,9 @@ object Main {
     }
 
     private fun run(job: Map<*, *>): Map<String, Any?> {
+        // 契约路径必须在读那张表之前定下来：批量模式下漏这一步会静默用相对路径的表，
+        // 对齐结果就变成「看起来对了」。
         (job["contract"] as? String)?.let { Commit.useContract(it) }
-
         val ledger = Ledger()
         val profile = job["profile"] as? String ?: "member:kid"
         for (raw in job["events"] as? List<*> ?: emptyList<Any?>()) {
@@ -38,6 +42,11 @@ object Main {
             val fields = LinkedHashMap<String, Long>()
             (e["fields"] as? Map<*, *>)?.forEach { (k, v) -> fields[k.toString()] = Day.num(v) }
             ledger.append(e["kind"].toString(), (e["profile"] as? String) ?: profile, fields)
+        }
+
+        // 零点刷新：当日那几量从零起算（DAY-01、DAY-06）。补一补池不按天清，所以留着。
+        if (job["rollover"] as? Boolean == true) {
+            ledger.events.removeAll { it.kind in DAY_SCOPED }
         }
 
         val plan = LinkedHashMap<String, Any>()

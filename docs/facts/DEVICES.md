@@ -191,6 +191,10 @@
   上面那次读到 `{"len":9,"cps":[4eca,5929,5df2,6309,7ea6,5b9a,4f7f,7528,3002]}`，
   与源文案逐位相同，所以那阵子「每个字同一个字形」不是文本坏了，是字形映射。
 - 还剩一小条：个别字仍缺字形（角标「无到期项」少画了一个字），属字体覆盖，不是这条链的塌法。
+- 这两条现在进了设备清单，不用手验（`tools/tv-device.yaml` 的 `probes:`）：
+  `input` 读 `/sdcard/Android/data/com.youban.tv/files/youban-input.json` 里有 `"key":"accept"`；
+  `text` 读 `youban-diag.json`，码位必须全落在汉字/标点/ASCII 之内，出现 U+FFFD 就是文本在途中坏了。
+  实测一行：`text PASS 9 个码位全是真字（8 个汉字），没有 U+FFFD`。
 - 复核：`sh device/android/build-apk.sh && adb -s <设备> install -r device/android/out/youban-tv.apk`
   → `am start -n com.youban.tv/.MainActivity` → `am broadcast -n com.youban.tv/.StateReceiver -a com.youban.STATE --es state '<CommitState JSON>'`
   → 截图 + `cat .../youban-diag.json`。**注意**：广播必须带 `-n`，且 `StateReceiver` 要先把 extra 落到文件

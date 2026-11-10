@@ -99,12 +99,69 @@ def device_step(args, file, id)
   [out.lines.grep(/已在/).any? && $?.success?, out.lines.last.to_s.strip, shot]
 end
 
+# 两道设备自检：验的不是「判定」而是「设备能力本身」——这两件事没有对应的判定夹具。
+# 它们只能证明东西落到了设备、码位是对的；字形画得对不对仍由上面那八步的像素比对管（F17）。
+APK_PACKAGE = 'com.youban.tv'
+APK_FILES = "/sdcard/Android/data/#{APK_PACKAGE}/files".freeze
+
+def shell(args, cmd)
+  IO.popen(['adb', '-s', args[:serial].to_s, 'shell', cmd], err: %i[child out], &:read).to_s
+end
+
+def probe_input(args)
+  return [false, '没装 com.youban.tv：先 sh device/android/build-apk.sh && adb install -r'] if
+    shell(args, "pm list packages #{APK_PACKAGE}").strip.empty?
+
+  shell(args, "am force-stop #{APK_PACKAGE}")
+  shell(args, "am start -n #{APK_PACKAGE}/.MainActivity")
+  sleep 3
+  shell(args, "rm -f #{APK_FILES}/youban-input.json")
+  shell(args, 'input keyevent 23') # 确认键：遥控器上那一下
+  sleep 1
+  got = shell(args, "cat #{APK_FILES}/youban-input.json")
+  ok = got.include?('"key":"accept"') && got.include?('monoMs')
+  return [true, "确认键落到设备：#{got.lines.first.to_s.strip}"] if ok
+
+  [false, "按了确认键但设备没落账：#{got.lines.first.to_s.strip.empty? ? '文件不存在' : got.lines.first.strip}"]
+end
+
+# 这一屏句子到 TextView 时的码位（应用自己写到 youban-diag.json，见 F17）。
+# 只看码位：它们必须是真汉字、不能是 U+FFFD——那意味着文本在编译或传递途中就坏了。
+PROBE_TEXT_CASE = ['fixtures/layer.yaml', 'LAYER-07'].freeze
+
+def probe_text(args)
+  raw = IO.popen(['ruby', File.join(ROOT, 'tools/tv-status.rb'), *PROBE_TEXT_CASE, '--raw'],
+                 err: %i[child out], &:read)
+  return [false, "内核这边就没出结论：#{raw.lines.last.to_s.strip}"] unless raw.include?('"status"')
+
+  shell(args, "am broadcast -n #{APK_PACKAGE}/.StateReceiver -a com.youban.STATE --es state #{raw.strip.gsub("'", "'\\''")}")
+  sleep 2
+  got = shell(args, "cat #{APK_FILES}/youban-diag.json")
+  json = (got.scan(/[\s\S]+/).join).gsub(/[\r\n]+/, '')[/{"len.*?\}/]
+  return [false, "设备没回写码位（装了 APK 并推过状态吗？）：#{got.lines.first.to_s.strip}"] unless json
+
+  # 不依 JSON 解析：这台机器的 screencap/cat 习惯在 stdout 里夹带警告，整份解析一炸就没法往下走。
+  cps = json.to_s.scan(/\b[0-9a-f]{4}\b/).map { |h| h.to_i(16) }
+  return [false, '码位是空的'] if cps.empty?
+
+  bad = cps.reject { |c| (0x4E00..0x9FFF).cover?(c) || [0x3002, 0xFF0C, 0x3001].include?(c) || (0x20..0x7E).cover?(c) }
+  return [false, "码位里有不该出现的字符：#{bad.map { |c| format('%X', c) }.join(',')}（文本在途中坏了）"] unless bad.empty?
+
+  han = cps.count { |c| (0x4E00..0x9FFF).cover?(c) }
+  return [false, "这一屏句子里一个汉字都没有：#{json}"] if han.zero?
+
+  [true, "#{cps.size} 个码位全是真字（#{han} 个汉字），没有 U+FFFD"]
+end
+
+PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text) }.freeze
+
 args = parse_args(ARGV)
 if args[:facts]
   device_facts(args)
   exit 0
 end
 
+probes = Array(YAML.load_file(LIST)['probes'])
 scenarios = YAML.load_file(LIST)['scenarios']
 scenarios = scenarios.select { |s| Array(args[:only]).any? { |p| s['case'].split('#').last.start_with?(p) } } if args[:only]
 abort "#{LIST} 里没有要跑的用例" if scenarios.empty?
@@ -126,6 +183,17 @@ args[:cycle].times do |round|
     printf("%-14s %s 内核侧 %s ｜ 设备侧 %s\n", label, ok ? 'PASS' : 'FAIL',
            kok ? '绿' : "红（#{klin.strip}）", dok ? '已显示并自证' : "没显示：#{dlast}")
     puts "               #{s['why']}；截图 #{shot}" if ok
+  end
+  puts
+end
+
+if fails.empty?
+  probes.each do |p|
+    fn = PROBES[p['probe'].to_s]
+    ok, detail = fn.call(args)
+    fails << "probe:#{p['probe']}" unless ok
+    printf("%-14s %s %s\n", p['probe'], ok ? 'PASS' : 'FAIL', detail)
+    puts "               #{p['why']}"
   end
   puts
 end

@@ -41,6 +41,7 @@ Dir[File.join(ROOT, 'fixtures', '*.yaml')].sort.each do |path|
       rescue Unsupported
         next # 这一轮的动作模型还不认，比不了；不算通过也不算失败，跳过（run-fixtures 会把它记成未支持）
       end
+      args = w.send(:decide_args)
       mine = w.commit_state
       next unless mine.is_a?(Hash) # 这一轮没有可比的结论（比如还没选人）
 
@@ -48,6 +49,13 @@ Dir[File.join(ROOT, 'fixtures', '*.yaml')].sort.each do |path|
       jobs << {
         'contract' => File.join(ROOT, 'contract/contract.json'),
         'profile' => w.profile, 'strength' => w.strength,
+        # 形态与「已受理的暂停」是这一轮的状态，不传就等于两边喂的输入不同——那是比对器的错，
+        # 不是内核的分歧（这种假阳性烧掉过一次，别再犯）。
+        'mode' => args[:mode], 'paused' => !args[:motion_state].empty?,
+        'pauseMs' => args[:motion_state]['pauseMs'].to_i,
+        'requested' => args[:requested], 'probeOk' => args[:probe],
+        # 这一轮做了零点刷新就得告诉内核，否则两边喂的输入不同（DAY-06）。
+        'rollover' => (c['when'] || {}).keys.any? { |k| k.to_s =~ /crossedMidnight|rollover|dayRefresh/i },
         'plan' => w.plan,
         'events' => w.ledger.events.map { |e|
           { 'kind' => e.kind.to_s, 'profile' => e.profile.to_s,
