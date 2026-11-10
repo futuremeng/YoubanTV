@@ -312,7 +312,7 @@ class World
   # 断言「保持不变」用 subject 的当日投影与跨天保留项，不受当前判定身份影响（切换不串账）。
   # 跨身份重算时要冻住的方案参数：这些是「默认值表」的内容，不是判定本身。
   PINNED_PLAN_KEYS = %w[allowanceMs graceMs moveFromMs inSlot groupsPerTask minutesPerGroup roundTarget
-                        form inviteTier slots].freeze
+                        form inviteTier slots dueKinds].freeze
 
   VERDICT_FIELDS = { 'status' => :status, 'tier' => :tier, 'mode' => :mode, 'wording' => :wording,
                      'nextAction' => :next_action, 'blocked' => :blocked, 'tierCeiling' => :tierCeiling }.freeze
@@ -1336,7 +1336,9 @@ class World
   # 当日方案里模型会真正用到的字段。其余状态键一律记为「未消费」，由调用方判未支持。
   def plan_overrides(given)
     o = {}
-    %w[allowanceMs graceMs moveFromMs inSlot groupsPerTask minutesPerGroup roundTarget].each do |k|
+    # dueKinds 也在这里：这一档的约定项有哪几类是**方案参数**（默认值挑选那一处给，PROFILE-11），
+    # 不加进来就等于夹具给了、模型没拿到——那条断言会绿着空转（今天就是这么撞上的）。
+    %w[allowanceMs graceMs moveFromMs inSlot groupsPerTask minutesPerGroup roundTarget dueKinds].each do |k|
       next unless given.key?(k)
 
       o[k] = given[k]

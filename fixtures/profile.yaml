@@ -300,3 +300,36 @@ AUTO-14:
       given: { actor: "member:mom", via: panel }
       when: { put: "PUT /api/myPlan" }
       expect: { writable: false, shown: [现值] }
+
+PROFILE-11:
+  spec: [spec/PROFILE.md#PROFILE-11, docs/DECISIONS.md#D76]
+  # 这一条钉的是「约定项有哪几类按受众挑一次」，位点只在默认值挑选那一处（PROFILE-02）。
+  # 前两例必须用**同一组数**：不然比的就不是这一条——把 watched 摆在运动段之后，
+  # kind 本来会选 exercise，受众那一步没实现也照样绿（第一条就是这么假绿的）。
+  given: { inSlot: true, answeredInTask: 0, roundsDone: 0 }
+  cases:
+    - name: 孩子的约定项含题目——过了宽限期、还没到运动段，就是题目
+      given: { profile: "member:kid", audience: child, allowanceMs: 10800000, graceMs: 7200000,
+               moveFromMs: 9000000, watchedMs: 7500000 }
+      when: { mode: ambient }
+      expect: { status: due, nextAction: quiz, due: { kind: quiz, deficit: questions } }
+    - name: 大人的约定项不含题目——同一组数字落点是「不按题目催」，屏上不会出现「还差 N 题」
+      given: { profile: "member:dad", audience: grown-up, allowanceMs: 10800000, graceMs: 7200000,
+               moveFromMs: 9000000, watchedMs: 7500000 }
+      when: { mode: ambient }
+      expect: { status: honored, due: null }
+    - name: 大人在运动段里仍按运动催——清单只删种类，不删那一档该有的事
+      given: { profile: "member:dad", audience: grown-up, allowanceMs: 14400000, graceMs: 7200000,
+               moveFromMs: 9000000, watchedMs: 9500000 }
+      when: { mode: ambient }
+      expect: { status: due, nextAction: exercise, due: { kind: exercise, deficit: reps } }
+    - name: 老人的约定项两样都不要——进了运动段也不催
+      given: { profile: "member:grandpa", audience: senior, allowanceMs: 28800000, graceMs: 7200000,
+               moveFromMs: 9000000, watchedMs: 9500000 }
+      when: { mode: ambient }
+      expect: { status: honored, due: null }
+    - name: 时长那一本账与受众无关——老人超出约定照样 overdue
+      given: { profile: "member:grandpa", audience: senior, allowanceMs: 28800000, graceMs: 28800000,
+               moveFromMs: 28800000, watchedMs: 29000000 }
+      when: { mode: ambient }
+      expect: { status: overdue, due: null, tier: L1.5, events: [OVER] }

@@ -1110,37 +1110,43 @@
         "allowanceMs": 3600000,
         "graceMs": 1800000,
         "moveFromMs": 3600000,
-        "form": "focused"
+        "form": "focused",
+        "dueKinds": ["quiz", "exercise"]
       },
       "child weekend": {
         "allowanceMs": 10800000,
         "graceMs": 3600000,
         "moveFromMs": 5400000,
-        "form": "focused"
+        "form": "focused",
+        "dueKinds": ["quiz", "exercise"]
       },
       "grown-up schoolday": {
         "allowanceMs": 7200000,
         "graceMs": 7200000,
         "moveFromMs": 7200000,
-        "form": "ambient"
+        "form": "ambient",
+        "dueKinds": ["exercise"]
       },
       "grown-up weekend": {
         "allowanceMs": 7200000,
         "graceMs": 7200000,
         "moveFromMs": 7200000,
-        "form": "ambient"
+        "form": "ambient",
+        "dueKinds": ["exercise"]
       },
       "senior schoolday": {
         "allowanceMs": 28800000,
         "graceMs": 28800000,
         "moveFromMs": 28800000,
-        "form": "ambient"
+        "form": "ambient",
+        "dueKinds": []
       },
       "senior weekend": {
         "allowanceMs": 28800000,
         "graceMs": 28800000,
         "moveFromMs": 28800000,
-        "form": "ambient"
+        "form": "ambient",
+        "dueKinds": []
       }
     },
     "firstRun": [

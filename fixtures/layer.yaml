@@ -119,7 +119,10 @@ LAYER-07:
       when: { modeRequested: focused }
       expect: { mode: ambient, shown: [当前模式与原因] }
     - name: 矩阵对所有身份同一张
-      given: { strengths: [accompanied, negotiated, selfManaged], audiences: [child, grown-up, senior] }
+      # 这一条比的是**层**那一维，不是「约定项有哪几类」——后者按受众挑（PROFILE-11、D76），
+      # 不管着它就成了未控变量：大人与老人没有题目到期项，落层当然不同，那不该由这条来判。
+      given: { strengths: [accompanied, negotiated, selfManaged], audiences: [child, grown-up, senior],
+               dueKinds: [quiz, exercise] }
       when: { mode: ambient }
       expect: { identicalAcross: { dimension: audience, fields: [tier] } }
 

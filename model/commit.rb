@@ -198,8 +198,13 @@ module Core
     def due_of(out, plan, q, strength, mode, watched, capability = {}, probe = nil, requested = false)
       round_target = plan.fetch('roundTarget', 5).to_i
       move_from = plan['moveFromMs'].to_i
-      quiz_open = watched < move_from && q['answeredInTask'].to_i < round_target
-      exercise_open = watched >= move_from && q['roundsDone'].to_i < plan.fetch('exerciseRounds', 1).to_i
+      # 这一档的约定项有哪几类，只由默认值挑选那一处给（PROFILE-11、D76）：清单里没有的种类不出到期项。
+      # 大人与老人的约定项**不含题目**——屏上就不会出现「还差 N 题」那种兑现不了的承诺（内容不是本产品的前提）。
+      # 存过的方案没这一项时按两类都开来算（老账原样跑，不因为这条改动而换结论）。
+      kinds = plan.fetch('dueKinds', %w[quiz exercise])
+      quiz_open = watched < move_from && q['answeredInTask'].to_i < round_target && kinds.include?('quiz')
+      exercise_open = watched >= move_from && q['roundsDone'].to_i < plan.fetch('exerciseRounds', 1).to_i &&
+                      kinds.include?('exercise')
       return honored_after_done(out, watched) unless quiz_open || exercise_open
 
       # 表的字面：COMMIT-02 是 grace ≤ watched < moveFrom；COMMIT-03 是 watched ≥ moveFrom。

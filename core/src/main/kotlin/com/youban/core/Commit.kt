@@ -147,8 +147,13 @@ object Commit {
     ): Map<String, Any?> {
         val roundTarget = Day.num(plan.getOrDefault("roundTarget", 5)).toInt()
         val moveFrom = Day.num(plan["moveFromMs"])
-        val quizOpen = watched < moveFrom && (q["answeredInTask"] ?: 0) < roundTarget
-        val exerciseOpen = watched >= moveFrom && (q["roundsDone"] ?: 0) < Day.num(plan.getOrDefault("exerciseRounds", 1))
+        // 这一档的约定项有哪几类，只由默认值挑选那一处给（PROFILE-11、D76）：清单里没有的种类不出到期项。
+        // 存过的方案没这一项时按两类都开来算（老账原样跑）。
+        val kinds = plan["dueKinds"] as? List<*>
+        val quizOpen = watched < moveFrom && (q["answeredInTask"] ?: 0) < roundTarget &&
+            (kinds == null || kinds.contains("quiz"))
+        val exerciseOpen = watched >= moveFrom && (q["roundsDone"] ?: 0) < Day.num(plan.getOrDefault("exerciseRounds", 1)) &&
+            (kinds == null || kinds.contains("exercise"))
         if (!quizOpen && !exerciseOpen) {
             return out + mapOf("tier" to tierFor(), "events" to listOf("DONE"), "value" to mapOf("watchedMs" to watched))
         }

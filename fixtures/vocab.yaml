@@ -57,6 +57,7 @@ fields:
   acceptedBy: {type: profile}
   audience: {type: enum, enum: audience}
   audiences: {type: list, enum: audience}
+  dueKinds: {type: list, enum: dueKind} # 这一档的约定项有哪几类（PROFILE-11、D76）
   strength: {type: enum, enum: strength}
   strengths: {type: list, enum: strength}
   assembly: {type: symbol, values: [tv, mobile]}
