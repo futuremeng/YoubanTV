@@ -117,8 +117,12 @@ object Commit {
             )
         }
         if (watched < grace) {
+            // 免题段覆盖全天时要给一句常驻说明；有当日任务额度时带上进度（DAY-03、DAY-05）。
+            var shown = listOf("角标剩余")
+            if (plan["quiet"].toString() == "allDay") shown = shown + "免题段说明"
+            if (plan.containsKey("groupsPerTask")) shown = shown + "进度"
             return out + mapOf(
-                "tier" to tierFor(), "sentence" to "honored", "shown" to listOf("角标剩余"),
+                "tier" to tierFor(), "sentence" to "honored", "shown" to shown,
                 "value" to mapOf("remainingMs" to grace - watched, "watchedMs" to watched)
             )
         }
@@ -201,9 +205,29 @@ object Commit {
             "wording" to v["wording"],
             "surface" to v["surface"],
             "fallbackReason" to v["fallbackReason"],
-            "text" to textOf(v, plan, q)
+            "text" to textOf(v, plan, q),
+            "panels" to panelsOf(v, plan, q)
         )
     }
+
+    /** 常驻提示条与角标上那些小条：名字在 shown 里，句子在契约的 panels 表里，数量从事件账的量来填。 */
+    @Suppress("UNCHECKED_CAST")
+    fun panelsOf(v: Map<String, Any?>, plan: Map<String, Any>, q: Map<String, Long>): List<String> {
+        val panels = commitState["panels"] as Map<String, String>
+        val value = v["value"] as Map<String, Any?>
+        return (v["shown"] as List<String>).map { name ->
+            when (name) {
+                "角标剩余" -> panels.getValue(name).replace("{minutes}", minutes(value["remainingMs"]).toString())
+                "超出约定分钟数" -> panels.getValue(name).replace("{minutes}", minutes(value["overMs"]).toString())
+                "进度" -> panels.getValue(name)
+                    .replace("{done}", q.getOrDefault("answeredInTask", 0).toString())
+                    .replace("{target}", (Day.effectiveGroups(plan) * Day.num(plan.getOrDefault("groupsPerTask", 1))).toString())
+                else -> panels.getOrDefault(name, name)
+            }
+        }
+    }
+
+    private fun minutes(ms: Any?): Long = Math.ceil(Day.num(ms) / 60_000.0).toLong()
 
     /**
      * 那句措辞的唯一拼法：句子与填空的小表都在契约里（commitState.sentences / .fill）。

@@ -46,6 +46,7 @@ public class MainActivity extends Activity {
     private TextView sentence;
     private TextView badge;
     private TextView foot;
+    private TextView panels;
 
     private final BroadcastReceiver stateReceiver = new BroadcastReceiver() {
         @Override
@@ -72,6 +73,7 @@ public class MainActivity extends Activity {
         sentence = (TextView) findViewById(R.id.sentence);
         badge = (TextView) findViewById(R.id.badge);
         foot = (TextView) findViewById(R.id.foot);
+        panels = (TextView) findViewById(R.id.panels);
         // 字形这一层现在不干预：这台机器上无论用系统族名、设备自带的 .otf/.ttc、还是随包带的字体，
         // 屏幕上都是「每个字同一个字形」，而换一个字体那个字形跟着变——就是每个字都落到了那个字体的
         // .notdef。也就是说：到达 TextView 的码位不是 dex 里那串汉字（dex 里的字节已逐字核过）。
@@ -269,7 +271,12 @@ public class MainActivity extends Activity {
         sentence.setText(said);
         // 对照：把同一份文案放进那个「画得对」的视图里。屏幕上两行一样就是同一个字符串两条命，
         // 那就是 per-string；两行不一样就是 per-view（画的那一层），字体与码位这两条就可以彻底划掉。
-        dumpCodepoints(said);
+        // 常驻那几条也是内核给的句子（契约 commitState.panels）：界面只串一个分隔符。
+        String notes = array(json, "panels");
+        if (panels != null) {
+            panels.setText(notes);
+        }
+        dumpCodepoints(said + (notes.isEmpty() ? "" : " · " + notes));
         dumpGlyphCoverage(said);
         badge.setText(tier + " · " + ("due".equals(status) ? "待做" : "无到期项"));
         foot.setText("落层 " + tier + " · 强度天花板 " + ceiling
@@ -408,6 +415,28 @@ public class MainActivity extends Activity {
     }
 
     /** 极简取值：这一层不需要 JSON 库，字段少，读不出来就用默认，绝不猜。 */
+    /** 取一个字符串数组，用「 · 」串起来：没有这个键就当没有这一条。 */
+    static String array(String json, String key) {
+        int at = json.indexOf("\"" + key + "\":[");
+        if (at < 0) {
+            return "";
+        }
+        int from = at + key.length() + 4;
+        int to = json.indexOf(']', from);
+        if (to < 0) {
+            return "";
+        }
+        String[] parts = json.substring(from, to).split("\",\"");
+        StringBuilder sb = new StringBuilder();
+        for (String part : parts) {
+            String clean = part.replace("\"", "").replace(",", " · ");
+            if (!clean.trim().isEmpty()) {
+                sb.append(sb.length() == 0 ? "" : " · ").append(clean.trim());
+            }
+        }
+        return sb.toString();
+    }
+
     static String field(String json, String key, String fallback) {
         String needle = "\"" + key + "\":";
         int i = json.indexOf(needle);

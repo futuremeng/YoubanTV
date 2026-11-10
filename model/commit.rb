@@ -46,7 +46,8 @@ module Core
         'wording' => v[:wording],
         'surface' => v[:surface],
         'fallbackReason' => v[:fallbackReason],
-        'text' => text_of(v, q, plan)
+        'text' => text_of(v, q, plan),
+        'panels' => panels_of(v, q, plan)
       }
     end
 
@@ -56,6 +57,22 @@ module Core
                          .fetch('commitState')
     SENTENCES = COMMIT_STATE.fetch('sentences')
     FILL = COMMIT_STATE.fetch('fill')
+    PANELS = COMMIT_STATE.fetch('panels')
+
+    # 常驻提示条与角标上那些小条：名字在 shown 里，句子在这张表里，数量从事件账的量来填。
+    def panels_of(v, q, plan)
+      value = v[:value] || {}
+      Array(v[:shown]).map do |name|
+        case name
+        when '角标剩余' then PANELS.fetch(name).sub('{minutes}', ((value['remainingMs'].to_i / 60_000.0).ceil).to_s)
+        when '超出约定分钟数' then PANELS.fetch(name).sub('{minutes}', ((value['overMs'].to_i / 60_000.0).ceil).to_s)
+        when '进度'
+          PANELS.fetch(name).sub('{done}', q['answeredInTask'].to_i.to_s)
+                       .sub('{target}', (Day.effective_groups(plan) * plan.fetch('groupsPerTask', 1).to_i).to_s)
+        else PANELS.fetch(name, name)
+        end
+      end
+    end
 
     def text_of(v, q, plan)
       key = v[:sentence] || (v[:status] == 'overdue' ? 'overdue' : 'honored')

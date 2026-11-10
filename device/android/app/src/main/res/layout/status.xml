@@ -14,6 +14,15 @@
       android:textColor="#F2F2F5" />
 
   <TextView
+      android:id="@+id/panels"
+      android:layout_width="match_parent"
+      android:layout_height="wrap_content"
+      android:layout_gravity="center_vertical"
+      android:layout_marginTop="150dp"
+      android:textSize="28sp"
+      android:textColor="#9AD0FF" />
+
+  <TextView
       android:id="@+id/sentence"
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
