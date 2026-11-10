@@ -80,6 +80,7 @@ fields:
   signed: {type: boolean}
   stillWatching: {type: boolean}
   exerciseTasks: {type: list}
+  series: {type: list, note: "一段节律：[{at, periodMs, amplitude}]，计次那一条读它（SENSE-01、F13）"}
   taskDone: {type: boolean}
   quizDone: {type: boolean}
   exerciseDone: {type: boolean}
@@ -226,6 +227,10 @@ predicates:
   noEvents: {listOf: event}
   absent: {listOf: name, note: "契约字段 / 端点 / API / 事件：不存在"}
   presentIn: {listOf: name, note: "出现在代码或契约中的位置"}
+  # —— 计次那一条数出来的是什么（SENSE-01、F31）：三个数都由模型答，执行器不自己数。
+  countedReps: {type: number}
+  ambiguousReps: {type: number}
+  rejectedReps: {type: number}
   value: {map: metric}
   delta: {map: metric}
   unchanged: {listOf: metric}

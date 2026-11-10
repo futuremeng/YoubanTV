@@ -1414,6 +1414,38 @@
       "spec": [
         "SENSE-04"
       ]
+    },
+    "counting": {
+      "x-note": "计次只有一处实现（SENSE-01）：这里定的是那一条怎么判一次。节律窗口与最小幅度复用 sense.rhythm 那几个数，这里只补每个项目那一条「幅度不够清楚」的线。",
+      "refractoryDivisor": 2,
+      "x-note2": "两次节律间隔小于 periodMs 下限除以这个数，算同一次，不重复计。",
+      "default": {
+        "amplitudeSoft": 4,
+        "x-note": "项目没登记时按这条：清楚线以下直接不算，清楚线与最小幅度之间算「要人确认」。"
+      },
+      "byKind": {
+        "jump": {
+          "name": "开合跳",
+          "amplitudeSoft": 4
+        },
+        "squat": {
+          "name": "深蹲",
+          "amplitudeSoft": 5
+        },
+        "seated": {
+          "name": "坐姿操",
+          "amplitudeSoft": 3
+        }
+      },
+      "verdicts": {
+        "counted": "算一次",
+        "ambiguous": "幅度不够清楚：不算，但给一次手动确认",
+        "rejected": "节律越界或幅度低于清楚线：不算，也不提示"
+      },
+      "spec": [
+        "SENSE-01",
+        "SENSE-02"
+      ]
     }
   },
   "motion": {

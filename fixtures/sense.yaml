@@ -14,6 +14,21 @@ SENSE-01:
     - name: ambiguous 不满足目标，给一次手动确认
       when: { exerciseVerdict: ambiguous }
       expect: { applied: false, unchanged: [roundsDone], value: { manualConfirmation: true }, noEvents: [ROUND_DONE] }
+    # 下面四条数的是「一段节律里有几次」——F13 要拿人工计数来对照的就是这一支（SENSE-01、D45）。
+    # 这一支不写账：传感器计次不兑换时长，入账仍走本人确认（D24、AUTO-14）。
+    - name: 连续 20 次节律都清楚，算法数出 20 次
+      when:
+        series: [{ kind: jump, at: 0, periodMs: 800, amplitude: 12 }, { kind: jump, at: 800, periodMs: 800, amplitude: 12 }, { kind: jump, at: 1600, periodMs: 800, amplitude: 12 }, { kind: jump, at: 2400, periodMs: 800, amplitude: 12 }, { kind: jump, at: 3200, periodMs: 800, amplitude: 12 }, { kind: jump, at: 4000, periodMs: 800, amplitude: 12 }, { kind: jump, at: 4800, periodMs: 800, amplitude: 12 }, { kind: jump, at: 5600, periodMs: 800, amplitude: 12 }, { kind: jump, at: 6400, periodMs: 800, amplitude: 12 }, { kind: jump, at: 7200, periodMs: 800, amplitude: 12 }, { kind: jump, at: 8000, periodMs: 800, amplitude: 12 }, { kind: jump, at: 8800, periodMs: 800, amplitude: 12 }, { kind: jump, at: 9600, periodMs: 800, amplitude: 12 }, { kind: jump, at: 10400, periodMs: 800, amplitude: 12 }, { kind: jump, at: 11200, periodMs: 800, amplitude: 12 }, { kind: jump, at: 12000, periodMs: 800, amplitude: 12 }, { kind: jump, at: 12800, periodMs: 800, amplitude: 12 }, { kind: jump, at: 13600, periodMs: 800, amplitude: 12 }, { kind: jump, at: 14400, periodMs: 800, amplitude: 12 }, { kind: jump, at: 15200, periodMs: 800, amplitude: 12 }]
+      expect: { countedReps: 20, ambiguousReps: 0, rejectedReps: 0, noEvents: [ROUND_DONE] }
+    - name: 幅度在清楚线与最小幅度之间，那一下算要人确认，不数进去
+      when: { series: [{ kind: squat, at: 0, periodMs: 900, amplitude: 5 }] }
+      expect: { countedReps: 0, ambiguousReps: 1, rejectedReps: 0, value: { manualConfirmation: true }, noEvents: [ROUND_DONE] }
+    - name: 一次动作被切成两段，只数一次
+      when: { series: [{ kind: jump, at: 0, periodMs: 800, amplitude: 12 }, { kind: jump, at: 100, periodMs: 800, amplitude: 12 }] }
+      expect: { countedReps: 1, rejectedReps: 1, ambiguousReps: 0 }
+    - name: 节律越出窗口就不算，也不提示要确认
+      when: { series: [{ kind: seated, at: 0, periodMs: 99999, amplitude: 9 }] }
+      expect: { countedReps: 0, rejectedReps: 1, ambiguousReps: 0 }
 
 SENSE-02:
   spec: [spec/SENSE.md#SENSE-02, docs/facts/DEVICES.md#F13, docs/DECISIONS.md#D36]

@@ -1120,6 +1120,9 @@ class World
       @extras['calibration'] = cal
       apply_calibration!
     end
+    if (ser = when_.delete('series'))
+      counting(ser)
+    end
     if (ry = when_.delete('rhythm'))
       rhythm(ry)
     end
@@ -1504,6 +1507,16 @@ class World
   end
 
   # 体感那一侧的节律计次：帧只在这一趟里过，落盘的只有计次（SENSE-01）。
+  # 项目名从这一段节律的第一条里取（契约 sense.counting.byKind 那一处认得它）。
+  # F13 要对照的就是这一支：算法计数的次数由模型数一次，执行器不自己数（SENSE-01、D45）。
+  # 这一支不写账：传感器计次不兑换时长，入账走本人确认那一条（D24、AUTO-14）。
+  def counting(series)
+    got = Core::Sense.count(kind: series.to_a.first&.[]('kind'), rhythm: series)
+    %w[countedReps ambiguousReps rejectedReps].each { |k| @extras[k] = got[k] }
+    @extras['manualConfirmation'] = true if got['manualConfirmation']
+    @extras['verdicts'] = got['verdicts']
+  end
+
   def rhythm(spec)
     @extras['counterInputFields'] = CONTRACT.dig('sense', 'rhythm', 'fields').to_a.size
     counted = Core::Sense.rhythm_counted?(spec)
@@ -1676,7 +1689,13 @@ def check(key, want, world, before)
   when 'agreementStep' then cmp(want, world.derived['agreementStep'])
   when 'otherProfileUnchanged' then cmp(want, world.derived['otherProfileUnchanged'])
   else
-    raise Unsupported, "断言键 #{key}"
+    # 模型答得出的键（derived/extras）走通用比较：这些值一律由模型算出来，
+    # 执行器不在这儿写第二个答案（D42、D45）。答不出来的键仍然落到下面的「未支持」。
+    if world.derived.key?(key)
+      cmp(want, world.derived[key])
+    else
+      raise Unsupported, "断言键 #{key}"
+    end
   end
 end
 

@@ -12,6 +12,58 @@ module Core
     FRAME_RETENTION_MS = 0
     CONTRACT = JSON.parse(File.read(File.expand_path('../contract/contract.json', __dir__)))
     INVITE = CONTRACT.fetch('sense').fetch('invite')
+    COUNT = CONTRACT.dig('sense', 'counting').to_h.freeze
+
+    module_function
+
+    # 计次只有一处实现（SENSE-01）：三条信号源都归到 {kind, periodMs, amplitude}，
+    # 判「这一下算不算一次」就这一支。数字来自 sense.rhythm（节律窗口与最小幅度）+
+    # sense.counting（每个项目那条「幅度不够清楚」的线与去重的那条）。
+    # F13 要对照的「算法计数」数的就是这里的 countedReps——采样之前先有可复核的一支。
+    def count(kind:, rhythm: [])
+      gate = CONTRACT.dig('sense', 'rhythm').to_h
+      lo = gate['minPeriodMs'].to_i
+      hi = gate['maxPeriodMs'].to_i
+      min_amp = gate['minAmplitude'].to_i
+      row = COUNT.dig('byKind', kind.to_s) || COUNT['default']
+      soft = row ? row['amplitudeSoft'].to_i : min_amp
+      divisor = COUNT['refractoryDivisor'].to_i
+      divisor = 1 if divisor < 1
+
+      verdicts = []
+      last_at = nil
+      rhythm.to_a.each_with_index do |ev, i|
+        period = ev['periodMs'].to_i
+        amp = ev['amplitude'].to_i
+        at = ev.key?('at') ? ev['at'].to_i : i
+        if period < lo || period > hi
+          verdicts << 'rejected'
+          next
+        end
+        if amp < soft
+          verdicts << 'rejected'
+          next
+        end
+        if amp < min_amp
+          verdicts << 'ambiguous'
+          next
+        end
+        # 去重：这一下离上一次「算过的那一次」太近，就是同一次动作被切成了两段。
+        if last_at && (at - last_at).abs < lo / divisor
+          verdicts << 'rejected'
+          next
+        end
+        last_at = at
+        verdicts << 'counted'
+      end
+
+      counted = verdicts.count('counted')
+      ambiguous = verdicts.count('ambiguous')
+      { 'countedReps' => counted, 'ambiguousReps' => ambiguous,
+        'rejectedReps' => verdicts.size - counted - ambiguous,
+        'verdicts' => verdicts, 'manualConfirmation' => ambiguous.positive?,
+        'countedRepsMatchesTarget' => nil }
+    end
 
     # 邀请这一条只由这一处答（SENSE-07）：档位决定频率，quiet 不主动邀请；
     # 拒绝只让本档内不再邀请——不改档位、不减次数、也不参与任何「今天表现」的记录。

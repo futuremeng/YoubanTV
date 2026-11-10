@@ -18,7 +18,9 @@
     "cardinality": "每类角色同一时刻各一人，可轮值",
     "grantPath": "本机当前激活模式内的两次确认：持有人提 roleChange 动议，对方在自己的界面受理",
     "keyHolderTransfer": "必须在被控设备本机由现任当场确认，不接受远程受理",
-    "derivedFrom": [],
+    "derivedFrom": [
+
+    ],
     "spec": [
       "AUTO-07",
       "AUTO-09",
@@ -622,7 +624,9 @@
       "clearBacklogFirst"
     ],
     "writePath": "PUT /api/myPlan（仅本人）",
-    "writePathsForOthers": [],
+    "writePathsForOthers": [
+
+    ],
     "inTighteningComparison": false,
     "uiWords": {
       "groupsPerTask": "组数",
@@ -1146,7 +1150,9 @@
           "PROFILE-01",
           "PROFILE-06"
         ],
-        "asks": [],
+        "asks": [
+
+        ],
         "note": "遥控器打不出名字：这一台先叫「这一台设备上的这一档」，名字在另一处改（PROFILE-01）。"
       },
       {
@@ -1182,7 +1188,9 @@
           "DAY-08",
           "DAY-03"
         ],
-        "asks": [],
+        "asks": [
+
+        ],
         "note": "时段表在电视遥控器上改不好：这一步按默认，写清楚去哪儿改（DAY-08）。"
       },
       {
@@ -1205,7 +1213,9 @@
           "AUTO-07",
           "AGREE-05"
         ],
-        "asks": []
+        "asks": [
+
+        ]
       }
     ],
     "firstRunEscape": "每一步都可以「先用默认」；用了默认的条目在界面上标「未签·默认」，不弹催签、不进周报、不打分（AGREE-04、ONBOARD-05）。",
@@ -1268,12 +1278,13 @@
     "rows": [
       {
         "permission": "android.permission.SYSTEM_ALERT_WINDOW",
-        "use": "L2 那一张卡的悬浮层",
+        "use": "L3 的应用外呈现：离开本应用仍可见的那一张",
         "declared": true,
         "implemented": true,
-        "note": "L3 那一张「离开本应用仍可见」的浮层已落（OverlayCard）：装完默认不开、由面板授予；窗口不抢焦点，且不进字幕带（LAYER-14、facts/DEVICES.md#F30）。",
+        "note": "L3 那一张已落（OverlayCard）：装完默认不开、由面板授予；窗口不抢焦点（NOT_FOCUSABLE），落点不许进字幕带（LAYER-13 的 L3 呈现那一句、facts/DEVICES.md#F30）。",
         "spec": [
           "LAYER-02",
+          "LAYER-13",
           "ONBOARD-06"
         ]
       },
@@ -1403,6 +1414,38 @@
       "spec": [
         "SENSE-04"
       ]
+    },
+    "counting": {
+      "x-note": "计次只有一处实现（SENSE-01）：这里定的是那一条怎么判一次。节律窗口与最小幅度复用 sense.rhythm 那几个数，这里只补每个项目那一条「幅度不够清楚」的线。",
+      "refractoryDivisor": 2,
+      "x-note2": "两次节律间隔小于 periodMs 下限除以这个数，算同一次，不重复计。",
+      "default": {
+        "amplitudeSoft": 4,
+        "x-note": "项目没登记时按这条：清楚线以下直接不算，清楚线与最小幅度之间算「要人确认」。"
+      },
+      "byKind": {
+        "jump": {
+          "name": "开合跳",
+          "amplitudeSoft": 4
+        },
+        "squat": {
+          "name": "深蹲",
+          "amplitudeSoft": 5
+        },
+        "seated": {
+          "name": "坐姿操",
+          "amplitudeSoft": 3
+        }
+      },
+      "verdicts": {
+        "counted": "算一次",
+        "ambiguous": "幅度不够清楚：不算，但给一次手动确认",
+        "rejected": "节律越界或幅度低于清楚线：不算，也不提示"
+      },
+      "spec": [
+        "SENSE-01",
+        "SENSE-02"
+      ]
     }
   },
   "motion": {
@@ -1429,11 +1472,11 @@
   },
   "layering": {
     "overlay": {
-      "x-note": "L3 那一张的位置只在这里定：贴在内容右上角，下边缘不许越过字幕带上沿（spec/LAYER.md#LAYER-14）。",
+      "x-note": "L3 那一张的位置只在这里定：贴在内容右上角，下边缘不许越过字幕带上沿（spec/LAYER.md#LAYER-13 的呈现那一句）。",
       "subtitleBandPct": 15,
       "corner": "top-end",
       "spec": [
-        "LAYER-14",
+        "LAYER-13",
         "LAYER-02"
       ]
     }

@@ -113,7 +113,9 @@ tools/probe-record.rb --fact=f12 --device="Mi TV Master" --player=third-party \
      --source=manual --attempts=20 --false-counts=1 --distance=180 --lux=320 --frame-ms=28 --temp=34
    ```
 
-2. **对照实验**（只用于按项目分档回填 F13，不阻塞开关）：每项目 ≥200 次，人工计数与算法计数对照，
+2. **对照实验**（只用于按项目分档回填 F13，不阻塞开关）：每项目 ≥200 次，人工计数与算法计数对照
+   （算法那一支现在在规范模型里：`model/sense.rb` 的 `Core::Sense.count` + 契约 `sense.counting`；
+   数的就是 `countedReps`，逐次比对看 `verdicts` 那条序列，见 `facts/DEVICES.md#F31`），
    按项目（开合跳 / 深蹲 / 坐姿操）与机型分档，同时记帧处理耗时与温升。
 
    ```sh
