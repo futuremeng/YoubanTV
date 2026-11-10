@@ -18,7 +18,10 @@ bt="$sdk/build-tools/$build_tools"
 jar="$sdk/platforms/$platform/android.jar"
 echo "SDK：build-tools $build_tools · $platform"
 
-rm -rf "$work" && mkdir -p "$work/obj" "$work/res" "$work/apk" "$work/gen"
+rm -rf "$work" && mkdir -p "$work/obj" "$work/res" "$work/apk" "$work/gen" "$root/app/src/main/assets"
+# 契约每次打包重新拷一份：留着手拷的那份会在改了契约之后悄悄带着旧表上设备，
+# 于是设备与 Mac 两边用两份契约——align 绿、设备红，最难查的那种（F19）。
+cp "$root/../../contract/contract.json" "$root/app/src/main/assets/contract.json"
 "$bt/aapt2" compile --dir "$root/app/src/main/res" -o "$work/res.zip"
 # --java 这一步不能省：R.java 由 aapt2 生成，javac 才有 R.layout.status 这些符号可引。
 # aapt2 link 没有 --assets 这个选项（试过了：它只吃 --manifest/--java/--auto-add-overlay 这些），

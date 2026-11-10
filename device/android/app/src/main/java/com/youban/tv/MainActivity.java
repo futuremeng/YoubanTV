@@ -32,6 +32,8 @@ public class MainActivity extends Activity {
     static final String PLAN_NAME = "youban-plan.json";
     /** 契约随包带（assets/contract.json），第一次起来时解到应用目录给内核读那张层级表。 */
     static final String CONTRACT_NAME = "contract.json";
+    /** 设备自己算出的那份结论写在这儿：设备测试把它读回来，与 Mac 上规范模型的结果逐字段比。 */
+    static final String STATE_OUT_NAME = "youban-state-out.json";
     /** 旧路径留着只作调试兜底：直接塞一份算好的结论进来看排版。屏幕上会标明这是调试来源。 */
     static final String STATE_NAME = "youban-state.json";
     /** 遥控器按键落在这儿：设备测试从 adb 读回它，验「按键真的到了设备」。 */
@@ -159,6 +161,7 @@ public class MainActivity extends Activity {
                 String events = read(path(this, EVENTS_NAME, false));
                 String local = Kernel.state(events == null ? "" : events, plan, profile(), strength(), null);
                 debugSource = null;
+                write(path(this, STATE_OUT_NAME, true), local); // 给设备测试读回去比一遍
                 return local;
             } catch (RuntimeException e) {
                 debugSource = "内核没跑起来：" + e.getClass().getSimpleName();
@@ -261,7 +264,8 @@ public class MainActivity extends Activity {
         String wording = field(json, "wording", "statusSentence");
         String status = field(json, "status", "honored");
         String reason = field(json, "fallbackReason", "");
-        String said = line(status, wording, json);
+        // 那句措辞来自内核（句子在契约那一份里）：界面这边不许再拼一遍——之前这里就有四条 if（D47）。
+        String said = field(json, "text", "内核没给出这句措辞。");
         sentence.setText(said);
         // 对照：把同一份文案放进那个「画得对」的视图里。屏幕上两行一样就是同一个字符串两条命，
         // 那就是 per-string；两行不一样就是 per-view（画的那一层），字体与码位这两条就可以彻底划掉。
@@ -275,19 +279,6 @@ public class MainActivity extends Activity {
     }
 
     /** 措辞仍按 LAYERING §4 那一句：状态句 + 下一步，不指责、不催促、不承诺兑换。 */
-    private String line(String status, String wording, String json) {
-        String mode = nested(json, "mode");
-        if ("due".equals(status) && "focused".equals(mode)) {
-            return "这一组答完就记为已完成。";
-        }
-        if ("due".equals(status)) {
-            return "有一组题待做，现在做吗？";
-        }
-        if ("overdue".equals(status)) {
-            return "超出约定时间。今天已按约定使用完。";
-        }
-        return "今天已按约定使用。";
-    }
 
     /**
      * 用设备自带的中文字形。为什么还要显式指一次：只靠 textAppearance 时，这条链落到一个
@@ -352,10 +343,10 @@ public class MainActivity extends Activity {
             }
             in.close();
             String dest = path(this, CONTRACT_NAME, true);
-            if (!new File(dest).exists()) {
-                new File(dest).getParentFile().mkdirs();
-                write(dest, new String(out.toByteArray(), "UTF-8"));
-            }
+            // 每次都覆盖：装新版 APK 时若留着上一版解出来的契约，内核会照着旧那张表判，
+            // 于是设备与 Mac 两边悄悄用了两份契约——那种错最难查。
+            new File(dest).getParentFile().mkdirs();
+            write(dest, new String(out.toByteArray(), "UTF-8"));
             com.youban.core.Kernel.useContract(dest);
         } catch (Exception e) {
             fontNote = "契约没解出来：" + e.getClass().getSimpleName();

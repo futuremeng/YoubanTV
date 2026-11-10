@@ -45,8 +45,25 @@ module Core
         'nextAction' => v[:next_action],
         'wording' => v[:wording],
         'surface' => v[:surface],
-        'fallbackReason' => v[:fallbackReason]
+        'fallbackReason' => v[:fallbackReason],
+        'text' => text_of(v, q, plan)
       }
+    end
+
+    # 那句措辞的唯一拼法：句子与填空的小表都在契约里（commitState.sentences / .fill），
+    # 界面那边不许再拼一遍——Java 里那份四条 if 的复制品就是从这个坑里长出来的（D47）。
+    COMMIT_STATE = JSON.parse(File.read(File.expand_path('../contract/contract.json', __dir__)))
+                         .fetch('commitState')
+    SENTENCES = COMMIT_STATE.fetch('sentences')
+    FILL = COMMIT_STATE.fetch('fill')
+
+    def text_of(v, q, plan)
+      key = v[:sentence] || (v[:status] == 'overdue' ? 'overdue' : 'honored')
+      text = SENTENCES.fetch(key)
+      deficit = due_shape(v, q, plan)&.fetch('deficit') || {}
+      unit = FILL.fetch('unit').fetch(deficit['unit'].to_s, '')
+      kind = FILL.fetch('kind').fetch(v.dig(:due, 'kind').to_s, '')
+      text.sub('{amount}', deficit.fetch('amount', 0).to_s).sub('{unit}', unit).sub('{kind}', kind)
     end
 
     # due 的形状照契约 dueFields；绝对时刻由设备端时钟填，模型只给相对量与当下窗口。
@@ -90,6 +107,7 @@ module Core
         # 已受理的暂停：冻结倒数，pauseMs 单列，状态层 L1.5（COMMIT-07）
         return out.merge(status: 'honored', due: nil, tier: tier_for(persistent: true),
                          wording: 'statusSentence', shown: %w[恢复时刻], events: [],
+                         sentence: 'paused',
                          value: { 'pauseMs' => motion_state['pauseMs'].to_i })
       end
 
@@ -98,6 +116,7 @@ module Core
       unless Day.in_slot?(plan)
         shown = Day.slot_mode(plan) == 'onlyWithinSlots' ? %w[下一个可用时刻] : []
         return out.merge(status: 'honored', due: nil, tier: tier_for, shown: shown,
+                         sentence: 'outOfSlot',
                          value: { 'watchedMs' => watched })
       end
 
@@ -108,12 +127,14 @@ module Core
         # COMMIT-04：条件是 ≥ allowance；零量不写 OVER（写了只是噪声）
         over = [watched - allowance, 0].max
         out.merge(status: 'overdue', due: nil, tier: tier_for(persistent: true), wording: 'statusSentence',
+                  sentence: 'overdue',
                   events: over.positive? ? %w[OVER] : [], shown: %w[超出约定分钟数],
                   value: { 'overMs' => over, 'watchedMs' => watched })
       elsif watched < grace
         # 有当日任务额度时，常驻呈现要带今天的次数进度（DAY-05、LAYERING §4）。
         shown = %w[角标剩余] + quiet_note
         shown += %w[进度] if plan['groupsPerTask']
+        out = out.merge(sentence: 'honored')
         out.merge(status: 'honored', due: nil, tier: tier_for, shown: shown,
                   value: { 'remainingMs' => grace - watched, 'watchedMs' => watched })
       else
@@ -129,7 +150,8 @@ module Core
 
     # 未选身份：只落账不判定，也不发任何邀请（COMMIT-11）。
     def unselected(out)
-      out.merge(status: 'honored', due: nil, tier: tier_for(persistent: true), shown: %w[选择身份的提示],
+      out.merge(status: 'honored', due: nil, tier: tier_for(persistent: true), sentence: 'unselected',
+                shown: %w[选择身份的提示],
                 value: { 'eventProfile' => 'none', 'quizIssued' => false,
                          'exerciseInvite' => false, 'coWatchInvite' => false })
     end
@@ -176,7 +198,8 @@ module Core
       extra = { 'playerPaused' => missing.empty?, 'resumedAfterAnswer' => missing.empty?, 'retried' => false }
       extra['tierCeilingLifted'] = false if want == 'ambient' && ceiling == 'L3'
       shown = want == 'focused' ? %w[约定 该做的事 窗口期] : %w[角标剩余 当前模式与原因]
-      out.merge(status: 'due', tier: tier, mode: want, next_action: kind, tierCeiling: ceiling,
+      out.merge(status: 'due', sentence: want == 'focused' ? 'dueFocused' : 'dueAmbient',
+                tier: tier, mode: want, next_action: kind, tierCeiling: ceiling,
                 wording: want == 'focused' ? 'nextStep' : 'statusSentence',
                 due: { 'kind' => kind, 'mode' => want,
                        'deficit' => kind == 'quiz' ? 'questions' : 'reps',
@@ -186,7 +209,7 @@ module Core
     end
 
     def honored_after_done(out, watched)
-      out.merge(status: 'honored', due: nil, tier: tier_for, events: %w[DONE],
+      out.merge(status: 'honored', due: nil, tier: tier_for, sentence: 'honored', events: %w[DONE],
                 value: { 'watchedMs' => watched })
     end
 

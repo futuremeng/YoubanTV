@@ -28,7 +28,7 @@ scenarios.each do |s|
   bad['设备清单引用的用例不存在'] << s['case'].to_s unless YAML.load_file(path)[cid.split('.').first]
 end
 
-KNOWN_PROBES = %w[input text glyphs].freeze
+KNOWN_PROBES = %w[input text glyphs state].freeze
 probes.each do |p|
   bad['probes 的每一项都要有 probe: 名字'] << p.inspect if p['probe'].to_s.empty?
   bad['probes 的每一项也要写清验什么（why）'] << p.inspect unless p['why']

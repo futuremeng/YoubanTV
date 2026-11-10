@@ -33,3 +33,5 @@ probes:
     why: 这一屏句子的码位必须是真汉字（不许 U+FFFD）（F17）
   - probe: glyphs
     why: 每个字单独画进小图比字节：distinct=1 才是真塌，别拿我读截屏的话当证据（F17）
+  - probe: state
+    why: 把设备的事件账读回 Mac 喂给规范模型，与设备自己算的那份逐字段比——不同源就是 M3 没成

@@ -667,7 +667,8 @@
       "nextAction",
       "wording",
       "surface",
-      "fallbackReason"
+      "fallbackReason",
+      "text"
     ],
     "dueFields": [
       "kind",
@@ -738,6 +739,30 @@
       "LAYER-07",
       "COMMIT-01",
       "COMMIT-11"
-    ]
+    ],
+    "sentences": {
+      "x-note": "措辞的唯一一份：内核按 status/mode/persistent 取一句并填上数量，界面不许自己拼（LAYERING §4、PRODUCT §2）。",
+      "unselected": "还没有选身份：这一屏只入账，不做判定。",
+      "paused": "暂停中：倒数已冻住，恢复后再继续。",
+      "outOfSlot": "不在约定时段内。",
+      "overdue": "超出约定时间。今天已按约定使用完。",
+      "honored": "今天已按约定使用。",
+      "dueFocused": "还差 {amount}{unit}：这一组做完就记为已完成。",
+      "dueAmbient": "有一组{kind}待做，现在做吗？"
+    },
+    "fill": {
+      "x-note": "填这些花括号时唯一用的两张小表。",
+      "unit": {
+        "questions": "题",
+        "reps": "组",
+        "none": ""
+      },
+      "kind": {
+        "quiz": "题",
+        "exercise": "练习",
+        "free": "事",
+        "none": ""
+      }
+    }
   }
 }

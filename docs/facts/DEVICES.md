@@ -212,7 +212,8 @@
   再用 `magick compare -metric AE` 与设备截图比——只能证伪「英文/版式」那部分。
 - 结论：**设备端中文只能在这台设备上验**（截图 + 前台窗口确认）。写进 `tools/tv-at.rb` 的清单才算数，
   别拿本地图或 `fc-list` 推断设备行为。
-## F19 结论是设备自己算的：事件进账，内核在包里跑
+## F19 结论是设备自己算的：事件进账，内核在包里跑，两端再逐字段比一次
+
 
 免安装那条路（adb 呈现演练）之外，装了 APK 之后内核可以跟着包走：`core/` 用 kotlinc 编出来，
 和 `kotlin-stdlib` 一起 d8 进同一个 dex（APK 0.60 MB），契约作为 `assets/contract.json` 随包带，
@@ -222,5 +223,11 @@
   adb 只能往里追加事件：`am broadcast -n com.youban.tv/.StateReceiver -a com.youban.STATE --es kind WATCHED --es profile member:kid --el ms 3600000`。
 - 实测：账里一条 `WATCHED ms=3600000` → 屏幕给出「超出约定时间。今天已按约定使用完。」，
   码位 17 个逐位对得上（`youban-diag.json`），字形自检 14 种不重复（`youban-glyphs.json`）。
-- 三个坑（都是这一晚真 bug）：`adb push` 出来的文件属主是 shell，应用读不到——要 push 进应用自己那个目录；
-  广播带 `--es state '{...}'` 会被两道 shell 吃掉 `{},"`，看起来像广播不通；事件账末尾的空行不是事件。
+- 设备把自己算的那份写回 `youban-state-out.json`；设备清单的 `state` 那一步把它读回 Mac，
+  用同一份事件账喂 Ruby 那份规范模型，再按契约 `commitState.fields` 逐字段比：
+  `state PASS 11 个字段与 Mac 上的规范模型逐位相同（overdue · L1.5）`。**这才是「设备在跑同一个内核」的证据**，
+  不是「屏幕看起来一样」。反证过一次：把设备端 Kotlin 的 tier 写死成 L3 → 这一步立刻红（align 同时红）。
+- 四个坑（都是这一晚真 bug）：`adb push` 出来的文件属主是 shell，应用读不到——要 push 进应用自己那个目录；
+  广播带 `--es state '{...}'` 会被两道 shell 吃掉 `{},"`，看起来像广播不通；事件账末尾的空行不是事件；
+  **契约是手拷进 assets 的**，改了契约忘了拷，设备上就带着旧那张表跑（align 绿、设备红）——
+  现在打包脚本每次重新拷，应用每次起来也重新解一遍，不留旧副本。

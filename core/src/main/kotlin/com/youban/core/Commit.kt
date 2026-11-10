@@ -79,12 +79,13 @@ object Commit {
             "status" to "honored", "due" to null, "tier" to tierFor(), "next_action" to null,
             "wording" to null, "surface" to listOf("self"), "events" to emptyList<String>(),
             "shown" to emptyList<String>(), "value" to emptyMap<String, Any?>(), "blocked" to false,
-            "tierCeiling" to Day.tierCeiling(strength), "fallbackReason" to null, "mode" to null
+            "tierCeiling" to Day.tierCeiling(strength), "fallbackReason" to null, "mode" to null, "sentence" to "honored"
         )
         if (profile == "none") {
             // 未选身份：只落账不判定，也不发任何邀请（COMMIT-11）。
             return out + mapOf(
                 "tier" to tierFor(persistent = true),
+                "sentence" to "unselected",
                 "shown" to listOf("选择身份的提示"),
                 "value" to mapOf("eventProfile" to "none", "quizIssued" to false,
                     "exerciseInvite" to false, "coWatchInvite" to false)
@@ -93,12 +94,13 @@ object Commit {
         if (paused) {
             return out + mapOf(
                 "tier" to tierFor(persistent = true), "wording" to "statusSentence",
-                "shown" to listOf("恢复时刻"), "value" to mapOf("pauseMs" to pauseMs)
+                "sentence" to "paused", "shown" to listOf("恢复时刻"), "value" to mapOf("pauseMs" to pauseMs)
             )
         }
         if (!Day.inSlot(plan)) {
             val shown = if (Day.slotMode(plan) == "onlyWithinSlots") listOf("下一个可用时刻") else emptyList<String>()
-            return out + mapOf("tier" to tierFor(), "shown" to shown, "value" to mapOf("watchedMs" to watched))
+            return out + mapOf("tier" to tierFor(), "sentence" to "outOfSlot", "shown" to shown,
+                "value" to mapOf("watchedMs" to watched))
         }
 
         val grace = Day.num(plan["graceMs"])
@@ -107,7 +109,8 @@ object Commit {
             // COMMIT-04：条件是 ≥ allowance；零量不写 OVER（写了只是噪声）。
             val over = maxOf(watched - allowance, 0)
             return out + mapOf(
-                "status" to "overdue", "tier" to tierFor(persistent = true), "wording" to "statusSentence",
+                "status" to "overdue", "sentence" to "overdue", "tier" to tierFor(persistent = true),
+                "wording" to "statusSentence",
                 "events" to if (over > 0) listOf("OVER") else emptyList<String>(),
                 "shown" to listOf("超出约定分钟数"),
                 "value" to mapOf("overMs" to over, "watchedMs" to watched)
@@ -115,7 +118,7 @@ object Commit {
         }
         if (watched < grace) {
             return out + mapOf(
-                "tier" to tierFor(), "shown" to listOf("角标剩余"),
+                "tier" to tierFor(), "sentence" to "honored", "shown" to listOf("角标剩余"),
                 "value" to mapOf("remainingMs" to grace - watched, "watchedMs" to watched)
             )
         }
@@ -161,7 +164,8 @@ object Commit {
         }
         val shown = if (want == "focused") listOf("约定", "该做的事", "窗口期") else listOf("角标剩余", "当前模式与原因")
         return out + mapOf(
-            "status" to "due", "tier" to tier, "mode" to want, "next_action" to kind,
+            "status" to "due", "sentence" to if (want == "focused") "dueFocused" else "dueAmbient",
+            "tier" to tier, "mode" to want, "next_action" to kind,
             "tierCeiling" to ceiling,
             "wording" to if (want == "focused") "nextStep" else "statusSentence",
             "due" to linkedMapOf<String, Any?>("kind" to kind, "mode" to want,
@@ -196,8 +200,27 @@ object Commit {
             "nextAction" to v["next_action"],
             "wording" to v["wording"],
             "surface" to v["surface"],
-            "fallbackReason" to v["fallbackReason"]
+            "fallbackReason" to v["fallbackReason"],
+            "text" to textOf(v, plan, q)
         )
+    }
+
+    /**
+     * 那句措辞的唯一拼法：句子与填空的小表都在契约里（commitState.sentences / .fill）。
+     * 与 Ruby 的 `text_of` 同一条，改句子只改契约（D47）；改这里忘了改那边，align 会红。
+     */
+    @Suppress("UNCHECKED_CAST")
+    fun textOf(v: Map<String, Any?>, plan: Map<String, Any>, q: Map<String, Long>): String {
+        val sentences = commitState["sentences"] as Map<String, String>
+        val fill = commitState["fill"] as Map<String, Any>
+        val unitTable = fill["unit"] as Map<String, String>
+        val kindTable = fill["kind"] as Map<String, String>
+        val key = (v["sentence"] as? String) ?: if (v["status"] == "overdue") "overdue" else "honored"
+        val deficit = dueShape(v, plan, q)?.get("deficit") as Map<String, Any?>?
+        return sentences.getValue(key)
+            .replace("{amount}", (deficit?.get("amount") ?: 0).toString())
+            .replace("{unit}", unitTable[deficit?.get("unit").toString()] ?: "")
+            .replace("{kind}", kindTable[((v["due"] as? Map<*, *>)?.get("kind")).toString()] ?: "")
     }
 
     /** 形状照契约 dueFields；绝对时刻由设备端时钟填，内核只给相对量与当下窗口。

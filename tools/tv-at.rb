@@ -170,8 +170,32 @@ def probe_glyphs(args)
   [true, "每个字各画各的：#{distinct} 种不同字形，没有空白"]
 end
 
+# 两端同源：把设备上的事件账读回 Mac，喂给 Ruby 那份规范模型，再与设备自己算的那份逐字段比。
+# 这是 M3 最硬的一道：设备不是在念别人算好的结论，而是在跑同一个内核——这一道红了就是不同源。
+def probe_state(args)
+  events = shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}").gsub(/\r/, '')
+  return [false, '设备上没有事件账，算不出结论'] if events.strip.empty?
+
+  mine = KernelFromEvents.call(events)
+  return [false, "Mac 这边的规范模型没出结论：#{mine}"] unless mine.is_a?(Hash)
+
+  theirs_raw = (shell(args, "cat #{APK_FILES}/youban-state-out.json").gsub(/\r\n?/, ''))[/\{.*\}/]
+  return [false, '设备没写出它自己算的那份结论'] unless theirs_raw
+
+  theirs = JSON.parse(theirs_raw)
+  fields = JSON.parse(File.read(File.join(ROOT, 'contract/contract.json')))['commitState']['fields']
+  diff = fields.reject { |k| JSON.parse(JSON.generate(mine[k] || mine[k.to_sym])) == theirs[k] }
+  return [false, "#{diff.size} 个字段与规范模型不同：#{diff.join(', ')}"] unless diff.empty?
+
+  [true, "#{fields.size} 个字段与 Mac 上的规范模型逐位相同（#{mine['status'] || mine[:status]} · #{mine['tier'] || mine[:tier]}）"]
+end
+
+EVENTS_FILE = 'youban-events.jsonl'
+require_relative 'kernel-from-events'
+KernelFromEvents = method(:kernel_from_events)
+
 PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text),
-           'glyphs' => method(:probe_glyphs) }.freeze
+           'glyphs' => method(:probe_glyphs), 'state' => method(:probe_state) }.freeze
 
 args = parse_args(ARGV)
 if args[:facts]

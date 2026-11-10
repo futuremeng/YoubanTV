@@ -25,6 +25,8 @@ end
 die("core/build/classes 不存在") unless File.directory?(CLASSES)
 die('kotlin-stdlib.jar 找不到（KOTLIN_STDLIB= 指一下）') unless STDLIB
 
+FIELDS = JSON.parse(File.read(File.join(ROOT, 'contract/contract.json')))['commitState']['fields']
+
 cases = []
 jobs = []
 Dir[File.join(ROOT, 'fixtures', '*.yaml')].sort.each do |path|
@@ -94,7 +96,7 @@ Tempfile.open(['youban-align', '.json']) do |f|
   cases.each_with_index do |(label, mine), i|
     theirs_i = theirs[i]
     # 只比契约里那批字段：其余键是 Ruby 侧的内部量，不进输出形状。
-    fields = %w[status activeProfile planVersion due tier tierCeiling nextAction wording surface fallbackReason]
+    fields = FIELDS # 字段名来自契约那一份（commitState.fields），不在这里另列一遍
     fields.each do |k|
       a = JSON.parse(JSON.generate(mine[k] || mine[k.to_sym]))
       b = theirs_i[k]
@@ -103,7 +105,7 @@ Tempfile.open(['youban-align', '.json']) do |f|
   end
 
   if diffs.empty?
-    puts "Kotlin 内核对齐：通过（#{cases.size} 个 case × 10 个字段逐位相同）"
+    puts "Kotlin 内核对齐：通过（#{cases.size} 个 case × #{FIELDS.size} 个字段逐位相同）"
   else
     puts "Kotlin 内核对齐：#{diffs.size} 处不一致 / #{cases.size} 个 case"
     diffs.first(12).each { |d| puts "  #{d}" }
