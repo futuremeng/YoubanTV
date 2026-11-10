@@ -33,7 +33,7 @@ module Core
       'memberAdded' => { 'tv' => %w[*.agree.plan *.agree.slots tv.profile.binding],
                          'mobile' => %w[*.agree.plan *.agree.slots] },
       'deviceAdded' => { 'any' => %w[*] },
-      'crossPlatform' => { 'any' => %w[*.probe.crossDevice *.agree.plan] },
+      'crossPlatform' => { 'any' => %w[*.agree.plan] },
       'roleChange' => { 'tv' => %w[*.role.holder], 'mobile' => %w[*.egress.state] },
       'memberRemoved' => { 'any' => %w[*.profile.archive] },
       'contentBindingChanged' => { 'any' => %w[*.pack.license] },
@@ -160,7 +160,7 @@ module Core
       key = item['id'].split('.')[2].to_s
       { 'overlay' => 'overlay', 'usageAccess' => 'usageAccess', 'pause' => 'pause',
         'bootReceiver' => 'bootReceiver', 'notifications' => 'notifications',
-        'crossDevice' => 'crossDevice', 'calibrate' => 'cameraChannel',
+        'calibrate' => 'cameraChannel',
         'motionSensors' => 'motionSensor', 'license' => 'packVerify' }.fetch(key, key)
     end
 

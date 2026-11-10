@@ -13,8 +13,26 @@ module Core
     CONTRACT = JSON.parse(File.read(File.expand_path('../contract/contract.json', __dir__)))
     INVITE = CONTRACT.fetch('sense').fetch('invite')
     COUNT = CONTRACT.dig('sense', 'counting').to_h.freeze
+    # 手机与电视之间的直连只为这两件事：体感与视觉（SENSE-06、D77）。
+    # 这条通路不承载计时、不承载判定输入，也不承载另一台的那本账（DAY-10）；
+    # 「过界的只有计数与判定」这一句只在这里答一次，界面与断言都读它。
+    LINK = CONTRACT.dig('sense', 'link').to_h.freeze
 
     module_function
+
+    def link_kinds
+      LINK.fetch('kinds').to_a
+    end
+
+    def link_carries
+      LINK.fetch('carries').to_a
+    end
+
+    # 画面出不出手机：契约 link.never 里列着这一条，所以答案永远是「不出」（SENSE-01、SENSE-02）。
+    # 这条断言的红法只有一种——有人把那条 never 删了或改成正面允许。
+    def frame_leaves_device
+      !LINK.fetch('never').to_a.include?('画面出手机')
+    end
 
     # 计次只有一处实现（SENSE-01）：三条信号源都归到 {kind, periodMs, amplitude}，
     # 判「这一下算不算一次」就这一支。数字来自 sense.rhythm（节律窗口与最小幅度）+

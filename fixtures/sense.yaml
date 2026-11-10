@@ -102,7 +102,7 @@ SENSE-05:
       expect: { shown: [支撑物提示], value: { promptCount: 1 } }
 
 SENSE-06:
-  spec: [spec/SENSE.md#SENSE-06, spec/PROFILE.md#PROFILE-07]
+  spec: [spec/SENSE.md#SENSE-06, spec/PROFILE.md#PROFILE-07, spec/DAY.md#DAY-10, docs/DECISIONS.md#D77]
   given: { profile: "member:kid", assembly: mobile, paired: true, inSlot: true }
   cases:
     - name: 传感器端上报按激活身份入账
@@ -112,6 +112,11 @@ SENSE-06:
       given: { watchedMs: 2400000, roundsDone: 2 }
       when: { exerciseVerdict: counted }
       expect: { unchanged: [watchedMs], delta: { roundsDone: 1 } }
+    - name: 那条直连只有体感与视觉两件事，过界的只有计数与判定
+      given: { assembly: mobile, paired: true }
+      when: { signalSource: sensor, exerciseVerdict: counted }
+      expect: { value: { linkKinds: [sense-relay, vision-relay], linkCarries: [计数, 判定],
+                        frameLeavesDevice: false } }
     - name: 上报通道不可用时显示待同步，不显示已完成
       given: { offline: true }
       when: { signalSource: sensor, exerciseVerdict: counted }

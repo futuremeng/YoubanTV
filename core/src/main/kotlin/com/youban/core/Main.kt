@@ -65,13 +65,14 @@ object Main {
         // 契约路径必须在读那张表之前定下来：批量模式下漏这一步会静默用相对路径的表，
         // 对齐结果就变成「看起来对了」。
         (job["contract"] as? String)?.let { Commit.useContract(it) }
-        val ledger = Ledger()
+        val ledger = Ledger(job["device"] as? String)
         val profile = job["profile"] as? String ?: "member:kid"
         for (raw in job["events"] as? List<*> ?: emptyList<Any?>()) {
             val e = raw as? Map<*, *> ?: continue
             val fields = LinkedHashMap<String, Long>()
             (e["fields"] as? Map<*, *>)?.forEach { (k, v) -> fields[k.toString()] = Day.num(v) }
-            ledger.append(e["kind"].toString(), (e["profile"] as? String) ?: profile, fields)
+            ledger.append(e["kind"].toString(), (e["profile"] as? String) ?: profile, fields,
+                e["device"] as? String)
         }
 
         // 墙钟跳过了午夜不等于真的过了一天：单调钟没跟上就不滚，也不回放（DAY-07）。

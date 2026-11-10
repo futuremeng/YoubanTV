@@ -41,10 +41,9 @@
 | `mobile.auth.motionSensors` | 加速度计节律计数可用 | 本机使用者 | 引导页 | 一次自检（20 次原地跳） | 只做手动确认 | `SENSE-02`、`COMMIT-03` |
 | `mobile.device.calibrate` | 摄像头姿态标定自检 | 本机使用者 | 「运动」页（默认关） | 连续 20 次误计率 ≤5% 的自检记录 | 停在加速度计 + 手动确认 | D36、D4 |
 | `mobile.agree.plan` | 本机的约定字段与周计划 | 该成员 + 对方 | 学习页签署卡 | `PLAN_SIGNED` | 按旧版计划跑 | `AUTO-07` |
-| `mobile.probe.crossDevice` | 同一身份跨设备时长能否合并 | 该成员 | 「设备」页 | 两端各产生带 `device` 的事件 | 各设备各自计，显示合并说明 | `PROFILE-04`、D27 |
 | `mobile.probe.notifications` | 通知是否可达（手机端不取 L3） | 无需成员 | 「设备」页 | 探针：通知授权状态 | 只用应用内提示（规矩 4） | `LAYERING.md §1` |
 | `mobile.egress.state` | 出网开关的**当前状态**（只读） | 所有成员 | 「隐私与出网」页 | 显示 `keyHolder` 的确认记录 | 显示「未确认，按关处理」 | `ONBOARD-08` |
-| `mobile.device.sensorRole`（可选） | 作为电视端的传感器端配对 | 该成员 | 「设备」页 | 配对记录 + 心跳 | 计次走本机路径 | `SENSE-06` |
+| `mobile.device.sensorRole`（可选） | 作为电视端的**体感与视觉端**配对 | 该成员 | 「设备」页 | 配对记录 + 心跳 | 计次走本机路径 | `SENSE-06`、D77 |
 
 ## 4. 扩充触发（随加入进来的东西）
 
@@ -54,7 +53,7 @@
 |---|---|---|
 | 新成员加入家庭 | 该成员每台已装配设备上的 `*.agree.plan` + `*.agree.slots`；电视端加一条「命名与内容绑定」 | 模式命名与内容绑定完成即算这条勾掉（`PROFILE-01`、`PROFILE-06`） |
 | 新设备加入 | 该装配的**全部固定项**（§2 / §3） | 首启引导就是这些条目的前五项（暂定值，`LAYER-02`、`DECISIONS.md`） |
-| 成员从电视端扩到手机端（或反之） | `mobile.probe.crossDevice` + 该设备的 `*.agree.plan` | 同一身份跨设备并集需两端都有事件 |
+| 成员从电视端扩到手机端（或反之） | 该设备的 `*.agree.plan`（**不再有跨设备那一条待确认项**：一台设备一本账，`DAY-10`、D77） | 各设备各算各的账，界面上那行数字按构造就是这台的 |
 | 角色移交（`ruleEditor` / `keyHolder`） | 一条 `tv.role.holder` / `mobile.egress.state` | 两次确认，交接双方各一次（`AUTO-09`） |
 | 身份删除 | 一条归档确认 | 面板写明留了什么（`PROFILE-08`） |
 | 内容包加入或更新 | 一条 `tv.pack.license` / `mobile.pack.license` | 许可不过则该包不取题（`PACK-01`） |

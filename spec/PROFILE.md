@@ -25,6 +25,7 @@ defaults{mode, schedulePrefs, presentation}}`。契约与代码里**不存在**�
   `MOTION` / `MOTION_SETTLED` 均带 `profile` 与
   `device`。事件集合以 `PRODUCT.md §3` 为单一清单。
 - 每个身份有独立的一套 `dayPlan` 与四量；跨身份不得互相扣时间，也不得互相设上限。
+- 同一身份在两台设备上**各自记账**：这台的判定只算这台的事件，另一台的段不进这台账（`DAY-10`、D77）。
 - 未选身份时写 `profile=none` 的空转会话，不做判定（`COMMIT-11`），并给出选择身份的提示（L1.5）。
 
 ### PROFILE-05 切换留痕，不设防

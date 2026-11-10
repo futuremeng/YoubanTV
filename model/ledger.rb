@@ -30,15 +30,17 @@ module Core
     # 补一补池的容量：四量里的 backlogSize 封顶在这里，选题器读同一个数（ASK-04、PACK-04）。
     BACKLOG_CAP = 20
 
-    attr_reader :events
+    attr_reader :events, :device
 
-    def initialize(allowed_kinds:, day: 'd0')
+    # 这一本账属于哪一台设备：账本来就在一台设备上（D35），所以「合并另一台的时长」这个入口在模型里没有。
+    def initialize(allowed_kinds:, day: 'd0', device: 'tv')
       @events = []
       @allowed = Set.new(allowed_kinds.map(&:to_s))
       @day = day
+      @device = device.to_s
     end
 
-    def append(kind, profile:, at:, device: 'tv', **fields)
+    def append(kind, profile:, at:, device: @device, **fields)
       kind = kind.to_s
       raise ArgumentError, "契约里无定义的事件 #{kind}" unless @allowed.include?(kind)
       raise ArgumentError, "profile 只能取 member:<id> 或 none（收到 #{profile}）" unless profile.to_s =~ /\A(member:.+|none)\z/
@@ -48,8 +50,26 @@ module Core
       ev
     end
 
+    # 一台设备一本账（DAY-10、D77）：另一台设备的事件不进这台账，也不与这台的段做并集。
+    # 不带 device 的事件算本机——老账原样跑，不因这条改动换结论。
     def for_profile(profile)
-      @events.select { |e| e.profile == profile && e.field('day') == @day }
+      @events.select { |e| e.profile == profile && e.field('day') == @day && this_device?(e) }
+    end
+
+    def this_device?(event)
+      event.device.nil? || event.device.to_s == @device
+    end
+
+    # 面板那一页各列一行：按设备数一遍，谁也不并进谁（DAY-10）。这是「列出来」，不是「合起来」。
+    def by_device(profile)
+      others = @events.map { |e| e.device.to_s }.uniq.sort - [@device]
+      rows = { @device => sum_ms(profile, 'WATCHED', 'ms') } # 这台那一行就是判定用的数
+      others.each do |dev|
+        rows[dev] = @events.select { |e| e.profile == profile && e.kind == 'WATCHED' && e.device.to_s == dev &&
+                                         e.field('day') == @day }
+                           .sum { |e| e.field('ms').to_i }
+      end
+      rows
     end
 
     def kinds(profile = nil)

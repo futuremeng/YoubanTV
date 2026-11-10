@@ -45,7 +45,6 @@ module Core
       # 临近传感器与加速度计同属第 9 / 17 行那条传感器端计数通路，不另占行。
       'proximitySensor' => { tier: 'L1', scenes: [9, 17] },
       'cameraChannel' => { tier: 'L2', scenes: [9, 17] },
-      'crossDevice' => { tier: 'L1', scenes: [16] },
       'homeAssistant' => { tier: 'L5', scenes: [1, 3] },
       'planSigning' => { tier: 'L2', scenes: [7] },
       'slotRules' => { tier: 'L2', scenes: [3] },

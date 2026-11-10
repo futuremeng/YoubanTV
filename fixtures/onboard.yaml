@@ -23,7 +23,7 @@ ONBOARD-02:
     - name: 手机固定项与电视不同装配
       given: { assembly: mobile }
       when: { get: "GET /api/checklist" }
-      expect: { checklist: { ids: [mobile.auth.motionSensors, mobile.device.calibrate, mobile.agree.plan, mobile.probe.crossDevice, mobile.probe.notifications, mobile.egress.state, mobile.device.sensorRole] } }
+      expect: { checklist: { ids: [mobile.auth.motionSensors, mobile.device.calibrate, mobile.agree.plan, mobile.probe.notifications, mobile.egress.state, mobile.device.sensorRole] } }
 
 ONBOARD-03:
   spec: [spec/ONBOARD.md#ONBOARD-03, spec/ONBOARD.md#ONBOARD-04]

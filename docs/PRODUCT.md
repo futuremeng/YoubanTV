@@ -53,7 +53,8 @@ CommitState { status: honored|due|overdue, activeProfile, planVersion,
 
 约定线 `allowance` 按身份各一套（上学日 / 周末与节假日两套默认值），是**目标线**：超出的时长记 `OVER`，
 呈现继续照常。做题与运动的完成只进事件与星 / 掌握进度，**不发放也不兑换时长**（`COMMITMENTS.md §2`）。
-跨身份的时长各自记账。未选身份时计时会话以 `profile=none` 记录，判定直接取 `status=honored`、`due=null`
+跨身份的时长各自记账；**同一身份在两台设备上也各自记账**——界面上那行数字按构造就是这台设备的数，
+两行就各列一行，谁也不并进谁（`DAY-10`、D77）。未选身份时计时会话以 `profile=none` 记录，判定直接取 `status=honored`、`due=null`
 并提示选择身份（`COMMIT-11`）。
 
 **词汇**：`status`、`due`（到期项）、`mode: focused|ambient`（停下来做 / 边看边做）、

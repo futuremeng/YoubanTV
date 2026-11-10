@@ -58,6 +58,10 @@ fields:
   audience: {type: enum, enum: audience}
   audiences: {type: list, enum: audience}
   dueKinds: {type: list, enum: dueKind} # 这一档的约定项有哪几类（PROFILE-11、D76）
+  watchedPerDevice: {type: kv} # 各设备各说各的数：这台的数在 watchedMs，另一台的数单列（DAY-10、D77）
+  linkKinds: {type: list} # 手机与电视之间的直连有哪几件事（SENSE-06、D77）
+  linkCarries: {type: list} # 那条直连上过界的是什么：只有计数与判定
+  frameLeavesDevice: {type: boolean} # 画面出不出手机——永远是否（SENSE-01、SENSE-02）
   strength: {type: enum, enum: strength}
   strengths: {type: list, enum: strength}
   assembly: {type: symbol, values: [tv, mobile]}
@@ -279,7 +283,7 @@ predicates:
   answerable: {type: string, note: "这条断言回答的那个问题"}
 
 kvKeys: [from, to, by, role, action, kind, target, minutes, accepted, verdict, reason, path,
-  profile, device, subjects, levels, mode, deficit, window, size, evicted, days, version, signed,
+  profile, device, tv, mobile, watchedPerDevice, linkKinds, linkCarries, frameLeavesDevice, subjects, levels, mode, deficit, window, size, evicted, days, version, signed,
   added, notAdded, status, owner, ownerForms, dimension, fields, paired, trigger, responseRate,
   sampleCount, fieldsPerItem, fields, slots, tighten, moveFrom, audience,
   attempts, falseCountRate, periodMs, amplitude, capability,
@@ -326,7 +330,7 @@ conceptNames: [先批完才入账, 扣分机制, 阻断观看, 红点递进催�
   成就系统, 连击, 徽章, 签到, 排行, 称号, 代为受理, 第二本账, 仅写日志, 录制通路, 拍照通路]
 
 # 能力登记表的能力 id（docs/facts/DEVICES.md §3）
-capabilityIds: [paired, cameraChannel, pause, overlay, notifications, bootReceiver, crossDevice,
+capabilityIds: [paired, cameraChannel, pause, overlay, notifications, bootReceiver,
   companionContext, mediaSession, voice, autoLaunchAtBoot, homeAssistant, motionSensor,
   proximitySensor, screenOn, screenOff, ambientLight, volume, speakerOutput, screenCapture,
   systemPresentation, timeSource, remoteInput, offline]

@@ -80,10 +80,13 @@ PROFILE-04:
     - name: 切换是事件不是状态字段
       when: { switch: { from: "member:kid", to: "member:mom" } }
       expect: { absent: [currentProfile], sameSource: [core/day], value: { profileDomain: [member, none] } }
-    - name: 电视与手机同时落账同一事件流
-      given: { sessions: [{ device: tv, from: 0, to: 1200000 }, { device: mobile, from: 0, to: 300000 }] }
+    - name: 一台设备一本账——另一台的段不进这台账，只作另一份账列出来
+      # 这条以前期望 1500000（两台的并集）。那条待确认项已由用户答了：不合并（DAY-10、D77），
+      # 所以这台的判定只看这台的数；另一台的数在面板上是另一行，不参与这里的任何判定。
+      given: { assembly: tv, sessions: [{ device: tv, from: 0, to: 1200000 }, { device: mobile, from: 0, to: 300000 }] }
       when: { stillWatching: true }
-      expect: { value: { watchedMs: 1500000 }, sameSource: [core/day] }
+      expect: { value: { watchedMs: 1200000, watchedPerDevice: { 'tv': 1200000, 'mobile': 300000 } },
+                sameSource: [core/day] }
 
 PROFILE-05:
   spec: [spec/PROFILE.md#PROFILE-05, spec/AUTONOMY.md#AUTO-10]

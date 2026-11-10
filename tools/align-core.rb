@@ -69,8 +69,10 @@ Dir[File.join(ROOT, 'fixtures', '*.yaml')].sort.each do |path|
         'crossedMidnight' => (c['when'] || {}).any? { |k, v| k.to_s == 'crossedMidnight' && v },
         'clock' => w.clock,
         'plan' => w.plan,
+        # 一条账属于哪一台也要送过去：一台设备一本账（DAY-10、D77），别台的事件不进这台账。
+        'device' => w.assembly,
         'events' => w.ledger.events.map { |e|
-          { 'kind' => e.kind.to_s, 'profile' => e.profile.to_s,
+          { 'kind' => e.kind.to_s, 'profile' => e.profile.to_s, 'device' => e.device.to_s,
             'fields' => { 'ms' => (e.fields[:ms] || 0).to_i,
                           'pauseMs' => (e.fields[:pauseMs] || 0).to_i } }
         }

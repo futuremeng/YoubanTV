@@ -85,7 +85,8 @@ class World
     @extras = {}
     @day = given['dayToken'] || 'd1'
     @used << 'dayToken' if given.key?('dayToken')
-    @ledger = Core::Ledger.new(allowed_kinds: EVENTS, day: @day)
+    @ledger = Core::Ledger.new(allowed_kinds: EVENTS, day: @day,
+                              device: %w[tv mobile].include?(given['assembly'].to_s) ? given['assembly'].to_s : 'tv')
     # 当前在哪一档也可以由 activeMember 说（PROFILE-10 那一条：一台设备同一时刻只有一个当前用户）。
     # 它是 profile 的另一种写法，不是第二个状态——读它，别让它变成「模型没消费」的键。
     @profile = given['activeMember'] || given['profile'] || 'member:kid'
@@ -879,6 +880,12 @@ class World
       'pendingItems' => @pending_items_given || checklist_items.count { |i| %w[pending unknown].include?(checklist_status(i['id'])) },
       'sessions' => profiles_seen.each_with_object({}) { |who, h| h[who] = @ledger.project(who) },
       'watchedRecorded' => @ledger.events.any? { |e| e.kind == 'WATCHED' },
+      # 各设备各一行：这台的那行是判定用的数，另一台那行只是列出来（DAY-10）。
+      'watchedPerDevice' => @ledger.by_device(@profile),
+      # 手机与电视的直连只为体感与视觉两件事（SENSE-06、D77）：这几项只由契约 link 那一处答。
+      'linkKinds' => Core::Sense.link_kinds,
+      'linkCarries' => Core::Sense.link_carries,
+      'frameLeavesDevice' => Core::Sense.frame_leaves_device,
       'quizIssued' => @plan['graceMs'].to_i < @plan['allowanceMs'].to_i,
       'quiet' => @quiet,
       # 会话可由事件重构：凡是出现过事件的身份，都要能算出它自己的那一行（DAY-04b）。
@@ -1361,7 +1368,9 @@ class World
       @plan[k] = given[k]
       @self_managed_now = true # 自管那一项不经过签署：摆上就是这一份的现值（AUTO-07、AUTO-14）。
     end
-    # 两台设备的事件汇成同一条流水：每一段都是这条账里的 WATCHED，按段相加（PROFILE-04、DAY-04b）。
+    # 一台设备一本账：只有**这台设备**的段进这台账（DAY-10、D77）。以前这里把两台的段相加（并集），
+    # 等于把「另一台看了多久」算进这台的约定判定里——那条待确认项今天已由用户答了：不合。
+    # 另一台的段不进账，只作为另一份账列出来（面板各列一行），所以它不参与任何判定。
     if given['sessions']
       @used << 'sessions'
       Array(given['sessions']).each do |s|

@@ -72,7 +72,8 @@ object Kernel {
             val e = Json.parse(text) as? Map<*, *> ?: return@forEach
             val fields = LinkedHashMap<String, Long>()
             (e["fields"] as? Map<*, *>)?.forEach { (k, v) -> fields[k.toString()] = Day.num(v) }
-            val added = Event(e["kind"].toString(), (e["profile"] as? String) ?: profile, fields)
+            val added = Event(e["kind"].toString(), (e["profile"] as? String) ?: profile, fields,
+                e["device"] as? String)
             ledger.events += added
             // 动议是哪一种（pause / extend / …）也在这一行里，Ledger 的 fields 只存数字，另记一笔。
             ((e["fields"] as? Map<*, *>)?.get("kind") as? String)?.let { motionKind[added] = it }

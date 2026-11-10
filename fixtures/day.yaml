@@ -185,3 +185,22 @@ DAY-09:
     - name: 面板走向与设备结果一致性由契约测试覆盖
       when: { simulate: true }
       expect: { identicalAcross: { dimension: profile, fields: [status, due] } }
+
+DAY-10:
+  spec: [spec/DAY.md#DAY-10, docs/DECISIONS.md#D77]
+  # 一台设备一本账：这条以前是一条待确认项（「能否合并」），今天由用户答了——不合。
+  # 判定的数只来自这台；另一台那一行只是列出来，谁也不并进谁。
+  given: { profile: "member:kid", inSlot: true }
+  cases:
+    - name: 另一台的段不进这台账——判定只看这台
+      given: { assembly: tv, sessions: [{ device: tv, from: 0, to: 1200000 }, { device: mobile, from: 0, to: 1200000 }] }
+      when: { stillWatching: true }
+      expect: { value: { watchedMs: 1200000 }, tier: L1 }
+    - name: 重叠也不去重合并：两端各说各的数
+      given: { assembly: mobile, sessions: [{ device: tv, from: 0, to: 1200000 }, { device: mobile, from: 0, to: 900000 }] }
+      when: { stillWatching: true }
+      expect: { value: { watchedMs: 900000, watchedPerDevice: { 'mobile': 900000, 'tv': 1200000 } } }
+    - name: 不带设备标记的老账算本机，不因这条改动换结论
+      given: { assembly: tv, watchedMs: 600000 }
+      when: { stillWatching: true }
+      expect: { value: { watchedMs: 600000, watchedPerDevice: { 'tv': 600000 } } }
