@@ -202,9 +202,12 @@ AUTO-01:
   spec: [spec/AUTONOMY.md#AUTO-01]
   cases:
     - name: 协商式的边界是默认值而非上限
-      given: { profile: "member:kid", strength: negotiated, watchedMs: 2400000, allowanceMs: 2700000, inSlot: true }
+      # 这条要的是「过了默认边界也照样继续」：观看要真的超过 allowance 才写得出 OVER（DAY-02），
+      # 50 分钟 > 45 分钟。以前这几个数是照旧默认写的，整条用例其实一直没跑（未支持）。
+      given: { profile: "member:kid", strength: negotiated, watchedMs: 3000000, allowanceMs: 2700000, inSlot: true }
       when: { stillWatching: true }
-      expect: { value: { ceilingApplied: 0 }, blocked: false, status: due, events: [OVER] }
+      # 50 分钟 > 45 分钟这条边界，所以 status 是 overdue 并记一条 OVER；要点是「不阻断」（blocked: false）。
+      expect: { value: { ceilingApplied: 0 }, blocked: false, status: overdue, events: [OVER] }
     - name: 自管式无能力上限
       given: { profile: "member:kid", strength: selfManaged, groupsPerTask: 10 }
       when: { mode: ambient }

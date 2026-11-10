@@ -629,7 +629,19 @@
       "ACHIEVED",
       "STREAK",
       "CHECKIN"
-    ]
+    ],
+    "kinds": {
+      "x-note": "禁用的字段按用途分一下类：「这一台实际应用了几个能力上限」这类结论只读这一处（AUTO-01、PROFILE-01）。这些名字都来自下面那张 values 表，不是另一份清单。",
+      "ceiling": [
+        "allowanceCeiling",
+        "capabilityCeiling",
+        "selfManagedCap",
+        "audienceAllowance",
+        "featureToggleByAudience",
+        "ageLimit",
+        "selfManageRequiresAge"
+      ]
+    }
   },
   "writeGuards": {
     "profileParameter": "写入口的 profile 参数只能取当前激活身份或 none",

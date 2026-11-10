@@ -273,6 +273,7 @@ class World
     # 事件带版本是写入时的义务（DAY-07）：夹具里种进去那几条也一样要带，不然查账分不出改表前后。
     @ledger.events.each { |e| e.fields[:version] ||= @running_version }
     apply_calibration!
+    refresh_ceiling!
     refresh_invite!
     refresh_project!
     @verdict = decide
@@ -610,6 +611,12 @@ class World
     # 达当日轮数上限：不再邀请，也不再排新的组（SENSE-05）。两个都听模型的，这里不再各判一次。
     @notify_suppressed = pr['notify'] == 'none'
     @external_allowed = false
+  end
+
+  # 实际应用了几个能力上限：由执行面那一处答（AUTO-01、PROFILE-01）。这里不再判一次。
+  def refresh_ceiling!
+    @extras['ceilingApplied'] = Core::Enforcement.ceiling_applied(plan: @plan, capability: @capability)
+    @extras['ceilingFieldsApplied'] = Core::Enforcement.ceiling_fields_applied(plan: @plan, capability: @capability)
   end
 
   def refresh_invite!
