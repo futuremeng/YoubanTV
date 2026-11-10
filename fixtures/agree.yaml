@@ -1,0 +1,56 @@
+# 约定怎么立（spec/AGREE.md）。这里刻意留下模型还没实现的部分：执行器会把它们记成「未支持」，
+# 不会当通过（D41）。它们就是 M3.5 那张活清单，绿的那天这条约定才算真的落地。
+AGREE-01:
+  spec: [AGREE-01]
+  given: {profile: "member:kid"}
+  cases:
+    - name: 装机后第一次打开，什么约定都没有，按默认跑
+      when: {}
+      expect: {status: honored, defaultsOnly: true}
+    - name: 六步走到第三步也能用，只是条目还是默认的
+      given: {agreementStep: 3}
+      when: {}
+      expect: {status: honored, defaultsOnly: true}
+
+AGREE-04:
+  spec: [AGREE-04]
+  given: {profile: "member:kid"}
+  cases:
+    - name: 学龄·上学日按契约默认
+      given: {audience: child}
+      when: {}
+      expect: {defaultsOnly: true}
+    - name: 成年·上学日按契约默认，形态是 ambient
+      given: {audience: "grown-up"}
+      when: {}
+      expect: {mode: ambient, defaultsOnly: true}
+
+AGREE-06:
+  spec: [AGREE-06]
+  given: {profile: "member:kid", watchedMs: 600000}
+  cases:
+    - name: 改了约定没签 → 旧版本继续生效，且不算谁的违规
+      given: {plan: {version: 7, signed: false, allowanceMs: 3600000, graceMs: 1800000}}
+      when: {planChange: {version: 7}}
+      expect: {status: honored, signaturePending: true, effective: nextPlanVersion}
+
+AGREE-08:
+  spec: [AGREE-08]
+  given: {profile: "member:kid", watchedMs: 600000}
+  cases:
+    - name: 切到成年身份，加载那一组约定，另一组不受影响
+      given: {plan: {version: 3, signed: true, allowanceMs: 3600000, graceMs: 1800000}}
+      when: {switchTo: "member:dad"}
+      expect: {status: honored, otherProfileUnchanged: true}
+    - name: 这一份的收紧不会改掉另一份
+      given: {plan: {version: 3, signed: true, allowanceMs: 3600000, graceMs: 1800000}}
+      when: {planChange: {allowanceMs: 1800000}, switchTo: "member:dad"}
+      expect: {otherProfileUnchanged: true, effective: nextPlanVersion}
+
+AGREE-09:
+  spec: [AGREE-09]
+  given: {profile: "member:kid"}
+  cases:
+    - name: 切到还没有约定的身份 → 走同样的六步，从第一步开始
+      when: {switchTo: "member:mom"}
+      expect: {defaultsOnly: true}

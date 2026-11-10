@@ -3,6 +3,8 @@
 package com.youban.core
 
 object Day {
+    /** 契约的位置：设备端会在装包时指一次（Android 上给不了相对路径）。 */
+    var contractPath = "contract/contract.json"
     val TIER_ORDER = listOf("L0", "L1", "L1.5", "L2", "L3", "L5")
 
     // 层的天花板由强度定，与身份无关（LAYER-07）。
@@ -12,21 +14,26 @@ object Day {
         "selfManaged" to "L1"
     )
 
-    // DAY-03 的默认值表（分钟）。存过配置的设备沿用原值，由调用方合并 overrides 处理。
+    /**
+     * DAY-03 的默认值表在契约里（agreement.defaults）：装机后先按它跑，界面上写明「默认·未签」（AGREE-04）。
+     * 这张表原来 Ruby 一份、Kotlin 一份，连「默认是不是在时段内」都只有一边写——那正是对齐门要抓的（D45）。
+     * 存过配置的设备沿用原值，由调用方合并 overrides 处理。
+     */
     fun defaultPlan(audience: String, dayType: String): MutableMap<String, Any> {
-        val row = when {
-            audience == "grown-up" -> longArrayOf(120, 120, 120) to "ambient"
-            audience == "senior" -> longArrayOf(480, 480, 480) to "ambient"
-            dayType == "weekend" -> longArrayOf(180, 60, 90) to "focused"
-            else -> longArrayOf(60, 30, 60) to "focused"
+        val table = agreementDefaults()
+        val row = table["$audience $dayType"] as? Map<*, *> ?: table["child schoolday"]
+        val out = linkedMapOf<String, Any>()
+        (row as Map<*, *>).forEach { (k, v) ->
+            out[k.toString()] = if (k.toString().endsWith("Ms")) Day.num(v) * MINUTE else v as Any
         }
-        return linkedMapOf(
-            "allowanceMs" to row.first[0] * MINUTE,
-            "graceMs" to row.first[1] * MINUTE,
-            "moveFromMs" to row.first[2] * MINUTE,
-            "form" to row.second,
-            "inSlot" to true
-        )
+        out["inSlot"] = true // 默认全天都在时段内（DAY-08）；时段本身要签了才有。
+        return out
+    }
+
+    private fun agreementDefaults(): Map<String, Any> {
+        val node = Json.parse(java.io.File(contractPath).readText()) as Map<*, *>
+        val defaults = ((node["agreement"] as Map<*, *>)["defaults"] as Map<*, *>)
+        return defaults.entries.filter { it.key != "x-note" }.associate { it.key.toString() to (it.value as Any) }
     }
 
     fun inSlot(plan: Map<String, Any>) = plan.getOrDefault("inSlot", true) as Boolean

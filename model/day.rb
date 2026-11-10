@@ -1,22 +1,16 @@
-# SPEC: DAY-01, DAY-02, DAY-03, DAY-04b, DAY-05, DAY-06, DAY-08, LAYER-07
+# SPEC: DAY-01, DAY-02, DAY-03, DAY-04b, DAY-05, DAY-06, DAY-08, LAYER-07, AGREE-04
 # 当日方案：默认值表、四量、时段规则、生效组数。判定在 core/commit。
 module Core
   module Day
-    # DAY-03 的默认值表（分钟）。存过配置的设备沿用原值，由调用方合并 overrides 处理。
-    DEFAULTS = {
-      %w[child schoolday] => { 'allowanceMs' => 60 * 60_000, 'graceMs' => 30 * 60_000,
-                               'moveFromMs' => 60 * 60_000, 'form' => 'focused' },
-      %w[child weekend] => { 'allowanceMs' => 180 * 60_000, 'graceMs' => 60 * 60_000,
-                             'moveFromMs' => 90 * 60_000, 'form' => 'focused' },
-      %w[grown-up schoolday] => { 'allowanceMs' => 120 * 60_000, 'graceMs' => 120 * 60_000,
-                                  'moveFromMs' => 120 * 60_000, 'form' => 'ambient' },
-      %w[grown-up weekend] => { 'allowanceMs' => 120 * 60_000, 'graceMs' => 120 * 60_000,
-                                'moveFromMs' => 120 * 60_000, 'form' => 'ambient' },
-      %w[senior schoolday] => { 'allowanceMs' => 480 * 60_000, 'graceMs' => 480 * 60_000,
-                                'moveFromMs' => 480 * 60_000, 'form' => 'ambient' },
-      %w[senior weekend] => { 'allowanceMs' => 480 * 60_000, 'graceMs' => 480 * 60_000,
-                              'moveFromMs' => 480 * 60_000, 'form' => 'ambient' }
-    }.freeze
+    # DAY-03 的默认值表在契约里（agreement.defaults）：装机后先按它跑，界面上写明「默认·未签」（AGREE-04）。
+    # 原来这张表在 Ruby 写一份、Kotlin 又写一份——「一处有一条没有」正是对齐门要抓的那种（D45）。
+    # 分钟数；存过配置的设备沿用原值，由调用方合并 overrides 处理。
+    DEFAULTS = JSON.parse(File.read(File.expand_path('../contract/contract.json', __dir__)))
+                   .fetch('agreement').fetch('defaults')
+                   .reject { |k, _| k == 'x-note' }
+                   .transform_keys { |k| k.split(' ') }
+                   .transform_values(&:dup)
+                   .freeze
 
     # 每组题量的默认值，与 DAY-05 的数字同源；组数与题量都是自管字段，面板只读（AUTO-14）。
     QUESTIONS_PER_GROUP_DEFAULT = 2

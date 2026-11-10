@@ -775,5 +775,251 @@
       "进度": "今天 {done}/{target} 组",
       "选择身份的提示": "还没有选身份"
     }
+  },
+  "agreement": {
+    "x-note": "约定怎么立、谁签哪一条、什么生效——这一节是那份约定的单一来源（spec/AGREE.md、docs/AGREEMENT.md）。装机后第一次打开要做的就是把这份约定立起来；其它条目都是可选的（ONBOARDING §4）。",
+    "fields": [
+      {
+        "id": "allowanceMs",
+        "kind": "joint",
+        "uiWords": "每天约定使用时长",
+        "spec": [
+          "DAY-01",
+          "AUTO-07"
+        ]
+      },
+      {
+        "id": "graceMs",
+        "kind": "joint",
+        "uiWords": "约定线（超出即 overdue）",
+        "spec": [
+          "COMMIT-04",
+          "AUTO-04"
+        ]
+      },
+      {
+        "id": "moveFromMs",
+        "kind": "joint",
+        "uiWords": "运动段起点",
+        "spec": [
+          "DAY-01",
+          "SENSE-05"
+        ]
+      },
+      {
+        "id": "slots",
+        "kind": "joint",
+        "uiWords": "时段",
+        "spec": [
+          "DAY-08"
+        ]
+      },
+      {
+        "id": "quiet",
+        "kind": "joint",
+        "uiWords": "免题段",
+        "spec": [
+          "DAY-03"
+        ]
+      },
+      {
+        "id": "form",
+        "kind": "joint",
+        "uiWords": "参与形式（边看边做／答完再看）",
+        "spec": [
+          "COMMIT-02",
+          "LAYER-07"
+        ]
+      },
+      {
+        "id": "planVersion",
+        "kind": "joint",
+        "uiWords": "这份约定的版本号",
+        "spec": [
+          "COMMIT-08",
+          "AUTO-04"
+        ]
+      },
+      {
+        "id": "groupsPerTask",
+        "kind": "self",
+        "uiWords": "组数",
+        "spec": [
+          "DAY-05",
+          "AUTO-14"
+        ]
+      },
+      {
+        "id": "questionsPerGroup",
+        "kind": "self",
+        "uiWords": "每组题量",
+        "spec": [
+          "ASK-01",
+          "AUTO-14"
+        ]
+      },
+      {
+        "id": "questionsPerTaskCap",
+        "kind": "self",
+        "uiWords": "每次任务的题目数上限",
+        "spec": [
+          "ASK-07",
+          "AUTO-14"
+        ]
+      },
+      {
+        "id": "clearBacklogFirst",
+        "kind": "self",
+        "uiWords": "补一补是否先补完",
+        "spec": [
+          "ASK-04",
+          "AUTO-14"
+        ]
+      },
+      {
+        "id": "strength",
+        "kind": "self",
+        "uiWords": "这一档的委托强度",
+        "spec": [
+          "AUTO-07",
+          "PROFILE-03"
+        ]
+      },
+      {
+        "id": "inSlot",
+        "kind": "device",
+        "uiWords": "当前是否在时段内",
+        "spec": [
+          "DAY-08"
+        ]
+      }
+    ],
+    "signers": {
+      "joint": "共意条目：双方签署才生效（PLAN_SIGNED(profile,version,by:[self,counterparty])）。",
+      "self": "自管条目：本人写，与强度与角色无关；不参与收紧比较。",
+      "device": "设备条目：当前激活成员确认；未完成只降级，不阻断（ONBOARD-06）。"
+    },
+    "defaults": {
+      "x-note": "装机后先按这张表跑，界面写明「这是默认值，还没签」（AGREE-04）。默认值本身不进签署记录。",
+      "child schoolday": {
+        "allowanceMs": 3600000,
+        "graceMs": 1800000,
+        "moveFromMs": 3600000,
+        "form": "focused"
+      },
+      "child weekend": {
+        "allowanceMs": 10800000,
+        "graceMs": 3600000,
+        "moveFromMs": 5400000,
+        "form": "focused"
+      },
+      "grown-up schoolday": {
+        "allowanceMs": 7200000,
+        "graceMs": 7200000,
+        "moveFromMs": 7200000,
+        "form": "ambient"
+      },
+      "grown-up weekend": {
+        "allowanceMs": 7200000,
+        "graceMs": 7200000,
+        "moveFromMs": 7200000,
+        "form": "ambient"
+      },
+      "senior schoolday": {
+        "allowanceMs": 28800000,
+        "graceMs": 28800000,
+        "moveFromMs": 28800000,
+        "form": "ambient"
+      },
+      "senior weekend": {
+        "allowanceMs": 28800000,
+        "graceMs": 28800000,
+        "moveFromMs": 28800000,
+        "form": "ambient"
+      }
+    },
+    "firstRun": [
+      {
+        "step": 1,
+        "do": "给这个身份起名字，并绑定内容包与大纲范围",
+        "writes": "PROFILE 建立",
+        "spec": [
+          "PROFILE-01",
+          "PROFILE-06"
+        ]
+      },
+      {
+        "step": 2,
+        "do": "选这一档是谁（受众）",
+        "writes": "audience",
+        "spec": [
+          "PROFILE-02"
+        ]
+      },
+      {
+        "step": 3,
+        "do": "约定三段：每天使用时长、约定线、运动段起点",
+        "writes": "plan v1（共意条目）",
+        "spec": [
+          "DAY-01",
+          "AUTO-07"
+        ]
+      },
+      {
+        "step": 4,
+        "do": "时段与免题段",
+        "writes": "plan v1（共意条目）",
+        "spec": [
+          "DAY-08",
+          "DAY-03"
+        ]
+      },
+      {
+        "step": 5,
+        "do": "这一档的委托强度（谁握约定字段编辑权）",
+        "writes": "strength",
+        "spec": [
+          "AUTO-07",
+          "PROFILE-03"
+        ]
+      },
+      {
+        "step": 6,
+        "do": "双方签署",
+        "writes": "PLAN_SIGNED(v1)",
+        "spec": [
+          "AUTO-07",
+          "AGREE-05"
+        ]
+      }
+    ],
+    "firstRunEscape": "每一步都可以「先用默认」；用了默认的条目在界面上标「未签·默认」，不弹催签、不进周报、不打分（AGREE-04、ONBOARD-05）。",
+    "perProfile": {
+      "x-note": "约定按身份各立一组： PROFILE_SWITCH 之后加载那一组的 plan/版本/签署记录，互不影响（AGREE-08）。",
+      "loadOnSwitch": "已有该身份的约定 → 直接加载生效版本；没有 → 走 firstRun 那六步（设备条目不重复问）。",
+      "independent": "一份约定的收紧不影响另一份；共意条目的对方可以不同。"
+    },
+    "never": [
+      "时长兑换成题目数或反过来（D24、D31）",
+      "签到／连续天数／徽章／任何递进催促（D31、ONBOARD-05）",
+      "把「父母」写成特权身份（D33）",
+      "把「还没签」记成某人的违规（AGREE-06）",
+      "装机即默认全开设备条目或出网（ONBOARD-06、ONBOARD-08）"
+    ],
+    "spec": [
+      "AGREE-01",
+      "AGREE-02",
+      "AGREE-03",
+      "AGREE-04",
+      "AGREE-05",
+      "AGREE-06",
+      "AGREE-07",
+      "AGREE-08",
+      "AGREE-09",
+      "AGREE-10",
+      "AGREE-11",
+      "AGREE-12",
+      "AGREE-13"
+    ]
   }
 }

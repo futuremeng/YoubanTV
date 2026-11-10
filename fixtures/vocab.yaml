@@ -43,6 +43,10 @@ symbols:
   presentIn: [core, device, contract, code]
 
 fields:
+  # —— 约定怎么立
+  firstRun: {type: boolean}
+  switchTo: {type: profile}
+  agreementStep: {type: number}
   # —— 身份与主体
   profile: {type: profile}
   member: {type: profile}
@@ -202,6 +206,12 @@ fields:
   at: {type: string}
 
 predicates:
+  # —— 约定怎么立（spec/AGREE.md）。这几条目前模型没实现，执行器会记成「未支持」，不许默默通过。
+  planForProfile: {type: kv} # 切到这个身份之后生效的那一组约定
+  agreementStep: {type: number} # 首启六步走到第几步
+  defaultsOnly: {type: boolean} # 这一屏的条目是否全部来自默认值（还没签）
+  signaturePending: {type: boolean} # 是不是停在「待对方签署」
+  otherProfileUnchanged: {type: boolean} # 另一组的约定有没有被这一份的收紧改掉
   status: {enum: status}
   checklistStatus: {enum: checklistStatus}
   due: {oneOf: [null, kv]}

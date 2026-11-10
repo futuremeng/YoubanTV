@@ -17,6 +17,7 @@
 | `ASK` | 选题管线、知识点状态机、难度阶梯、两种参与形式的题目形状 | [`ASK.md`](ASK.md) |
 | `PACK` | 内容包格式、许可与署名、按身份绑定 | [`PACK.md`](PACK.md) |
 | `SENSE` | 体感计次：口径、数据边界、用途边界、标定与安全约束 | [`SENSE.md`](SENSE.md) |
+| `AGREE` | 约定怎么立：初始化的六步、谁来签哪一条、切换身份就是换一组约定 | [`AGREE.md`](AGREE.md) |
 | `CONTEXT` | 伴看上下文：取值边界、出网条件、出题时机 | [`CONTEXT.md`](CONTEXT.md) |
 | `LAYER` | 层的取值、默认层、升层与回退、措辞规则 | [`LAYER.md`](LAYER.md) |
 | `AUTO` | 自主性规则、协商强度与签署、主体权限、自管字段与查阅修订 | [`AUTONOMY.md`](AUTONOMY.md) |

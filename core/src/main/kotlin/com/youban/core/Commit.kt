@@ -32,6 +32,7 @@ object Commit {
     val stateFields: List<String> by lazy { (commitState["fields"] as List<*>).map { it.toString() } }
 
     fun useContract(path: String) {
+        Day.contractPath = path // 默认值表也在契约里（AGREE-04），设备端只指一次两处都通
         contractPath = path
     }
 
