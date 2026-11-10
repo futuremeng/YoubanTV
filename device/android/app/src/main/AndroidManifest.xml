@@ -11,9 +11,10 @@
     <uses-feature android:name="android.software.leanback" android:required="false" />
     <uses-feature android:name="android.hardware.touchscreen" android:required="false" />
 
-    <!-- 现在这一版一条权限都不声明：L2 悬浮层还没做，做的那天再声明；
+    <!-- L3 那一张浮层要这一条：装完默认不开，由面板授予（LAYERING §1、ONBOARD-06）。
          后台常驻与开机自启这两条路压根不许有。声明了却没用＝白要权限，
-         清单里每一条的交代在契约 devicePermissions 那一处（ONBOARD-06）。 -->
+         清单里每一条的交代在契约 devicePermissions 那一处。 -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
 
     <application
         android:allowBackup="false"

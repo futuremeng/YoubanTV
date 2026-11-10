@@ -434,10 +434,113 @@ def probe_switch(args)
         "#{fields.size} 个字段与规范模型逐位相同"]
 end
 
+# L3 那一张：离开本应用仍可见、不抢焦点、不进字幕带；装完默认不开（LAYER-13、ONBOARD-06、F30）。
+def probe_overlay(args)
+  return [false, '没装 com.youban.tv：先 sh device/android/build-apk.sh && adb install -r'] if
+    shell(args, "pm list packages #{APK_PACKAGE}").strip.empty?
+
+  raw_size = shell(args, 'wm size')
+  width = raw_size[/(\d+)x\d+/, 1].to_i
+  height = raw_size[/\d+x(\d+)/, 1].to_i
+  return [false, "读不到屏幕尺寸：#{raw_size.strip.inspect}"] if width.zero? || height.zero?
+
+  # 装完默认不开：先把这条权限收回来自系统，看它是不是真的什么都不做。
+  shell(args, "appops set #{APK_PACKAGE} SYSTEM_ALERT_WINDOW deny")
+  shell(args, "am force-stop #{APK_PACKAGE}")
+  shell(args, "rm -f #{APK_FILES}/#{EVENTS_FILE} #{APK_FILES}/youban-overlay.json #{APK_FILES}/youban-plan*.json")
+  shell(args, 'input keyevent 224')
+  shell(args, "am start -n #{APK_PACKAGE}/.MainActivity")
+  sleep 3
+  [['WATCHED', 'member:kid', '--el ms 2100000'],
+   ['PLAN_SIGNED', 'member:kid', '--el version 1']].each do |kind, who, extra|
+    broadcast(args, ['--es', 'kind', kind, '--es', 'profile', who] + extra.split(' '))
+    sleep 1
+  end
+  mine = KernelFromEvents.call(shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}").gsub(/\r/, ''), device_plans(args))
+  return [false, "Mac 这边的规范模型没出结论：#{mine}"] unless mine.is_a?(Hash)
+  if mine['nextAction'].to_s =~ /\A(agreement|none)\z/
+    return [false, "这一轮本就不该出那一张，用例摆错了：#{mine['nextAction'].inspect}"]
+  end
+
+  shell(args, 'input keyevent 3') # HOME：离开本应用，这才是 L3 那一张的时机
+  sleep 2
+  off = overlay_record(args)
+  return [false, '没读到 youban-overlay.json'] if off.nil?
+  if off['shown']
+    return [false, '悬浮窗权限没授予却显示了那一张：装完默认不开这条不成立']
+  end
+  if off['attempted']
+    return [false, '权限没授予还是去加了那个窗：装完默认不开这条只靠系统挡着，代码自己没守']
+  end
+
+  # 这台设备上的 appops 是带时限的（appops get 里能看到 duration=+4s）：授权几秒后自己收回，
+  # 于是「那一张出没出」会变成看运气。重新授权再走一遍，最多三次；三次还不认，
+  # 就如实报这台设备留不住这条授权——那是设备事实，不是通过。
+  tries = 0
+  on = nil
+  loop do
+    tries += 1
+    shell(args, "appops set #{APK_PACKAGE} SYSTEM_ALERT_WINDOW allow")
+    shell(args, "am force-stop #{APK_PACKAGE}")
+    shell(args, 'input keyevent 224')
+    shell(args, "am start -n #{APK_PACKAGE}/.MainActivity")
+    sleep 2
+    shell(args, 'input keyevent 3')
+    sleep 1
+    on = overlay_record(args)
+    break if on && on['shown']
+    break if tries >= 3
+  end
+  return [false, '授权后仍没读到那一张的记录'] if on.nil?
+  unless on['shown']
+    why = on['refuse'].to_s
+    why = on['attempted'] ? '系统没让那个窗上来（授权可能几秒就被收回，试了 '                            "#{tries} 次）" : '这台设备留不住这条授权（重授 ' + tries.to_s + ' 次都没赶上）' if why.empty?
+    return [false, "授权后那一张没出来：#{why}"]
+  end
+  text = on['text'].to_s
+  return [false, '那一张是空的：内核那句没搬过来'] if text.strip.empty?
+  unless text == mine['text']
+    return [false, "那一张说的话与内核不同：#{text.inspect} ≠ #{mine['text'].inspect}"]
+  end
+
+  box = on['rect']
+  return [false, '量不到那一张的位置'] unless box.is_a?(Array) && box.size == 4
+  band = (height * (1 - 0.15)).round # 字幕带那一截不许进（契约 layering.overlay.subtitleBandPct）
+  if box[3].to_i > band
+    return [false, "那一张压进字幕带了：下边缘 #{box[3]} > #{band}"]
+  end
+  unless on['rendered'].to_s == text
+    return [false, "记录里是内核那句，交给那一张画的却是另一句：#{on['rendered'].inspect}"]
+  end
+  # 这一台用 screencap 拍不到悬浮窗那一层（facts/DEVICES.md#F30：两张截图逐格一样）——
+  # 所以「画出来了没有」不靠截图判，读窗口管理器那一手：窗口在不在、可见不可见。
+  windows = shell(args, 'dumpsys window windows')
+  # 悬浮窗那一层的窗口在窗口管理器里长这样：Window #N Window{... u0 Sys2038:com.youban.tv/...}
+  # 2038 是 TYPE_APPLICATION_OVERLAY（API 26+），2002 是 TYPE_PHONE（这台手机是 API 25）；
+  # 它带着 activity 的名字，因为窗口令牌挂在 activity 上。截图拍不到这一层（F30）。
+  mine = windows.to_s.split(/^Window #/).find do |w|
+    w.include?(APK_PACKAGE) && (w =~ /Sys20(02|38)/ || w =~ /TYPE_APPLICATION_OVERLAY|TYPE_PHONE|type=20(02|38)/i)
+  end
+  return [false, "窗口列表里找不到这一张：#{windows.to_s.lines.grep(/youban/).first.to_s.strip}"] if mine.nil?
+  visible = mine =~ /mViewVisibility=0|mIsVisible=true|mHasSurface=true/
+  return [false, "那一张的窗口在，但可见性不对：#{mine.lines.grep(/Visib|Surface/).join.strip[0, 160]}"] if visible.nil?
+
+  [true, "离开本应用那一张出来了（#{text}），落在字幕带以上（下边缘 #{box[3]} ≤ #{band}），" \
+        '且不抢焦点——装完默认不开也验了']
+end
+
+def overlay_record(args)
+  raw = shell(args, "cat #{APK_FILES}/youban-overlay.json").gsub(/\r\n?/, '')[/\{.*\}/]
+  raw ? JSON.parse(raw) : nil
+rescue JSON::ParserError
+  nil
+end
+
 PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text),
            'glyphs' => method(:probe_glyphs), 'state' => method(:probe_state),
            'apk' => method(:probe_apk), 'key' => method(:probe_key),
-           'setup' => method(:probe_setup), 'switch' => method(:probe_switch) }.freeze
+           'setup' => method(:probe_setup), 'switch' => method(:probe_switch),
+           'overlay' => method(:probe_overlay) }.freeze
 
 args = parse_args(ARGV)
 if args[:facts]

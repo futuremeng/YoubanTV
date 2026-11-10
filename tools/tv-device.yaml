@@ -35,6 +35,8 @@ probes:
     why: 确认键要落进事件账并让设备上的内核重算——落一条回执不算（AGREE-11、D34）
   - probe: setup
     why: 首启那六步要在真机上走到签署——问什么、有哪些可选都由设备上的内核给（AGREE-05）
+  - probe: overlay
+    why: L3 那一张要在离开本应用后出现、说内核那句、且不进字幕带；装完默认不开这条也一起验（LAYER-14）
   - probe: switch
     why: 换这一档要落 PROFILE_SWITCH 并加载那一组的约定——kid 签过的不算 dad 签的（AGREE-08）
   - probe: apk

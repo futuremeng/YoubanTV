@@ -1269,9 +1269,9 @@
       {
         "permission": "android.permission.SYSTEM_ALERT_WINDOW",
         "use": "L2 那一张卡的悬浮层",
-        "declared": false,
-        "implemented": false,
-        "note": "浮层还没做，就先不声明；做的那天再声明，装完默认不开、由面板授予（LAYERING §2）。",
+        "declared": true,
+        "implemented": true,
+        "note": "L3 那一张「离开本应用仍可见」的浮层已落（OverlayCard）：装完默认不开、由面板授予；窗口不抢焦点，且不进字幕带（LAYER-14、facts/DEVICES.md#F30）。",
         "spec": [
           "LAYER-02",
           "ONBOARD-06"
@@ -1426,5 +1426,16 @@
       "AUTO-16",
       "PROFILE-10"
     ]
+  },
+  "layering": {
+    "overlay": {
+      "x-note": "L3 那一张的位置只在这里定：贴在内容右上角，下边缘不许越过字幕带上沿（spec/LAYER.md#LAYER-14）。",
+      "subtitleBandPct": 15,
+      "corner": "top-end",
+      "spec": [
+        "LAYER-14",
+        "LAYER-02"
+      ]
+    }
   }
 }

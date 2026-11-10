@@ -39,7 +39,8 @@ public class MainActivity extends Activity {
     /** 遥控器按键落在这儿：设备测试从 adb 读回它，验「按键真的到了设备」。 */
     static final String INPUT_NAME = "youban-input.json";
     static final String PROFILE_NAME = "youban-profile.txt";
-    static final String PROBE_NAME = "youban-probe.json"; // 上一次到前台是什么时候：证据不过期那一条的凭据（ONBOARD-07）
+    static final String PROBE_NAME = "youban-probe.json";
+    static final String OVERLAY_NAME = "youban-overlay.json"; // 那一张到底出没出、落在哪儿：设备自检第 9 道读它 // 上一次到前台是什么时候：证据不过期那一条的凭据（ONBOARD-07）
     /** 公共目录做兜底：装了存储权限的开发机可以 adb push 到那儿直接看效果。 */
     static final String PUBLIC_DIR = "/sdcard/Download";
 
@@ -100,6 +101,59 @@ public class MainActivity extends Activity {
         }
         recordProbe();
         render();
+    }
+
+    /**
+     * 离开本应用才有的那一张（L3：悬浮角标/浮层，LAYERING §1）。
+     * 三条同时成立才显示：内核这一轮确有要说的（有到期项，且不是「去立约定」那一步）、
+     * 悬浮窗权限被授予过、窗口落得进字幕带以上那块地方。任何一条不成立就是不显示——
+     * 不重试、不排队、不提示（ONBOARD-06：未完成只降级）。
+     */
+    @Override
+    protected void onStop() {
+        super.onStop();
+        boolean shown = false;
+        String rect = "null";
+        String said = null;
+        try {
+            String state = stateJson();
+            String action = field(state, "nextAction", "");
+            if (!action.isEmpty() && !"agreement".equals(action) && !"none".equals(action)) {
+                said = field(state, "text", "");
+                if (said.isEmpty()) {
+                    said = null;
+                } else if (OverlayCard.show(this, said)) {
+                    // 布局落在下一帧：等到量到真实落点为止，量不到就用预测值。
+                    int[] box = OverlayCard.rect();
+                    int waited = 0;
+                    while (waited < 20 && (box == null || box[3] <= box[1])) {
+                        try {
+                            Thread.sleep(50L);
+                        } catch (InterruptedException e) {
+                            break;
+                        }
+                        box = OverlayCard.rect();
+                        waited++;
+                    }
+                    if (box != null) {
+                        rect = "[" + box[0] + "," + box[1] + "," + box[2] + "," + box[3] + "]";
+                    }
+                    shown = true;
+                }
+            }
+        } catch (RuntimeException ignored) {
+            // 算不出结论就没有这一张：不在这里编一句，也不留在屏上（F21 那一条的同一家族）。
+        }
+        write(path(this, OVERLAY_NAME, true),
+                overlayRecord(OverlayCard.attempted(), shown, rect, said, OverlayCard.rendered(),
+                        OverlayCard.refuse()));
+    }
+
+    /** 回到前台就收掉那一张：L3 是「离开时才在」，不是常驻（LAYERING §1）。 */
+    @Override
+    protected void onStart() {
+        super.onStart();
+        OverlayCard.hide();
     }
 
     @Override
@@ -630,7 +684,30 @@ public class MainActivity extends Activity {
         }
     }
 
-    private static String read(String path) {
+    /**
+     * 那一张的记录：去没去试（attempted）、显示出来没有（shown）、落在哪儿、说的是哪一句。
+     * 这两件分开记是设备自检要能分开「系统挡了」与「我们压根不该去试」。
+     */
+    private static String overlayRecord(boolean attempted, boolean shown, String rect, String text,
+                                      String rendered, String refuse) {
+        return "{\"attempted\":" + attempted + ",\"shown\":" + shown + ",\"rect\":" + rect
+                + ",\"text\":\"" + quote(text) + "\",\"rendered\":\"" + quote(rendered)
+                + "\",\"refuse\":\"" + quote(refuse) + "\"}";
+    }
+
+    /** 只把引号与反斜杠转掉：这一份记录很短，不必带一个 JSON 库上设备。 */
+    private static String quote(String s) {
+        StringBuilder out = new StringBuilder();
+        for (char ch : (s == null ? "" : s).toCharArray()) {
+            if (ch == '"' || ch == '\\') {
+                out.append('\\');
+            }
+            out.append(ch);
+        }
+        return out.toString();
+    }
+
+    static String read(String path) {
         try {
             File f = new File(path);
             if (!f.canRead()) {
