@@ -533,6 +533,21 @@
         "spec/SENSE.md#SENSE-07",
         "docs/COMMITMENTS.md#§4b"
       ]
+    },
+    "planChangeField": {
+      "note": "PLAN_CHANGE 这一次改的是约定里的哪一项（D42：一类规则只写一处——哪些变更算一次约定变更，看这一张表）。",
+      "x-note": "哪些触发算一次约定变更，只由这张表的键决定；表里没有的触发不写 PLAN_CHANGE。",
+      "values": [
+        "slots",
+        "allowanceMs",
+        "graceMs",
+        "moveFromMs",
+        "form",
+        "contentBinding"
+      ],
+      "byTrigger": {
+        "contentBindingChanged": "contentBinding"
+      }
     }
   },
   "profile": {
@@ -996,10 +1011,33 @@
       }
     ],
     "signers": {
-      "joint": "共意条目：双方签署才生效（PLAN_SIGNED(profile,version,by:[self,counterparty])）。",
-      "self": "自管条目：本人写，与强度与角色无关；不参与收紧比较。",
-      "device": "设备条目：当前激活成员确认；未完成只降级，不阻断（ONBOARD-06）。",
-      "profile": "受众属于身份那一层（PROFILE-02）：首启第二步问它，改了它就把那一档的默认整行换掉。"
+      "joint": {
+        "note": "共意条目：双方签署才生效（PLAN_SIGNED(profile,version,by:[self,counterparty])）。",
+        "fields": [
+          "allowanceMs",
+          "graceMs",
+          "moveFromMs",
+          "slots",
+          "quiet",
+          "form"
+        ]
+      },
+      "self": {
+        "note": "自管条目：本人写，与强度与角色无关；不参与收紧比较。",
+        "fields": [
+          "groupsPerTask",
+          "questionsPerGroup",
+          "questionsPerTaskCap",
+          "clearBacklogFirst"
+        ]
+      },
+      "device": {
+        "note": "设备条目：当前激活成员确认；未完成只降级，不阻断（ONBOARD-06）。"
+      },
+      "profile": {
+        "note": "受众属于身份那一层（PROFILE-02）：首启第二步问它，改了它就把那一档的默认整行换掉。"
+      },
+      "x-note": "哪些字段要双方签、哪些是自己当场生效，只有这一处答得清（model/write.rb 生效时间这一列读它）。self 那一组与强度、角色无关，也不参与收紧比较（AUTO-07）。"
     },
     "defaults": {
       "x-note": "装机后先按这张表跑，界面写明「这是默认值，还没签」（AGREE-04）。默认值本身不进签署记录。",

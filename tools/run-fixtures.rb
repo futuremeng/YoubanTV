@@ -18,6 +18,7 @@ require 'sense'
 require 'task'
 require 'pick'
 require 'kp'
+require 'write'
 
 class Unsupported < StandardError; end
 
@@ -48,7 +49,8 @@ PRODUCERS = {
   'device/sensor' => [:sensor, 'model/sense.rb'],
   'core/task' => [:task, 'model/task.rb'],
   'core/topics' => [:topics, 'model/pick.rb'],
-  'core/kp' => [:kp, 'model/kp.rb']
+  'core/kp' => [:kp, 'model/kp.rb'],
+  'core/write' => [:write, 'model/write.rb']
 }.freeze
 MEMBERS = %w[member:kid member:mom member:dad member:grandpa].freeze
 # 「只有一处来源」是跟文件走的：同一产物种类只准登记一个文件。
@@ -79,7 +81,15 @@ class World
     @day = given['dayToken'] || 'd1'
     @used << 'dayToken' if given.key?('dayToken')
     @ledger = Core::Ledger.new(allowed_kinds: EVENTS, day: @day)
-    @profile = given['profile'] || 'member:kid'
+    # 当前在哪一档也可以由 activeMember 说（PROFILE-10 那一条：一台设备同一时刻只有一个当前用户）。
+    # 它是 profile 的另一种写法，不是第二个状态——读它，别让它变成「模型没消费」的键。
+    @profile = given['activeMember'] || given['profile'] || 'member:kid'
+    @used << 'activeMember' if given.key?('activeMember')
+    # 写入口那一条判定要的两个输入：从哪一个界面走过来、这一条令牌带了哪些范围（PROFILE-02、PROFILE-05）。
+    @via = given['via']
+    @used << 'via' if given.key?('via')
+    @token_scopes = given['scopes']
+    @used << 'scopes' if given.key?('scopes')
     @used << 'profile' if given.key?('profile')
     @strength = given['strength'] || 'negotiated'
     @used << 'strength' if given.key?('strength')
@@ -283,6 +293,7 @@ class World
     p = project_now
     return p[key] if p.key?(key)
     return @extras[key] if @extras.key?(key)
+    return contract_endpoint('exercise') if key == 'endpoint' # 这个键只答「出题走哪条路」；写的是哪一条用 writeEndpoint（一个键一个意思）
     return @plan[key] if @plan.key?(key)
     dv = derived_values
     return dv[key] if dv.key?(key)
@@ -291,10 +302,19 @@ class World
   end
 
   # 统一取值：先判定结论，再当日投影，再跨天保留项，再当日方案。
+  # 这份输出形状是契约声明的那一份（D47）：设备读的就是它。断言里问这些字段，
+  # 就该拿同一个对象来答——再去判定/投影里各翻一遍，就是同一处规则写第二遍了。
+  SHARED_OUTPUT_FIELDS = %w[status activeProfile activeMember planVersion due tier tierCeiling nextAction
+                            fallbackReason pendingMotion].freeze
+
   def lookup(key, profile = nil)
     return @verdict[:value][key] if @verdict[:value].key?(key)
+    if SHARED_OUTPUT_FIELDS.include?(key.to_s)
+      s = commit_state
+      k = key.to_s == 'activeMember' ? 'activeProfile' : key.to_s
+      return s.key?(k) ? s[k] : nil # 这一份里没有这个字段就是「没有」，不去别处再编一个
+    end
     return verdict_field(key) if VERDICT_FIELDS.key?(key.to_s)
-    return contract_endpoint('exercise') if key == 'endpoint'
 
     p = project_now(profile)
     return p[key] if p.key?(key)
@@ -302,6 +322,8 @@ class World
     return @plan[key] if @plan.key?(key)
     dv = derived_values
     return dv[key] if dv.key?(key)
+    # 这个键只答「出题走哪条路」（端点注册表那一条）；写的是哪一条用 writeEndpoint——一个键一个意思。
+    return contract_endpoint('exercise') if key == 'endpoint'
 
     raise Unsupported, "#{key} 在判定、投影、保留项、当日方案与登记表常量里都无定义"
   end
@@ -351,8 +373,49 @@ class World
       hit.each { |id| @reopened << id unless @added.include?(id) }
     end
     @checklist = nil
+    # 哪些触发算一次约定变更，看契约那张表；表里没有的触发不写 PLAN_CHANGE（D42：只在这一处判）。
+    field = CONTRACT.dig('enums', 'planChangeField', 'byTrigger')&.fetch(name.to_s, nil)
+    append('PLAN_CHANGE', @profile, field: field) if field
     @applied = true
     @effective = 'now'
+  end
+
+  # 写入口那一条路怎么走，由 model/write.rb 那一处答（PROFILE-02、PROFILE-10、AUTO-07）。
+  def write_attempt(spec)
+    endpoint = spec['endpoint'].to_s
+    # 这一次改的是哪几项：断言里点名，或者从 given 里那几项约定字段推出来（AUTO-07 生效时间看这一列）。
+    fields = Array(spec['fields'])
+    fields += Core::Write.joint_fields + Core::Write.self_fields
+    fields = fields.select { |f| @given.key?(f.to_s) || spec.key?(f.to_s) }.uniq
+    r = Core::Write.call(endpoint: endpoint, profile: spec['profile'], actor: @actor || @profile,
+                         via: @via, scopes: @token_scopes, fields: fields, active: @profile)
+    @action_allowed = r['allowed']
+    @extras['httpStatus'] = r['httpStatus']
+    @extras['writable'] = r['writable']
+    @extras['rolesDerivableFromToken'] = r['rolesDerivableFromToken']
+    @extras['writeEndpoint'] = endpoint.split(' ', 2).last
+    if r['allowed']
+      fields.each do |f|
+        k = f.to_s
+        val = spec.key?(k) ? spec[k] : @given[k]
+        next if val.nil?
+
+        # 当日方案里没这一项就不硬塞：约定字段与当日字段是两张表（DAY-01、AGREE-03）。
+        @plan[k] = val if Core::Day.day_keys.include?(k) || @plan.key?(k)
+      end
+      unless fields.empty?
+        append('PLAN_CHANGE', @profile, fields: fields.join(','))
+        append('REVISION', @profile, by: @actor || @profile, target: @profile) if @via.to_s == 'panel'
+        @effective = r['effective']
+      end
+    else
+      append('REVISION', @profile, by: @actor || @profile, target: @profile) if @via.to_s == 'panel'
+      # 面板那一面改不了，但当前值照样看得见——「只显示不代设」是这两件事一起成立（AUTO-14、PROFILE-05）。
+      @shown << '现值' if @via.to_s == 'panel'
+      @extras['reason'] = r['reason']
+      @extras['writable'] = false
+    end
+    @verdict = decide
   end
 
   def role_change(rc)
@@ -832,6 +895,7 @@ class World
     lookup(key)
   end
 
+
   # 呈现侧读量：这一屏可能就是没有这个数（已受理的暂停段没有 remainingMs），读不到就是「没有」，
   # 不报错也不编一个。断言侧仍走严格的 lookup——未知键必须记「未支持」（D41）。
   def value_opt(key)
@@ -902,6 +966,12 @@ class World
       when_.delete('export')
       @extras.merge!(Core::Checklist.export(checklist_items).slice('storedFields', 'derived'))
       @extras['completeness'] = Core::Checklist.completeness(checklist_items)
+    end
+    if (spec = when_.delete('put'))
+      write_attempt('endpoint' => spec)
+    end
+    if (spec = when_.delete('writeAttempt'))
+      write_attempt('endpoint' => "PUT #{spec['path']}", 'profile' => spec['profile'], 'fields' => spec['fields'])
     end
     if when_.key?('egress')
       egress_change(when_.delete('egress'), when_.delete('reauth'))
@@ -1316,8 +1386,10 @@ class World
   end
 
   def switch_body(spec, to)
-    append('PROFILE_SWITCH', to == 'none' ? 'none' : to, from: spec['from'], to: to)
+    # 空账也写：from/to 是这一条的语义，取值是标识符不是计数，不许用空账省掉（D31、PROFILE-10.3）。
+    append('PROFILE_SWITCH', to == 'none' ? 'none' : to, from: spec['from'] || @profile, to: to)
     @profile = to
+    @used << 'activeMember' # 换到人就是把当前档换掉：这一处消费 activeMember 那个写法
     @extras['eventProfile'] = to
     @extras['inheritedWatchedMs'] = @ledger.project(to)['watchedMs']
     @verdict = decide
@@ -1334,6 +1406,10 @@ def check(key, want, world, before)
   when 'blocked' then cmp(want, world.verdict[:blocked])
   when 'allowed' then cmp(want, world.action_allowed)
   when 'wording' then cmp(want, world.verdict[:wording])
+  # 写入口这一族：结论由 model/write.rb 给，断言这边只搬运，不再判一次。
+  when 'httpStatus' then cmp(want, world.derived['httpStatus'])
+  when 'writable' then cmp(want, world.derived['writable'])
+  when 'rolesDerivableFromToken' then cmp(want, world.derived['rolesDerivableFromToken'])
   when 'due' then cmp_due(want, world.verdict[:due])
   when 'surface' then Array(want).all? { |s| (Array(world.verdict[:surface]) + world.surfaces).include?(s) } ? :pass : :fail
   when 'shown' then Array(want).all? { |s| all_shown(world).include?(s) } ? :pass : :fail

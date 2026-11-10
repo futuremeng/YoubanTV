@@ -87,11 +87,16 @@ PROFILE-05:
   cases:
     - name: 自管成员调组数走同一条写入路径
       when: { put: "PUT /api/myPlan" }
-      expect: { writable: true, sameSource: [core/day], value: { endpoint: "/api/myPlan" } }
+      expect: { writable: true, sameSource: [core/day], value: { writeEndpoint: "/api/myPlan" } }
     - name: 面板只能查阅与修订
       given: { actor: "member:mom", via: panel }
       when: { put: "PUT /api/myPlan" }
       expect: { writable: false, allowed: false, events: [REVISION] }
+    - name: 本人从面板也不代设
+      # 这一条只有 enforcementSurface 管得着：本人 + 面板，身份那两条都是过的。
+      given: { actor: "member:kid", via: panel, groupsPerTask: 3 }
+      when: { put: "PUT /api/myPlan" }
+      expect: { writable: false, allowed: false, shown: [现值], events: [REVISION] }
     - name: 自管字段变动即时生效
       given: { actor: "member:kid", groupsPerTask: 4 }
       when: { put: "PUT /api/myPlan" }
@@ -182,6 +187,12 @@ PROFILE-10:
       given: { activeMember: none }
       when: { switch: { from: none, to: "member:kid" } }
       expect: { events: [PROFILE_SWITCH], value: { eventProfile: "member:kid" } }
+    - name: 另一成员在场直接改这台设备的当前档被拒
+      # 这条只有「一个操作者」那一条管得着：没带 profile 参数、也不是面板，站着的就是另一个人。
+      # 要动这一档的约定，走「动议 + 这一档的自己受理」或「修订建议」（D34、PROFILE-10）。
+      given: { actor: "member:mom" }
+      when: { put: "PUT /api/myPlan" }
+      expect: { allowed: false, value: { httpStatus: 403 }, noEvents: [PLAN_CHANGE, PLAN_SIGNED] }
     - name: 面板代提交他身份的写入被拒
       given: { actor: "member:mom", via: panel }
       when: { writeAttempt: { path: "/api/myPlan", profile: "member:kid" } }
@@ -274,7 +285,8 @@ AUTO-14:
     - name: 组数与每组题量由该身份自己设定
       given: { actor: "member:kid", groupsPerTask: 2, questionsPerGroup: 2 }
       when: { put: "PUT /api/myPlan" }
-      expect: { writable: true, effective: now, value: { effectiveGroups: 4 } }
+      # 组数与每组题量都是自己定的，两个都要在这一屏上看得见：2 组 × 2 题 = 一次最多 4 题。
+      expect: { writable: true, effective: now, value: { effectiveGroups: 2, maxQuestions: 4 } }
     - name: 面板只显示不代设
       given: { actor: "member:mom", via: panel }
       when: { put: "PUT /api/myPlan" }

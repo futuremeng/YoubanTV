@@ -281,7 +281,7 @@ metricNames: [watchedMs, allowanceMs, graceMs, moveFromMs, pauseMs, overMs, roun
   stemChars, stemIdentical, optionsLines, singleKey, estimatedSeconds, questionPickedAt,
   dynamicGeneration, fallbackApplied, source, gradeMethod, verify, verifySemanticsUnchanged,
   sensorModeAllowed, manualConfirmation, signalSource, counting, exerciseVerdict,
-  ceilingApplied, poolSame, poolSize, evicted, httpStatus, endpoint, apiExists, writePathExists,
+  ceilingApplied, poolSame, poolSize, evicted, httpStatus, endpoint, writeEndpoint, apiExists, writePathExists,
   commitStateTier,
   newEndpointNeeded, allowed, writable, allowedBranchSites, branchInForbiddenSites,
   selfManagedFields, selfManagedMayLowerGrace, acknowledgementOnlyItems, humanAction,

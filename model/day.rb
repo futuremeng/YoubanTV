@@ -44,6 +44,11 @@ module Core
     end
 
     # DAY-05：生效组数 = max(自设组数, ceil((moveFrom − grace) ÷ 每组预计分钟))
+    # 当日方案里有哪些量：写入口与断言都读这一处，别在两边各列一张清单。
+    def day_keys
+      @day_keys ||= plan(audience: 'child', day_type: 'schoolday', overrides: {}).keys.freeze
+    end
+
     def effective_groups(plan)
       self_set = plan.fetch('groupsPerTask', 0).to_i
       span = plan.fetch('moveFromMs', 0).to_i - plan.fetch('graceMs', 0).to_i
