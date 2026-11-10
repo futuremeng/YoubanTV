@@ -77,6 +77,9 @@ if val.is_a?(Hash)
         bad["能力 id 未登记 #{k2}"] << where unless capSet.include?(k2.to_s)
       elsif key.to_s == "roles"
         bad["角色名越界 #{k2}"] << where unless c["roles"]["values"].include?(k2.to_s)
+      elsif key.to_s == "plans"
+        # 按身份各立一组约定（AGREE-08）：这一层的键是身份，不是字段名。
+        bad["约定分组键不是身份 #{k2}"] << where unless k2.to_s =~ /\A(member:[^\s]+|none)\z/
       elsif key.to_s == "egress"
         bad["出网开关名越界 #{k2}"] << where unless vocab["egressNames"].include?(k2.to_s)
       else
