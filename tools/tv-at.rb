@@ -261,7 +261,9 @@ def probe_key(args)
   shell(args, "am force-stop #{APK_PACKAGE}")
   shell(args, "rm -f #{APK_FILES}/#{EVENTS_FILE}")
   # 先起应用再广播：被 force-stop 的应用处在 stopped 状态，广播会被直接丢掉（F20 那一坑）。
-  shell(args, 'input keyevent 82')
+  # 用 WAKEUP(224) 不用 POWER(82)：82 是「切换」，屏本来就醒着时它把手机屏按熄了——
+  # 应用进了 onPause，后面的按键就没人接（真机上踩过，见 F22）。
+  shell(args, 'input keyevent 224')
   shell(args, "am start -n #{APK_PACKAGE}/.MainActivity")
   sleep 2
   broadcast(args, %w[--es kind WATCHED --es profile] + [profile] + %w[--el ms 1800000])
@@ -280,7 +282,9 @@ def probe_key(args)
 
   ledger = shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}")
   unless ledger.include?('"kind":"MOTION_SETTLED"')
-    return [false, '确认键没落进事件账——按键不许只落回执']
+    top = shell(args, 'dumpsys window windows').gsub(/\r/, '')[/mCurrentFocus=\S+/].to_s
+    got = shell(args, "cat #{APK_FILES}/youban-input.json").lines.last.to_s.strip
+    return [false, "确认键没落进事件账——按键不许只落回执｜这一会儿前台是 #{top.empty? ? '读不到' : top.split('=').last}，"                     "按键本身到了吗：#{got.empty? ? '没落 input.json' : got}"]
   end
   if after['pendingMotion']
     return [false, "受理之后还挂着一条要受理的动议：#{after['pendingMotion'].inspect}"]

@@ -43,6 +43,10 @@ public class MainActivity extends Activity {
 
     private String fontNote = null;
     private String debugSource = null;
+    // 这一屏正在显示的那份结论。按键时看的是它，不在按键那一刻重跑内核。
+    // static 是有意的：广播用 CLEAR_TOP 起Activity 时可以另起一个实例，实例字段会让按键落到
+    // 另一个实例上、看到的是自己那份旧结论（真机上就是「按键像没被听见」，见 F22）。
+    private static String displayed = null;
     private TextView sentence;
     private TextView badge;
     private TextView foot;
@@ -145,6 +149,11 @@ public class MainActivity extends Activity {
             return;
         }
         String pending = pendingMotion();
+        // 排查用：按键那一刻看到了什么。「没挂着动议」与「没读到结论」在屏上是同一件事，病因不同。
+        write(path(this, "youban-settle.json", true), "{\"key\":\"" + key + "\",\"pending\":"
+                + (pending == null ? "null" : "\"" + pending + "\"") + ",\"saw\":"
+                + (displayed == null ? "\"没有一份算好的结论\""
+                   : "\"" + slice(displayed, "\"pendingMotion\":") + "\"") + "}");
         if (pending == null) {
             return;
         }
@@ -159,7 +168,7 @@ public class MainActivity extends Activity {
 
     /** 内核算出来的那份结论里，挂着要受理的动议是哪一种（子对象，不看屏上那句话，也不自己判）。 */
     private String pendingMotion() {
-        String json = stateJson();
+        String json = displayed != null ? displayed : stateJson();
         String needle = "\"pendingMotion\":{\"kind\":\"";
         int at = json.indexOf(needle);
         if (at < 0) {
@@ -188,6 +197,12 @@ public class MainActivity extends Activity {
             }
         }
         return found;
+    }
+
+    /** 从那份结论里截一小段出来看，够用就行——不为诊断在壳层里写一个 JSON 解析器。 */
+    private static String slice(String text, String needle) {
+        int at = text.indexOf(needle);
+        return at < 0 ? "没有 pendingMotion 这个字段" : text.substring(at, Math.min(text.length(), at + 40));
     }
 
     private static String numberAfter(String text, String key) {
@@ -235,6 +250,7 @@ public class MainActivity extends Activity {
                 String events = read(path(this, EVENTS_NAME, false));
                 String local = Kernel.state(events == null ? "" : events, plan, profile(), strength(), null);
                 debugSource = null;
+                displayed = local;
                 write(path(this, STATE_OUT_NAME, true), local); // 给设备测试读回去比一遍
                 return local;
             } catch (RuntimeException e) {
