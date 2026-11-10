@@ -363,7 +363,8 @@
   - 清单里每条 `uses-permission` 必须在契约那一处有交代，且 `declared: true` 才准出现；
   - 契约说该声明而清单没有 → 红；清单多出来 → 红（**双向**，一条不许多一条不许少）；
   - 清单里有 `<service>`、有 `BOOT_COMPLETED`、`allowBackup` 不是 `false`、或声明了定位权限 → 红。
-  反证：把 `FOREGROUND_SERVICE` 塞回清单，门当场红「声明了但实现还没做」。
+  反证三处都红：塞回 `FOREGROUND_SERVICE` → 「声明了但实现还没做」；`allowBackup` 改 `true` →
+  「这台设备上的账与约定不许备份到别处」；加一个 `<service>` → 「这台设备上不许有后台常驻」。
 - **开机重探这条路改了实现方式，也写回规格**（`ONBOARD-07`）：不再依赖开机广播——
   每一次到前台都重跑一遍并把时间记进 `youban-probe.json`，开机后的第一次打开就是那一次重跑。
   开机不自启界面、不在后台探（契约 `devicePermissions.never`）。设备事实里带上
