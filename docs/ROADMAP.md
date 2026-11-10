@@ -129,7 +129,13 @@ Kotlin 一份，连「默认算不算在时段内」都只有一边写）。
 `AUTO-03`、`PROFILE-10`）；题库与内容包；自评结果的**查阅与修订**（`AUTO-15`）；
 成长记录；诊断（含每台设备的**待确认清单**与完成度，`ONBOARDING.md §5`）；关于。角色与轮值的交接入口不在面板上（`AUTO-09`）。
 
-## M5 · 内容包
+## M5 · 内容包 —— **落了第一片：许可与来源这道门**（D82）
+
+已落：`contract.contentPack`（白名单 + 唯一一条条件条目 + 按年级绑定 + 署名落点状态）、`model/content.rb`（判定只在这一处，
+门与夹具都调它）、`tools/make-pack.rb`（从编写源仓导出并按年级过滤）、`tools/check-packs.rb`（**空目录不算绿**）、
+一个真的在跑的包 `packs/k12-compulsory.qpack`（点 2591 · 边 3663 · 题 10511 · CC BY-NC 4.0 · audience child · **不入库**）。
+**未落**：出题与「收下这题」、`/api/topics`、题目 schema 落到契约、署名在屏上那两处；自创 CC0 种子题库仍按
+D19 走旧 fork 当草稿纸。
 
 `.qpack` 格式（含 `audience`、`presentationHints`）与许可校验；自创 CC0 种子题库（300–800 题，编写位置按
 D19 与 `PROVENANCE.md §2`）；按身份绑定与统计；实时出题与「收下这题」；`/api/topics`。

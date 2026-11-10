@@ -23,6 +23,7 @@ require 'agreement'
 require 'report'
 require 'panel'
 require 'startup'
+require 'content'
 
 class Unsupported < StandardError; end
 
@@ -894,6 +895,27 @@ class World
       # 「这段时间的账」那一页（REPORT-01..04、D78）：三条开关与那批词都由契约 report 那一处答。
       # 面板那 12 页的可用性只在 panel.availability 那一处答（PANEL-02、D80）。
       # 这台电视上的启动形态（LAYER-14、ONBOARD-11、ONBOARD-12）：只在 startup 那一处答。
+      # 内容包的许可与来源（PACK-02、PACK-09、D82）：判定在 model/content.rb 那一处，门也调它。
+      'packLicenseOk' => Core::Content.license_ok?(Core::Content.pack_license),
+      'packDistribution' => Core::Content.distribution,
+      'packConditional' => Core::Content.conditional?,
+      'packConditionalRequires' => Core::Content.conditional_requires,
+      'packRevokeRules' => Core::Content.revoke_rules.size,
+      'packRevoked' => Core::Content.revoked?,
+      'packLicenseBlockedND' => !Core::Content.license_ok?('CC BY-ND 4.0'),
+      'packLicenseBlockedCCBY' => !Core::Content.license_ok?('CC-BY-4.0'),
+      'packBindingGrades' => Core::Content.binding_grades.size,
+      'packExcludedGrades' => Core::Content.excluded_grades.size,
+      'packHighSchoolBound' => Core::Content.high_school_bound?,
+      'packGradeOkG5' => Core::Content.grade_ok?('child', 5),
+      'packGradeOkG7' => Core::Content.grade_ok?('child', 7),
+      'packGradeOkG11' => Core::Content.grade_ok?('child', 11),
+      'packTextbookFilter' => Core::Content.textbook_filter?,
+      'packTextbookMarks' => Core::Content.textbook_marks.size,
+      'packTextbookHit' => Core::Content.textbook_hit?('课文里的天空是什么样的？'),
+      'packAttributionLanded' => Core::Content.attribution_landed,
+      'packAttributionPending' => Core::Content.attribution_pending,
+      'packAttributionBroken' => Core::Content.attribution_broken,
       'startupCollapse' => Core::Startup.collapse?,
       'startupFullScreenForbidden' => Core::Startup.full_screen_forbidden?,
       'startupSelfStartForbidden' => Core::Startup.self_start_forbidden? && !Core::Startup.boot_permission_declared?,

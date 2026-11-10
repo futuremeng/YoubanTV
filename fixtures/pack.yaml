@@ -1,0 +1,36 @@
+# 内容包的许可与来源（spec/PACK.md#PACK-02、#PACK-09）：判定只在 model/content.rb 那一处，门调它，这里也调它。
+PACK-02:
+  spec: [spec/PACK.md#PACK-02, spec/PACK.md#PACK-09, docs/DECISIONS.md#D82]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 这个来源在私域那一条下可以装
+      when: { mode: ambient }
+      expect: { value: { packLicenseOk: true, packDistribution: private, packConditional: true } }
+
+    - name: 条件条目要求的分布就是私域，撤销那三条一条都不许省
+      when: { mode: ambient }
+      expect: { value: { packConditionalRequires: private, packRevokeRules: 3, packRevoked: false } }
+
+    - name: 带 ND/SA/保留所有权利的，白名单之外一律拒
+      when: { mode: ambient }
+      expect: { value: { packLicenseBlockedND: true, packLicenseBlockedCCBY: false } }
+
+PACK-09:
+  spec: [spec/PACK.md#PACK-09, spec/PACK.md#PACK-04, spec/PROFILE.md#PROFILE-11]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 按年级绑——高中段一题不绑（D76）
+      when: { mode: ambient }
+      expect: { value: { packBindingGrades: 9, packExcludedGrades: 7, packHighSchoolBound: false } }
+
+    - name: 义教段在绑、高中段不在绑
+      when: { mode: ambient }
+      expect: { value: { packGradeOkG5: true, packGradeOkG7: true, packGradeOkG11: false } }
+
+    - name: 署名的落点逐条带状态：已落的真在，未落的不许冒充
+      when: { mode: ambient }
+      expect: { value: { packAttributionLanded: 2, packAttributionPending: 2, packAttributionBroken: 0 } }
+
+    - name: 预设「手上有那一本教材」的那类题要滤掉（这道过滤是开的）
+      when: { mode: ambient }
+      expect: { value: { packTextbookFilter: true, packTextbookMarks: 3, packTextbookHit: true } }

@@ -69,6 +69,26 @@ fields:
   reportForbiddenWords: {type: number} # 那批不许有的词在这一页的产出里出现几次（REPORT-04）
   reportNeverSingleSource: {type: boolean} # 不许有的词是不是只有一份清单（D45）
   reportWindowDays: {type: number} # 那一页默认看几天
+  # —— 内容包的许可与来源（PACK-02、PACK-09）：全部由 model/content.rb 那一处答。
+  packLicenseOk: {type: boolean} # 这个来源的许可在现在的分布下能不能装
+  packDistribution: {type: string} # 私域还是公开：只有 contract.contentPack.distribution 那一处答
+  packConditional: {type: boolean} # 现在这个许可走的是不是那条条件条目
+  packConditionalRequires: {type: string} # 条件条目要求的分布
+  packRevokeRules: {type: number} # 撤销条件几条——三条，一条不许省
+  packRevoked: {type: boolean} # 现在的分布下这条是否已经该撤
+  packLicenseBlockedND: {type: boolean} # 带 ND 的确实被挡在外面
+  packLicenseBlockedCCBY: {type: boolean} # 白名单里的 CC BY 没有被误挡
+  packBindingGrades: {type: number} # 绑进去的年级数——只有义教那 9 个
+  packExcludedGrades: {type: number} # 明确不绑的年级数——高中那 7 个
+  packHighSchoolBound: {type: boolean} # 高中段有没有被绑进任何一档——必须是否（D76）
+  packGradeOkG5: {type: boolean} # 小学五年级在绑
+  packGradeOkG7: {type: boolean} # 初一在绑
+  packGradeOkG11: {type: boolean} # 高二不在绑（D76）
+  packTextbookFilter: {type: boolean} # 预设课本那类题的过滤是不是开着
+  packTextbookMarks: {type: number} # 标记词几个——三个
+  packTextbookHit: {type: boolean} # 那句「课文里的天空是什么样的」确实被认成预设课本
+  packAttributionPending: {type: number} # 还没落的有几处——不许冒充已落
+  packAttributionBroken: {type: number} # 写着已落却找不到——必须 0，这是那条「绿着但没在看」的门
   startupCollapse: {type: boolean} # 冷启动要不要缩起来（LAYER-14）
   startupFullScreenForbidden: {type: boolean} # 本应用能不能全屏停留——不能（LAYER-14）
   startupSelfStartForbidden: {type: boolean} # 开机不许自启，也不为它要权限（ONBOARD-11）
@@ -304,6 +324,11 @@ kvKeys: [from, to, by, role, action, kind, target, minutes, accepted, verdict, r
   panelAvailable, panelUnavailableStated,
   startupCollapse, startupFullScreenForbidden, startupSelfStartForbidden, startupExceptions,
   autoOpenCount, autoOpenNeverHits, autoOpenTarget, autoOpenRetries,
+  packLicenseOk, packDistribution, packConditional, packConditionalRequires, packRevokeRules,
+  packRevoked, packLicenseBlockedND, packLicenseBlockedCCBY, packBindingGrades, packExcludedGrades,
+  packHighSchoolBound, packGradeOkG5, packGradeOkG7, packGradeOkG11,
+  packAttributionLanded, packAttributionPending, packAttributionBroken,
+  packTextbookFilter, packTextbookMarks, packTextbookHit,
   reportPush, reportComparison, reportVisibleTo, reportForbiddenWords, reportRows,
   reportNeverSingleSource, reportWindowDays, subjects, levels, mode, deficit, window, size, evicted, days, version, signed,
   added, notAdded, status, owner, ownerForms, dimension, fields, paired, trigger, responseRate,

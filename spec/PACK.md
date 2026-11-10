@@ -10,8 +10,29 @@ APK 内只含自创 CC0 种子包；任何第三方内容都必须以包的形�
 字段齐全是安装前置条件；许可信息在装前确认。
 
 ### PACK-02 许可白名单，机器判定
-允许的 license：`CC0-1.0`、`CC-BY-4.0`、`Apache-2.0`、自创。出现 `NC` / `ND` / `SA` / `All Rights Reserved` /
+允许的 license：`CC0-1.0`、`CC-BY-4.0`、`Apache-2.0`、自创。出现 `ND` / `SA` / `All Rights Reserved` /
 字段缺失 → 拒绝安装并说明哪一条挡住。CI 扫 `packs/` 目录，白名单之外即红。
+- **条件条目是白名单唯一的扩展**（`contentPack.license.conditional`，D82）：`CC BY-NC 4.0` **只在**
+  `contentPack.distribution = private` 时可装——家庭自用就是非商业，NC 的实质条件在这台设备上成立，
+  署名按 `PACK-03` 显示。**这条不是一个可以随手改的字段**：它跟着 D29/D30（不公开发布、不收费）走，
+  `distribution` 一旦不是 `private`，这一条立刻变成拒装，并按 `revokeIf` 那三条撤——按 `PACK-04` 卸干净，
+  已答记录保留并标注来源为「已卸载内容」。
+- 测试：fixtures/pack.yaml#PACK-02
+
+### PACK-09 包怎么来、谁签、门扫不到时不许绿
+- 导出：`ruby tools/make-pack.rb --from=<编写源仓>`（本机是 `../cn-math-taxonomy`）——按 `contentPack.audienceBinding`
+  的年级过滤（**高中段 g10–g16 一题不绑**，D76），裁掉的边要报出条数；产出 `packs/<packId>.qpack` + `manifest.json` +
+  `ATTRIBUTION.md` + `checksums.json`。包本体**不入库**（`trackedInRepo = false`）：它是本地一次导出的产物，
+  编写源在别人的仓（`PACK-08`）。
+- 签：`checksums` 是逐文件 SHA-256；`signature` 用第一次导出时生成的随机 key（`packs/.pack-key`）HMAC 签 manifest。
+  **只防误改与半途中断，不作信任锚**（`integrity.signature`）——这条要如实这么写，家里没有公钥体系。
+- **门扫不到东西时不许绿**：`packs/` 为空或 key 不在，`ruby tools/check-packs.rb` 报「本地未导出」并以红收（空目录不算绿）。
+- 署名的落点逐条带状态写在 `contentPack.attributionVisible`：已落的那几处必须真在（`THIRD_PARTY_NOTICES.md`
+  里能找到这个 `packId`）；未落的那几处不许被当成已落——「题面角落那一行」要等出题那一片。
+- **预设「手上有那一本教材」的那类题不进题集**（`contentPack.textbookDependent`）：题面或解析里出现
+  「课文 / 原文 / 教材」那批标记的，导出时滤掉、门再验一遍（抽查 354 / 13339，D82）。**大纲里的知识点照留**——
+  大纲是地图不是题，只是那一题不出。这台设备不知道孩子用的是哪一版课本，这类题在孩子那边就是「什么课文？」。
+- 测试：fixtures/pack.yaml#PACK-09
 
 ### PACK-03 署名与来源的显示位置
 `ATTRIBUTION.md` 的内容进面板「内容库」页与题目详情角落（「本题来自 <pack> · CC BY 4.0」）。

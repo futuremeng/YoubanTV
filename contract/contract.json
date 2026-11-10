@@ -1706,5 +1706,115 @@
       "retries": 0,
       "neverFrom": "agreement.panel.never"
     }
+  },
+  "contentPack": {
+    "x-note": "K12 的题库与知识大纲以**第三方内容包**的形式装进来，来源是 cn-math-taxonomy（CC BY-NC 4.0）。包本体不入库——它是本地一次导出的产物，编写源在别人的仓（PACK-08）；这道门扫的是本地 packs/ 目录，空目录不算绿。",
+    "spec": [
+      "PACK-02",
+      "PACK-09"
+    ],
+    "dir": "packs",
+    "trackedInRepo": false,
+    "distribution": "private",
+    "license": {
+      "allowed": [
+        "CC0-1.0",
+        "CC-BY-4.0",
+        "Apache-2.0",
+        "自创"
+      ],
+      "conditional": [
+        {
+          "license": "CC BY-NC 4.0",
+          "requiresDistribution": "private",
+          "why": "家庭自用就是非商业：NC 的实质条件在这台设备上成立；署名按要求显示（PACK-03）。这是白名单的唯一一条扩展，写在这一处。",
+          "revokeIf": [
+            "转为公开发布",
+            "开始收费或任何商业形态",
+            "任何对家庭之外的分发"
+          ],
+          "onRevoke": "按 PACK-04 卸干净，已答记录保留并标注来源为「已卸载内容」。"
+        }
+      ],
+      "forbiddenMarks": [
+        "ND",
+        "SA",
+        "All Rights Reserved",
+        "公共仓库抓取"
+      ]
+    },
+    "integrity": {
+      "checksums": "sha256",
+      "signature": "本地自签：第一次导出时生成 packs/.pack-key（随机），签 manifest；只防误改与半途中断，不作信任锚（PACK-07）。",
+      "keyFile": "packs/.pack-key"
+    },
+    "attributionVisible": [
+      {
+        "place": "THIRD_PARTY_NOTICES.md 的一节",
+        "state": "已落",
+        "check": "THIRD_PARTY_NOTICES.md",
+        "packId": "k12-compulsory"
+      },
+      {
+        "place": "包内 ATTRIBUTION.md",
+        "state": "已落",
+        "check": "pack",
+        "packId": "k12-compulsory"
+      },
+      {
+        "place": "题面角落的来源标记",
+        "state": "未落",
+        "check": "ASK-01",
+        "why": "要等 M5 出题那一片；现在一道题都不出"
+      },
+      {
+        "place": "只读那一屏里那一行「题从哪儿来」",
+        "state": "未落",
+        "check": "AGREE-14",
+        "why": "行集要两个内核同时改，随出题那一片一起做"
+      }
+    ],
+    "audienceBinding": [
+      {
+        "audience": "child",
+        "grades": [
+          1,
+          2,
+          3,
+          4,
+          5,
+          6,
+          7,
+          8,
+          9
+        ]
+      }
+    ],
+    "excludedGrades": [
+      10,
+      11,
+      12,
+      13,
+      14,
+      15,
+      16
+    ],
+    "source": {
+      "project": "cn-math-taxonomy",
+      "license": "CC BY-NC 4.0",
+      "url": "https://github.com/xiaoyang111222/cn-math-taxonomy",
+      "attribution": "知识点 3298 · 先修边 4868 · 题 13339（导出时按年级过滤，见 audienceBinding）"
+    },
+    "packId": "k12-compulsory",
+    "textbookDependent": {
+      "filter": true,
+      "marks": [
+        "课文",
+        "原文",
+        "教材"
+      ],
+      "why": "这类题的题面或解析预设「手上有那一本教材」——这台设备不知道孩子用的是哪一版课本，这类题在孩子那边就是「什么课文？」（抽查 354/13339，D82）",
+      "onFilter": "知识点照留（大纲是地图，不是题），只是那一题不出"
+    }
   }
 }
