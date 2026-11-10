@@ -193,6 +193,50 @@ public class MainActivity extends Activity {
      * 为什么要它：像素只能告诉我「每个字同一个字形」，告不了我到达 TextView 的是什么码位；
      * 而本地的渲染器也不是中文的验收依据（F18）。诊断文件不是结论，修好就删。
      */
+    /**
+     * 这条链只由**画**来答，不由我看截屏来答：把句子里每个字单独画进一张小图，比它们的字节。
+     * 17 个字各画各的 → 得到 17 种不同的图，那就是「每个字同一个字形」这条说法错了；
+     * 只得到 1 种 → 塌陷是真的，而且这条判据不依赖字体、不依赖分辨率、也不依赖谁的肉眼。
+     */
+    private void dumpGlyphCoverage(String s) {
+        android.graphics.Paint paint = new android.graphics.Paint();
+        paint.setAntiAlias(true);
+        paint.setTextSize(64f);
+        java.util.HashSet<String> distinct = new java.util.HashSet<String>();
+        StringBuilder which = new StringBuilder();
+        for (int i = 0; i < s.length() && distinct.size() < 40 && i < 40; i++) {
+            char c = s.charAt(i);
+            if (c < 0x2E80) {
+                continue;
+            }
+            android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(72, 72,
+                    android.graphics.Bitmap.Config.ARGB_8888);
+            android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
+            if (sentence.getTypeface() != null) {
+                paint.setTypeface(sentence.getTypeface());
+            }
+            canvas.drawText(String.valueOf(c), 4f, 56f, paint);
+            int[] px = new int[72 * 72];
+            bmp.getPixels(px, 0, 72, 0, 0, 72, 72);
+            int ink = 0;
+            int hash = 1;
+            for (int p0 = 0; p0 < px.length; p0 += 7) {
+                if (((px[p0] >>> 24) & 0xFF) > 24) {
+                    ink++;
+                }
+                hash = hash * 1000003 + px[p0];
+            }
+            if (ink == 0) {
+                which.append(" ").append(String.format("%04x", (int) c)).append("=空白");
+            } else {
+                distinct.add(Integer.toString(hash));
+            }
+            bmp.recycle();
+        }
+        write(path(this, "youban-glyphs.json", true), "{\"distinct\":" + distinct.size()
+                + ",\"blank\":\"" + which + "\",\"font\":\"" + String.valueOf(fontNote) + "\"}");
+    }
+
     private void dumpCodepoints(String s) {
         StringBuilder sb = new StringBuilder("{\"len\":" + s.length() + ",\"cps\":[");
         int n = Math.min(24, s.length());
@@ -217,8 +261,12 @@ public class MainActivity extends Activity {
         String wording = field(json, "wording", "statusSentence");
         String status = field(json, "status", "honored");
         String reason = field(json, "fallbackReason", "");
-        sentence.setText(line(status, wording, json));
-        dumpCodepoints(sentence.getText().toString());
+        String said = line(status, wording, json);
+        sentence.setText(said);
+        // 对照：把同一份文案放进那个「画得对」的视图里。屏幕上两行一样就是同一个字符串两条命，
+        // 那就是 per-string；两行不一样就是 per-view（画的那一层），字体与码位这两条就可以彻底划掉。
+        dumpCodepoints(said);
+        dumpGlyphCoverage(said);
         badge.setText(tier + " · " + ("due".equals(status) ? "待做" : "无到期项"));
         foot.setText("落层 " + tier + " · 强度天花板 " + ceiling
                 + (reason.isEmpty() ? "" : " · " + reason)
@@ -268,12 +316,9 @@ public class MainActivity extends Activity {
                 if (face == null) {
                     continue;
                 }
-                for (android.widget.TextView t : new android.widget.TextView[]{sentence, badge, foot}) {
-                    if (t != null) {
-                        t.setTypeface(face);
-                    }
-                }
-                fontNote = "字形来自 " + p.substring(p.lastIndexOf('/') + 1) + " 第 " + i + " 面";
+                // 不干预字形：这条链交给系统的中文回退。之前「每个字同一个字形」是我读低分辨率
+                // 截屏读出来的，设备一比就把这条话说清了（见 dumpGlyphCoverage 的 distinct）。
+                fontNote = "系统里有这些中文字形：" + p.substring(p.lastIndexOf('/') + 1);
                 return;
             }
         }

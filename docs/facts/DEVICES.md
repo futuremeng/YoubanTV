@@ -171,43 +171,37 @@
 - 结论：**adb 能承担调试与设备测试**——判定 → 落层 → 措辞 → 呈现这条链每一步都要自证；
   但它替代不了界面：输入、按键受理、焦点这些必须有原生 APK。M3 之前电视端的「测试」就是这条命令。
 
-## F17 电视端汉字渲染：两条错话、两个真因，最后一屏终于画对了
+## F17 汉字这条：真正要记的是「我读截屏读错了」
 
-- 现象（BOX-B / Android 9 与 PHONE-C / Android 7.1 都一样的症状）：界面上每个汉字都是**同一个字形**，
-  英文数字正常；换哪个字体，那个字形就跟着换——每个字都落到了该字体的 `.notdef`。
-- 排查记录（含两次我给自己下的假病因）：
-  1. **假病因一**「这台电视 `/system/fonts` 里没有汉字字形」——错的，`ls | head -20` 看漏：机器上有
-     `NotoSansCJK-Regular.ttc`、`NotoSerifCJK-Regular.ttc`、`SourceHanSerifSC-Bold/Heavy.otf`。
-     旁证一直在屏幕上：窗口标题「伴看板」（系统自己画的）始终是对的。F15 里同样那句一并作废。
-  2. **真因一（编译期）**：`javac` 少了 `-encoding UTF-8`，源文件里的中文常量在编译期就成了另一个字符。
-     已修（`build-apk.sh` 里写明原因），这一条修完症状仍在。
-  3. **假病因二**「随包带的字体没生效」——也不对。随包带 `.otf`/`.ttf`、指设备自带的 `.otf`/`.ttc`、
-     用 `Typeface.createFromFile`/`createFromAsset`，四种都试过，症状一模一样。
-  4. **真因二（呈现层）**：TextView 只写 `android:textSize`、不写 `android:textAppearance` 时，
-     这条链不接中文回退。**改成 `android:textAppearance="?android:attr/textAppearanceLarge"`（及 Small）
-     之后，同一台电视上「今天已按约定使用完。」九个字逐字画对了**（码位与屏上一字一位对上）。
-- 不再靠像素猜的抓手（留在应用里）：`render()` 把这一屏句子的码位写到
-  `/sdcard/Android/data/com.youban.tv/files/youban-diag.json`，`adb shell cat` 直接读——
-  上面那次读到 `{"len":9,"cps":[4eca,5929,5df2,6309,7ea6,5b9a,4f7f,7528,3002]}`，
-  与源文案逐位相同，所以那阵子「每个字同一个字形」不是文本坏了，是字形映射。
-- **剩下的堵点不在字体上**（这一条推翻了上面我自己给的「个别字缺字形」那句）：同一屏里
-  **只有那一句大字号状态句**塌，角标那行「无到期项」和小字那行「落层 · 强度天花板 · 结论来自设备上的内核」
-  都是对的。三种字体一样塌：系统 serif 族、设备自带 `SourceHanSerifSC-Bold.otf`、随包带的单字面
-  TrueType（阿里普惠，字形齐全，测完即删）。码位由 `youban-diag.json` 证明是对的：
-  `["8d85","51fa","7ea6","5b9a","65f6","95f4","3002","4eca","5929","5df2","6309","7ea6","5b9a","4f7f","7528","5b8c","3002"]`
-  →「超出约定时间。今天已按约定使用完。」其中只有「约定完」画对，其余都成同一个字。
-  所以：同一份文本、同一台设备，小字对、大字错，与用哪个字体无关——这条链在**大字号那条 TextView** 上断。
-- 选面这条路在这台设备上走不通：`ls /system/fonts` 里**没有单字面的中文字体**，汉字只在
-  `NotoSansCJK-Regular.ttc` / `NotoSerifCJK-Regular.ttc` 里；而 `Typeface.Builder(String, int)` 在我们编译用的
-  android.jar 里没有（编译器把它解析成 `Builder(AssetManager, String)`），低版本只有 `createFromFile`，只能拿第 0 面。
-- 这两条现在进了设备清单，不用手验（`tools/tv-device.yaml` 的 `probes:`）：
-  `input` 读 `/sdcard/Android/data/com.youban.tv/files/youban-input.json` 里有 `"key":"accept"`；
-  `text` 读 `youban-diag.json`，码位必须全落在汉字/标点/ASCII 之内，出现 U+FFFD 就是文本在途中坏了。
-  实测一行：`text PASS 9 个码位全是真字（8 个汉字），没有 U+FFFD`。
-- 复核：`sh device/android/build-apk.sh && adb -s <设备> install -r device/android/out/youban-tv.apk`
-  → `am start -n com.youban.tv/.MainActivity` → `am broadcast -n com.youban.tv/.StateReceiver -a com.youban.STATE --es state '<CommitState JSON>'`
-  → 截图 + `cat .../youban-diag.json`。**注意**：广播必须带 `-n`，且 `StateReceiver` 要先把 extra 落到文件
-  （之前它只 `startActivity`、把 extra 丢了——那一晚反复对比截图对不上就是这个坑）。
+**设备的回答（不看分辨率、不看字体名、不看肉眼）**：应用把这一屏句子里每个字单独画进 72×72 的小图、
+比像素哈希，写回 `/sdcard/Android/data/com.youban.tv/files/youban-glyphs.json`：
+
+```
+{"distinct":14,"blank":"","font":"系统中文回退可用：NotoSansCJK-Regular.ttc"}
+```
+
+14 个 CJK/标点 → **14 种不同的图，没有一张是空白**。也就是说：这台电视一直在正常画中文，
+我前面几轮写在文档里的「每个字都塌成同一个字形」是**我读低分辨率截屏读出来的**，不是设备的事实。
+同样，那句「改了 `textAppearance` 就通了」也是同一类误读——它没有可复核的判据。
+
+留下的真事实（都有字节级或机器判据）：
+
+1. `javac` 必须带 `-encoding UTF-8`：那时 `classes.dex` 里的中文常量字节就是错的，这条查的是字节，不是眼睛。
+2. 到达 TextView 的码位是对的：`youban-diag.json` 与文案逐位相同，且不含 U+FFFD。
+   这台设备上有 `NotoSansCJK-Regular.ttc` / `NotoSerifCJK-Regular.ttc` / `SourceHanSerifSC-Bold|Heavy.otf`。
+3. 屏幕上「哪个层、哪句措辞」由设备上的内核给：见 F19。
+4. 广播带 JSON 字符串会被两道 shell 吃掉字符；`adb push` 出来的文件属主是 shell，应用读不到；
+   事件账末尾的空行不是事件——这三条是这一晚真正的 bug，都不是字形。
+
+以后中文这条怎么算验过（写死在这三条，别再靠我看图）：
+
+- `probe text`：码位全是真汉字、没有 U+FFFD；
+- `probe glyphs`：`distinct` 明显大于 1 且 `blank` 为空——**塌没塌由这条说**；
+- 判定链正确性由设备清单那 8 步的「本地卡 vs 设备截图」灰度比分管（F15）。
+
+顺带说清那条走不通的路：这台机器**没有单字面的中文字体**，汉字只在 `.ttc` 里，而选面的
+`Typeface.Builder(String, int)` 在我们编译用的 android.jar 里没有。既然系统回退本来就画得对，
+这一层就不干预了（代码里写明「不干预」，别再试第第四种字体）。
 
 ## F18 本地 ImageMagick 出图不是中文显示的验收依据
 
@@ -218,3 +212,15 @@
   再用 `magick compare -metric AE` 与设备截图比——只能证伪「英文/版式」那部分。
 - 结论：**设备端中文只能在这台设备上验**（截图 + 前台窗口确认）。写进 `tools/tv-at.rb` 的清单才算数，
   别拿本地图或 `fc-list` 推断设备行为。
+## F19 结论是设备自己算的：事件进账，内核在包里跑
+
+免安装那条路（adb 呈现演练）之外，装了 APK 之后内核可以跟着包走：`core/` 用 kotlinc 编出来，
+和 `kotlin-stdlib` 一起 d8 进同一个 dex（APK 0.60 MB），契约作为 `assets/contract.json` 随包带，
+第一次起来解到应用目录给内核取那张层级表。界面上没有一条自己判层级的分支：读事件账 → `Kernel.state()` → 照着画。
+
+- 事实来源是设备本地的 `youban-events.jsonl`（一行一条 JSON），不是别人算好推上来的文件。
+  adb 只能往里追加事件：`am broadcast -n com.youban.tv/.StateReceiver -a com.youban.STATE --es kind WATCHED --es profile member:kid --el ms 3600000`。
+- 实测：账里一条 `WATCHED ms=3600000` → 屏幕给出「超出约定时间。今天已按约定使用完。」，
+  码位 17 个逐位对得上（`youban-diag.json`），字形自检 14 种不重复（`youban-glyphs.json`）。
+- 三个坑（都是这一晚真 bug）：`adb push` 出来的文件属主是 shell，应用读不到——要 push 进应用自己那个目录；
+  广播带 `--es state '{...}'` 会被两道 shell 吃掉 `{},"`，看起来像广播不通；事件账末尾的空行不是事件。

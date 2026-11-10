@@ -48,13 +48,14 @@
   （`input keyevent 23` → 应用私有目录里的 `youban-input.json`，`facts/DEVICES.md#F17`）。
   还差三件才说得上 M3 完成：① 汉字渲染**通了**——真因是 TextView 只给 `textSize` 不给
   `textAppearance` 时不接中文回退，另有编译期一条 `javac -encoding UTF-8`（`facts/DEVICES.md#F17`）；
-  个别字仍缺字形，属字体覆盖；② **设备上跑内核这一件正在做，还没成**：Kotlin 内核与 stdlib 已 d8 进
+  中文这条由两条机器判据把关（`probe text` 码位、`probe glyphs` 字形不重样），不再靠我看截屏；② **设备上跑内核这一件成了**：Kotlin 内核与 stdlib 已 d8 进
   同一个 dex（APK 0.60 MB），事件账落在设备本地 `youban-events.jsonl`（广播带的是**事件**不是结论），
   **内核在设备上跑起来了**：设备本地事件账 `youban-events.jsonl` 里一条 WATCHED(ms=3600000)，
   屏幕给出「超出约定时间。今天已按约定使用完。」，码位逐位对得上（`facts/DEVICES.md#F17`）。
   路上三个坑都记在 F17：adb push 出来的文件属主是 shell，应用读不到（要 push 到应用自己那个目录）；
   广播带 JSON 字符串会被两道 shell 吃掉字符（改成 `--es kind … --el ms …`）；事件账末尾的空行不是事件。
-  大字号那一句的字形还是塌的，与字体无关，见 F17。
+  字形那条**是我读截屏读错的**：设备自己一比是 14 种不同字形、没有空白（`facts/DEVICES.md#F17`）——
+  以后中文这条以 `probe text` / `probe glyphs` 两条机器判据为准，不以我看图为准。
   ③「按键落到设备」与「屏上文案的码位」已进设备清单（`tools/tv-device.yaml` 的 `probes:`，
   现在一条命令跑 8 步判定 + 2 步设备自检，两道全绿才算过）。
 - **现在能用 adb 验的部分**（M3 的呈现半边）：`ruby tools/tv-at.rb --serial=…` 跑 `tools/tv-device.yaml`，

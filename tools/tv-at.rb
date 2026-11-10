@@ -153,7 +153,25 @@ def probe_text(args)
   [true, "#{cps.size} 个码位全是真字（#{han} 个汉字），没有 U+FFFD"]
 end
 
-PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text) }.freeze
+# 字形这条只由画来答：应用把句子里每个字单独画进小图、比字节，写回 youban-glyphs.json。
+# distinct=1 就是真的塌成同一个字；blank 里列出画出来是空白的码位。这条判据不看分辨率、不看字体名、
+# 也不看谁的肉眼——之前「每个字同一个字形」那句就是我读低分辨率截屏读出来的（F17）。
+GLYPHS_DISTINCT_MIN = 8 # 那句状态句有 14 个 CJK/标点，塌了会是 1；这里只要求明显大于 1。
+
+def probe_glyphs(args)
+  got = (shell(args, "cat #{APK_FILES}/youban-glyphs.json").gsub(/[\r\n]+/, ''))[/\{.*?\}/]
+  return [false, '设备没回写字形自检（装了 APK 并起过界面吗？）'] unless got
+
+  distinct = got[/"distinct":(\d+)/, 1].to_i
+  blank = got[/"blank":"(.*?)"/, 1].to_s
+  return [false, "有字画出来是空白：#{blank}"] unless blank.empty?
+  return [false, "#{distinct} 种——字都画成同一个了"] if distinct < GLYPHS_DISTINCT_MIN
+
+  [true, "每个字各画各的：#{distinct} 种不同字形，没有空白"]
+end
+
+PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text),
+           'glyphs' => method(:probe_glyphs) }.freeze
 
 args = parse_args(ARGV)
 if args[:facts]
