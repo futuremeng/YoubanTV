@@ -94,7 +94,10 @@ end
 def device_step(args, file, id)
   FileUtils.mkdir_p(SHOT_DIR)
   shot = File.join(SHOT_DIR, "#{id.tr('.', '-')}.png")
-  out = IO.popen(['ruby', File.join(ROOT, 'tools/tv-present.rb'), file, id,
+  # 设备侧走装了 APK 的那条：事实进账 → 设备自己算 → 读回逐字段比 → 屏幕自证。
+  # 老那条「Mac 画卡推相册」（tools/tv-present.rb）留作呈现通路演练，不再当设备测试的依据：
+  # 在旧设备上它八步里能开四步屏，而且验的是 Mac 画的图，不是设备算的结论。
+  out = IO.popen(['ruby', File.join(ROOT, 'tools/tv-app-state.rb'), file, id,
                   "--serial=#{args[:serial]}", "--shot=#{shot}"], err: %i[child out], &:read)
   [out.lines.grep(/已在/).any? && $?.success?, out.lines.last.to_s.strip, shot]
 end
@@ -144,7 +147,9 @@ def probe_text(args)
   cps = json.to_s.scan(/\b[0-9a-f]{4}\b/).map { |h| h.to_i(16) }
   return [false, '码位是空的'] if cps.empty?
 
-  bad = cps.reject { |c| (0x4E00..0x9FFF).cover?(c) || [0x3002, 0xFF0C, 0x3001].include?(c) || (0x20..0x7E).cover?(c) }
+  # 只拦两类：U+FFFD（替换字符——文本在途中坏了）和控制字符。中文标点（？、。（））都算合法，
+  # 之前把它们当非法，一句带问号的状态句就误报过一次。
+  bad = cps.select { |c| c == 0xFFFD || (c < 0x20 && ![0x0A, 0x0D, 0x09].include?(c)) }
   return [false, "码位里有不该出现的字符：#{bad.map { |c| format('%X', c) }.join(',')}（文本在途中坏了）"] unless bad.empty?
 
   han = cps.count { |c| (0x4E00..0x9FFF).cover?(c) }
@@ -172,7 +177,20 @@ end
 
 # 两端同源：把设备上的事件账读回 Mac，喂给 Ruby 那份规范模型，再与设备自己算的那份逐字段比。
 # 这是 M3 最硬的一道：设备不是在念别人算好的结论，而是在跑同一个内核——这一道红了就是不同源。
+# 先把账清成一条已知的事件流再比：留着前面八步的账，比的就是「两份不同的账」而不是同一个内核。
+# 而且「这一轮请求了 focused」「已受理的暂停」这类状态不在事件里，靠攒下来的账比必然对不上。
+SEED_EVENTS = [['WATCHED', 3_600_000]].freeze
+
 def probe_state(args)
+  shell(args, "am force-stop #{APK_PACKAGE}")
+  shell(args, "rm -f #{APK_FILES}/#{EVENTS_FILE}")
+  shell(args, "am start -n #{APK_PACKAGE}/.MainActivity")
+  sleep 2
+  SEED_EVENTS.each do |kind, ms|
+    shell(args, "am broadcast -n #{APK_PACKAGE}/.StateReceiver -a com.youban.STATE " \
+                 "--es kind #{kind} --es profile member:kid --el ms #{ms} --el pauseMs 0")
+  end
+  sleep 2
   events = shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}").gsub(/\r/, '')
   return [false, '设备上没有事件账，算不出结论'] if events.strip.empty?
 
@@ -242,7 +260,8 @@ end
 
 if fails.empty?
   puts "电视端设备测试：#{scenarios.size} 步全部通过（内核判定 + 真机显示各一道）"
-  puts '这验的是「判定 → 落层 → 措辞 → 呈现」这条链在真机上对；界面本身仍要 device/ 的原生 APK（M3）。'
+  puts '这验的是「事实 → 设备上的内核 → 落层 → 措辞 → 屏上自证」这条链在真机上对；' \
+       '设备侧走的是装了 APK 的那条，不再是 Mac 画卡推相册（那是呈现通路演练，见 F15）。'
 else
   puts "电视端设备测试：#{fails.size} 步没过——#{fails.join(', ')}"
 end

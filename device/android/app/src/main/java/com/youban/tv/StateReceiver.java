@@ -25,9 +25,14 @@ public class StateReceiver extends BroadcastReceiver {
             String profile = intent.getStringExtra("profile");
             long ms = intent.getLongExtra("ms", 0L);
             long pauseMs = intent.getLongExtra("pauseMs", 0L);
+            String fieldKind = intent.getStringExtra("fieldKind");
             StringBuilder fields = new StringBuilder("\"ms\":" + ms);
             if (pauseMs > 0) {
                 fields.append(",\"pauseMs\":").append(pauseMs);
+            }
+            // 动议是哪一种也要进账：受理了的「延一延」不是暂停，只看有没有 MOTION_SETTLED 会判错。
+            if (fieldKind != null && !fieldKind.isEmpty()) {
+                fields.append(",\"kind\":\"").append(fieldKind).append('"');
             }
             MainActivity.append(MainActivity.path(context, MainActivity.EVENTS_NAME, true),
                     "{\"kind\":\"" + kind + "\",\"profile\":\"" + (profile == null ? "" : profile)

@@ -353,10 +353,23 @@ public class MainActivity extends Activity {
         }
     }
 
-    /** 事件只追加，不改写：这是设备端唯一的事实来源（D47）。 */
+    /**
+     * 事件只追加，不改写：这是设备端唯一的事实来源（D47）。
+     * 必须用真正的追加流：连着几条广播进来时，"读全文 + 写全文" 会互相覆盖——
+     * COMMIT-04 那一步八条只落了四条，屏幕上就从 due 掉回 honored，看着像判定错了。
+     */
     static void append(String path, String line) {
-        String old = read(path);
-        write(path, (old == null || old.isEmpty() ? "" : old) + line + "\n");
+        java.io.File f = new java.io.File(path);
+        if (f.getParentFile() != null) {
+            f.getParentFile().mkdirs();
+        }
+        try {
+            java.io.FileOutputStream out = new java.io.FileOutputStream(f, true);
+            out.write((line + "\n").getBytes("UTF-8"));
+            out.close();
+        } catch (java.io.IOException e) {
+            // 账写不进去就是设备故障，界面仍按现有账显示；不在这层编结论。
+        }
     }
 
     private static String read(String path) {
