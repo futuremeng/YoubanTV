@@ -143,8 +143,14 @@ Tempfile.open(['youban-align', '.json']) do |f|
       'events' => [{ 'kind' => 'PLAN_SIGNED', 'profile' => 'member:kid', 'at' => 1700000000000,
                      'fields' => { 'version' => 3 } }],
       'plans' => { 'member:kid' => { 'audience' => 'child', 'allowanceMs' => 3600000 } }, 'tag' => '签过的' },
-    { 'profile' => 'member:dad', 'events' => [], 'plans' => { 'member:dad' => { 'audience' => 'grown-up' } },
-      'tag' => '还没签的' }
+    { 'profile' => 'member:dad', 'plans' => { 'member:dad' => { 'audience' => 'grown-up' } },
+      'tag' => '还没签的',
+      'events' => [{ 'kind' => 'MOTION', 'profile' => 'member:dad', 'actor' => 'member:kid', 'at' => 5,
+                     'fields' => { 'kind' => 'pause' } },
+                   { 'kind' => 'MOTION_SETTLED', 'profile' => 'member:dad', 'at' => 6,
+                     'fields' => { 'kind' => 'pause', 'accepted' => false } },
+                   { 'kind' => 'MOTION_UNANSWERED', 'profile' => 'member:dad', 'at' => 7,
+                     'fields' => { 'kind' => 'extend' } }] }
   ].each do |job0|
     mine_p = Core::Agreement.panel(events: job0['events'], profile: job0['profile'], plans: job0['plans'])
     job = { 'contract' => File.join(ROOT, 'contract/contract.json') }.merge(job0.reject { |k, _| k == 'tag' })

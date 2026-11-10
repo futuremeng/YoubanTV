@@ -254,11 +254,33 @@ object Kernel {
             }
             lines.add(panel["row"].toString().replace("{label}", f["uiWords"].toString()).replace("{value}", shown))
         }
+        // 动议那一路的历史挂在同一屏的下半段（AUTO-03）：只读，种类的名字只在 motion.kinds 那一处。
+        val motion = node["motion"] as Map<*, *>
+        val history = motion["history"] as Map<*, *>
+        val kinds = (motion["kinds"] as Map<*, *>).filterKeys { it.toString() != "x-note" }
+        events.forEach { e ->
+            val fields = e["fields"] as? Map<*, *>
+            val kind = kinds[(fields?.get("kind") ?: "").toString()] ?: kinds["unknown"]
+            val who = e["actor"]?.toString() ?: e["profile"].toString()
+            val at = ((e["at"] as? Number)?.toLong() ?: 0L) / 1000L
+            val stamp = if (at > 0L) at.toString() else "—"
+            val line = when (e["kind"].toString()) {
+                "MOTION" -> history["proposed"]
+                // 婉拒与没受理在账上不是两条结论：accepted=false（或 0）才是婉拒，没这一条就是接受了。
+                "MOTION_SETTLED" -> if (declined(fields?.get("accepted"))) history["declined"] else history["accepted"]
+                "MOTION_UNANSWERED" -> history["unanswered"]
+                else -> null
+            } ?: return@forEach
+            lines.add(line.toString().replace("{kind}", kind.toString()).replace("{by}", who).replace("{when}", stamp))
+        }
         return Json.write(linkedMapOf<String, Any?>(
-            "title" to panel["title"], "lines" to lines, "foot" to panel["timeSource"],
-            "never" to panel["never"]
+            "title" to panel["title"], "lines" to lines,
+            "foot" to (listOf(panel["timeSource"], history["foot"]).map { it.toString() }.joinToString(" · ")),
+            "never" to ((panel["never"] as List<*>) + (history["never"] as List<*>)).distinct()
         ))
     }
+
+    private fun declined(v: Any?) = v == false || v == 0L || v == 0
 
     /** 左右键在一项的可选值里走一步：可选值在契约 fields.choices，顺序也在那儿（界面上不许另列一份）。 */
     @JvmStatic

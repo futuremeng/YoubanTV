@@ -1502,7 +1502,36 @@
       "AUTO-03",
       "AUTO-16",
       "PROFILE-10"
-    ]
+    ],
+    "kinds": {
+      "x-note": "动议那一张的种类与名字只在这里登记一次（AUTO-03 那张表的那一列）。",
+      "pause": "暂停 / 解除暂停",
+      "extend": "临时加时",
+      "stopHint": "停止本机提示",
+      "cancelTask": "免做本次任务",
+      "changeTask": "换任务形式",
+      "slotChange": "时段微调（当天内）",
+      "planChange": "改规则",
+      "dataExport": "导出数据",
+      "coWatch": "共看邀请",
+      "roleChange": "角色的移交与收回",
+      "unknown": "那一种动议"
+    },
+    "history": {
+      "x-note": "那一屏只读的历史（AUTO-03）：谁提的、什么时候、结果怎样；没有按钮，也不催第二次。",
+      "title": "动议这一路",
+      "proposed": "· {kind} · {by} · {when} · 等对方受理",
+      "accepted": "· {kind} · {by} · {when} · 对方接受了",
+      "declined": "· {kind} · {by} · {when} · 对方婉拒了（没受理也一样：账上只有一条）",
+      "unanswered": "· {kind} · {by} · {when} · 没人受理，过了 24 小时就过期",
+      "foot": "受理只发生在被请求方自己那一面，这里没有受理的按钮（AUTO-03、PROFILE-10）",
+      "never": [
+        "代为受理",
+        "催第二次",
+        "自动重发",
+        "得分"
+      ]
+    }
   },
   "layering": {
     "overlay": {

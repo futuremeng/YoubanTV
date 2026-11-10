@@ -195,7 +195,9 @@ public class MainActivity extends Activity {
             case KeyEvent.KEYCODE_INFO:
                 key = "switch"; // 换这一档：这一屏只挑人，改不了任何约定（AGREE-08）
                 break;
-            case KeyEvent.KEYCODE_SETTINGS:
+            // SETTINGS(176) 在这一台电视上被系统吃掉，压根不进 onKeyDown（实测）；
+            // BOOKMARK(174) 两边都能到这里，拿来开那一屏只读的条目。
+            case KeyEvent.KEYCODE_BOOKMARK:
                 key = "panel"; // 那一屏只读的条目（AGREE-14）：没有按钮，也不写账
                 break;
             default:

@@ -628,9 +628,25 @@ def probe_panel(args)
     broadcast(args, ['--es', 'kind', kind, '--es', 'profile', who] + extra.split(' '))
     sleep 1
   end
+  # 动议那一路也摆几条：提出 / 婉拒 / 没人受理（AUTO-03）——那一屏的历史就是数这几条。
+  broadcast(args, ['--es', 'kind', 'MOTION', '--es', 'profile', 'member:kid',
+                   '--es', 'actor', 'member:mom', '--es', 'fieldKind', 'pause'])
+  sleep 1
+  broadcast(args, ['--es', 'kind', 'MOTION_SETTLED', '--es', 'profile', 'member:kid',
+                   '--es', 'fieldKind', 'pause', '--es', 'accepted', 'false'])
+  sleep 1
+  broadcast(args, ['--es', 'kind', 'MOTION', '--es', 'profile', 'member:kid',
+                   '--es', 'actor', 'member:dad', '--es', 'fieldKind', 'slotChange'])
+  sleep 1
+  broadcast(args, ['--es', 'kind', 'MOTION_UNANSWERED', '--es', 'profile', 'member:kid',
+                   '--es', 'fieldKind', 'extend'])
+  sleep 1
+  broadcast(args, ['--es', 'kind', 'MOTION_SETTLED', '--es', 'profile', 'member:kid',
+                   '--es', 'fieldKind', 'slotChange', '--es', 'accepted', 'true'])
+  sleep 1
   ledger_before = shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}").gsub(/\r\n?/, '')
 
-  shell(args, 'input keyevent 176') # SETTINGS：那一屏只读的条目
+  shell(args, 'input keyevent 174') # BOOKMARK：那一屏只读的条目（SETTINGS 被系统吃了，见 F33）
   sleep 2
   raw = shell(args, "cat #{APK_FILES}/youban-panel.json").gsub(/\r\n?/, '')[/\{.*\}/]
   return [false, '没读到 youban-panel.json：那一屏没出来'] if raw.nil?
@@ -662,7 +678,15 @@ def probe_panel(args)
   after = shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}").gsub(/\r\n?/, '')
   return [false, '打开那一屏往账里写了东西'] unless after == ledger_before
 
-  [true, "#{mine['lines'].size} 行与规范模型逐字相同；#{never.size} 个不许有的词一个没出现；开这一屏账里一个字没多"]
+  # 提出来 / 接受了 / 婉拒了 / 没人受理，这四样各要在屏上出现一次：这三条用例正好覆盖
+  # 「婉拒与接受是同一条事件的两种结果」和「没受理不是婉拒」（AUTO-03）。
+  want = ['等对方受理', '对方接受了', '婉拒', '没人受理']
+  missing = want.reject { |w| mine['lines'].to_a.any? { |l| l.to_s.include?(w) } }
+  return [false, "那一屏的历史少了这些结果：#{missing.join('、')} · 屏上：#{mine['lines'].last(3).inspect}"] if missing.any?
+  motions = mine['lines'].to_a.count { |l| l.to_s.start_with?('· ') }
+
+  [true, "#{mine['lines'].size} 行与规范模型逐字相同（动议 #{motions} 行）；" \
+        "#{never.size} 个不许有的词一个没出现；开这一屏账里一个字没多"]
 end
 
 PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text),

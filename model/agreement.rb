@@ -109,6 +109,37 @@ module Core
     end
 
     PANEL = AGREEMENT.fetch('panel').to_h.freeze
+    MOTION = CONTRACT.fetch('motion').to_h.freeze
+    HISTORY = MOTION.fetch('history').to_h.freeze
+
+    # 动议那一路的历史（AUTO-03）：只读，挂在同一屏的下半段——不另开一屏、不催第二次。
+    # 种类的名字只在契约 motion.kinds 那一处；受理那一条在账上是 MOTION_SETTLED，
+    # 婉拒与没受理在账上是同一条（没受理记 MOTION_UNANSWERED），这里不替谁编结论。
+    # 婉拒与没受理在账上不是两条结论：accepted=false 才是婉拒，没这一条就是接受了。
+    # 0 / false 两种写法同一个意思（设备上字段曾按数字存过），两边一处认。
+    def declined?(v)
+      v == false || v == 0
+    end
+
+    def history_lines(events)
+      kinds = MOTION.fetch('kinds').reject { |k, _| k == 'x-note' }
+      events.to_a.map do |e|
+        h = e.to_h.transform_keys(&:to_sym)
+        h[:fields] = h[:fields].to_h.transform_keys(&:to_sym) if h[:fields].is_a?(Hash)
+        kind = kinds[h[:fields][:kind].to_s] || kinds['unknown']
+        who = h[:actor] || h[:profile]
+        when_ms = (h[:at].to_i / 1000).to_i
+        stamp = when_ms.positive? ? when_ms.to_s : '—'
+        line = case h[:kind].to_s
+               when 'MOTION' then HISTORY['proposed']
+               when 'MOTION_SETTLED' then declined?(h[:fields][:accepted]) ? HISTORY['declined'] : HISTORY['accepted']
+               when 'MOTION_UNANSWERED' then HISTORY['unanswered']
+               end
+        next if line.nil?
+
+        line.sub('{kind}', kind).sub('{by}', who.to_s).sub('{when}', stamp)
+      end.compact
+    end
 
     # 「这一档现在按哪几项跑」那一屏（AGREE-14）：全是读——没有按钮、没有红点、没有完成度。
     # 取值只从两处来：契约那张默认表垫底 + 这一档存过的那份盖上来；签署那一行取自账里的 PLAN_SIGNED。
@@ -143,7 +174,9 @@ module Core
 
         lines << PANEL['row'].sub('{label}', f['uiWords'].to_s).sub('{value}', shown_value(id, plan[id]))
       end
-      { 'title' => PANEL['title'], 'lines' => lines, 'foot' => PANEL['timeSource'], 'never' => PANEL['never'] }
+      lines += history_lines(events)
+      { 'title' => PANEL['title'], 'lines' => lines, 'foot' => [PANEL['timeSource'], HISTORY['foot']].join(' · '),
+        'never' => (PANEL['never'].to_a + HISTORY['never'].to_a).uniq }
     end
 
     def shown_value(id, raw)

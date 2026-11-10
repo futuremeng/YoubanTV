@@ -26,6 +26,9 @@ public class StateReceiver extends BroadcastReceiver {
             long ms = intent.getLongExtra("ms", 0L);
             long pauseMs = intent.getLongExtra("pauseMs", 0L);
             String fieldKind = intent.getStringExtra("fieldKind");
+            String accepted = intent.getStringExtra("accepted");
+            String actor = intent.getStringExtra("actor");
+            boolean actorSeen = false;
             StringBuilder fields = new StringBuilder("\"ms\":" + ms);
             if (pauseMs > 0) {
                 fields.append(",\"pauseMs\":").append(pauseMs);
@@ -34,9 +37,19 @@ public class StateReceiver extends BroadcastReceiver {
             if (fieldKind != null && !fieldKind.isEmpty()) {
                 fields.append(",\"kind\":\"").append(fieldKind).append('"');
             }
+            // 动议的结果也要进账：婉拒与「接受了」是同一条 MOTION_SETTLED，靠 accepted 分（AUTO-03）。
+            if (accepted != null && !accepted.isEmpty()) {
+                fields.append(",\"accepted\":").append("false".equalsIgnoreCase(accepted) ? "false" : "true");
+            }
+            // 带 actor 才落这个顶层键：不然每条 WATCHED 都多一个空 actor，那一屏的历史会多出没有的动议。
+            // （这一条今天写坏过一次 JSON——多了一个引号，账里每一行都解析不过去，
+            //  屏幕上只剩「内核没跑起来」，最难查的那种。）
+            String head = "{\"kind\":\"" + kind + "\",\"profile\":\"" + (profile == null ? "" : profile) + "\"";
+            if (actor != null && !actor.isEmpty()) {
+                head += ",\"actor\":\"" + actor + "\"";
+            }
             MainActivity.append(MainActivity.path(context, MainActivity.EVENTS_NAME, true),
-                    "{\"kind\":\"" + kind + "\",\"profile\":\"" + (profile == null ? "" : profile)
-                            + "\",\"fields\":{" + fields + "}}");
+                    head + ",\"fields\":{" + fields + "}}");
         }
         // 旧路径留着：直接塞一份算好的结论只看排版，屏幕上会写明它是调试来源。
         String json = intent.getStringExtra("state");
