@@ -91,9 +91,12 @@ Kotlin 一份，连「默认算不算在时段内」都只有一边写）。
 
 **已落**：首启那六步在设备上能走（确认键进流程、最后一屏写 `PLAN_SIGNED`，设备自检第 7 道 `setup`，见 `facts/DEVICES.md#F23`）。
 
-**活清单**：`fixtures/agree.yaml` 现在故意红着——8 条未支持（`defaultsOnly` / `signaturePending` /
-`switchTo` / `otherProfileUnchanged` / `agreementStep`），那就是 M3.5 的全部实现面。验收两条设备测试：
-首启走到签署后，设备上算出的结论与规范模型逐字段一致；切到另一身份后加载的是另一组约定。
+**已清**：`fixtures/agree.yaml` 那五条（`defaultsOnly` / `signaturePending` / `switchTo` /
+`otherProfileUnchanged` / `agreementStep`）全部在跑且绿——夹具这一层现在 **706 通过、0 失败、未支持 0**
+（`facts/DEVICES.md#F29`）。验收的两条设备测试都已落并且两台设备各跑过：
+首启走到签署后，设备上算出的结论与规范模型逐字段一致（自检 `setup`）；
+切到另一身份后加载的是另一组约定（自检 `switch`，`facts/DEVICES.md#F24`）。
+剩下的只有「时段表这类遥控器改不了的字段仍按默认并写明去哪儿改」与另一档的名字/受众由哪儿定。
 
 ## M4 · 家庭面板
 
