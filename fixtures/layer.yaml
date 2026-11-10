@@ -211,3 +211,11 @@ LAYER-12:
       given: { capability: { motionSensor: granted } }
       when: { mode: ambient }
       expect: { gate: passed, allowed: true, value: { sceneRows: 20 } }
+
+LAYER-14:
+  spec: [spec/LAYER.md#LAYER-14, spec/ONBOARD.md#ONBOARD-11, spec/AUTONOMY.md#AUTO-11]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 冷启动加载完就交回前台，全屏例外只有那两处
+      when: { mode: ambient }
+      expect: { value: { startupCollapse: true, startupFullScreenForbidden: true, startupExceptions: 2 } }

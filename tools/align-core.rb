@@ -10,6 +10,7 @@ require 'json'
 require 'yaml'
 require_relative 'run-fixtures'
 require_relative '../model/agreement'
+require_relative '../model/startup'
 
 ROOT = File.expand_path('..', __dir__)
 CLASSES = File.join(ROOT, 'core/build/classes')
@@ -169,6 +170,26 @@ Tempfile.open(['youban-align', '.json']) do |f|
         a = mine_p[k]
         bq = theirs_p[k]
         screen_diffs << "#{job0['tag']} 那一屏 #{k}: Ruby #{a.inspect} / Kotlin #{bq.inspect}" if a != bq
+      end
+    end
+  end
+
+  # 这台电视上的启动形态也在这儿比（LAYER-14、ONBOARD-11、ONBOARD-12、D81）：
+  # 缩不缩、全屏例外几处、开机那条路有没有要权限、要不要拉起那一个应用。
+  [[nil, '没指定'], ['com.example.player', '指定了一个']].each do |pkg, tag|
+    mine_su = Core::Startup.startup_shape(pkg)
+    job = { 'contract' => File.join(ROOT, 'contract/contract.json'), 'autoOpen' => pkg }
+    Tempfile.open(['youban-startup', '.json']) do |g|
+      g.write(JSON.generate(job)); g.flush
+      raw = IO.popen(['java', '-cp', "#{CLASSES}:#{STDLIB}", 'com.youban.core.Main',
+                      '--startup', '--file', g.path], &:read)
+      unless $?.success?
+        warn raw.to_s.lines.last(4).join
+        die('Kotlin 启动形态那一条跑挂了')
+      end
+      theirs_su = JSON.parse(raw.to_s.lines.last.to_s.strip)
+      mine_su.each do |k, v|
+        screen_diffs << "#{tag} 启动形态 #{k}: Ruby #{v.inspect} / Kotlin #{theirs_su[k].inspect}" if v != theirs_su[k]
       end
     end
   end

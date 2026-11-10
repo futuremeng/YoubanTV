@@ -689,12 +689,57 @@ def probe_panel(args)
         "#{never.size} 个不许有的词一个没出现；开这一屏账里一个字没多"]
 end
 
+# 这台设备被桌面或开机启动项拉起来之后，有没有把前台交回去（LAYER-14、ONBOARD-11、D81）。
+# 依据用窗口管理器那一格，不用应用自己报的那一句——F30 那条教训：程序自己说的「显示了」不算。
+def probe_startup(args)
+  return [false, '没装 com.youban.tv：先 sh device/android/build-apk.sh && adb install -r'] if
+    shell(args, "pm list packages #{APK_PACKAGE}").strip.empty?
+  # 「那一个应用」用这台设备的桌面：包名由本机答（@home），不在这条命令里写死——各家桌面不同。
+  broadcast(args, ['--es', 'autoLaunch', '@home'])
+  sleep 1
+  home_pkg = shell(args, "cat #{APK_FILES}/youban-autolaunch.txt").gsub(/\r/, '').strip
+  return [false, '这台设备答不出自己的桌面包名'] if home_pkg.empty? || home_pkg == APK_PACKAGE
+
+  shell(args, "am force-stop #{APK_PACKAGE}")
+  shell(args, "rm -f #{APK_FILES}/youban-startup.json")
+  # 首启那一步那一处是例外（那一屏要给人走完），所以先把「这一档签过」摆上，验的是正常那一路；
+  # 当前在哪一档也要摆：前一道自检会把它留在别人身上（F20 那一类：输入没摆回来，红的就不是这条）。
+  shell(args, "echo member:kid > #{APK_FILES}/youban-profile.txt")
+  broadcast(args, ['--es', 'kind', 'PLAN_SIGNED', '--es', 'profile', 'member:kid', '--el', 'version', '1'])
+  sleep 1
+  shell(args, "monkey -p #{APK_PACKAGE} -c android.intent.category.LAUNCHER 1") # 桌面那一路的启动动作
+  sleep 3
+  raw = shell(args, "cat #{APK_FILES}/youban-startup.json").gsub(/
+/, '').strip
+  return [false, '没读到 youban-startup.json（这一轮没走到交回那一步？）'] if raw.empty?
+  rec = begin
+    JSON.parse(raw)
+  rescue StandardError
+    nil
+  end
+  return [false, "那份自证读不出：#{raw[0, 60].inspect}"] unless rec.is_a?(Hash)
+  focus = shell(args, 'dumpsys window windows') + shell(args, 'dumpsys activity activities')
+  mine = focus[/mCurrentFocus=[^\r\n]*#{Regexp.escape(APK_PACKAGE)}[^\r\n]*/]
+  mine = focus[/mFocusedApp=[^\r\n]*#{Regexp.escape(APK_PACKAGE)}[^\r\n]*/] if mine.nil?
+  return [false, "前台还是这一屏：#{mine.to_s.strip}（全屏停留是 LAYER-14 明令不许的）"] if mine
+  bad = []
+  bad << "自证说没缩：#{rec['collapse'].inspect}" unless rec['collapse'] == true
+  bad << "那一个应用没拉起：#{rec['launched'].inspect}" unless rec['launched'] == true
+  bad << "指定的那一个不是 #{home_pkg}：#{rec['target'].inspect}" unless rec['target'].to_s == home_pkg
+  broadcast(args, ['--es', 'autoLaunch', '']) # 摆回没指定的样子，别影响后面那几步
+  return [false, bad.join('；')] if bad.any?
+
+  shown = focus[/mCurrentFocus=[^\r\n]*/].to_s.strip
+  [true, "起来 #{rec['ms']}ms 就把前台交回给 #{home_pkg}（窗口管理器那一格：#{shown[/\S+\/?\S*/].to_s}）"]
+end
+
 PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text),
            'glyphs' => method(:probe_glyphs), 'state' => method(:probe_state),
            'apk' => method(:probe_apk), 'key' => method(:probe_key),
            'setup' => method(:probe_setup), 'switch' => method(:probe_switch),
            'overlay' => method(:probe_overlay),
-           'panel' => method(:probe_panel) }.freeze
+           'panel' => method(:probe_panel),
+           'startup' => method(:probe_startup) }.freeze
 
 args = parse_args(ARGV)
 if args[:facts]

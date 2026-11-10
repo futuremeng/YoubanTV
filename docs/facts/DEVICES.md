@@ -634,3 +634,34 @@ Ruby `Core::Agreement.history_lines` 与 Kotlin `Kernel.panel` 同源，`tools/a
 1. 划出范围不是改文档：把名字在**定义面**里清干净，才有「它不存在」这种断言可言 ✓
 2. 一条断言如果只查「文本里有没有这个串」，就要问一句**这个串本来会出现在文本的哪一侧** ✓
    键名那一侧以前是空的 ✓ 与 F33 那条「绿着但没在看」同一类：断言在，看守的位置不在 ✓
+
+## F36 被桌面拉起来之后要把前台交回去：量的两个数是 190ms 与 287ms
+
+电视端要做成开机启动的那一个 app（别的法子被固件锁死，用户实测），于是「打开就占全屏」这件事从
+礼貌问题变成了**计时问题**：前台计时看的是「现在前面是什么」（`AUTO-11`），本应用自己占着全屏，
+那条计时就一路看见自己（`LAYER-14`、D81）。
+
+做法与量到的数（`probes` 里第 11 道 `startup`）：
+
+| 设备 | 起来到交回前台 | 交给谁（包名由本机答） |
+|---|---|---|
+| Smartisan OD103 | **190ms** | `com.smartisanos.launcher` |
+| Konka 55A60（`192.168.1.44:5555`） | **287ms** | `com.konka.livelauncher` |
+
+依据用**窗口管理器那一格**（`mCurrentFocus` / `mFocusedApp` 里没有本应用），不用应用自己报的那句——
+F30 那条教训在这里同样成立：那台机器上「写了显示记录」和「真画出来了」是两件事 ✓ 这一道里
+`youban-startup.json` 只是**自证的一份**，红了不够，还要焦点那一格也红了才算。
+
+三个只在真机上才露面的坑：
+
+1. **`monkey -p … -c LAUNCHER` 第二次进来走的是 `onNewIntent`，不是 `onCreate`**（`launchMode=singleTask`）✓
+   只在 `onCreate` 里设那个「从桌面来」的标记，第一次缩、第二次就赖着不走——现象是「有时缩有时不缩」✓
+2. **`cmd package resolve-activity -c android.intent.category.HOME` 在两台设备上都回 `No activity found`** ✓
+   命令行答不出桌面包名，于是这一条改由**设备自己答**（`@home` → 壳层 `resolveActivity`），
+   测试里不写死任何一家的桌面包名 ✓
+3. **`getLaunchIntentForPackage(桌面包名)` 返回 `null`**：桌面带的是 `CATEGORY_HOME` 那一项，不是 `LAUNCHER` ✓
+   拉起的第二步改走 `queryIntentActivities(MAIN + HOME)` ✓ 只写第一步的话，指到桌面就是「这台设备没拉起」。
+
+还有一条不是坑，是范围：开机启动这一条由**电视设置里的开机启动项**指过来——本应用**不声明
+`RECEIVE_BOOT_COMPLETED`、不起 `<service>`**（`tools/check-manifest.rb` 那两条门守着，F3 那条重探规矩不变）。
+被系统作为开机启动项拉起是合法形态；自己找路常驻不是。

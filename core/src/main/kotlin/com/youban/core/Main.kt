@@ -50,6 +50,11 @@ object Main {
                 Day.num(job["step"] ?: 0), Day.num(job["version"] ?: 1), false))
             return
         }
+        if (args.contains("--startup")) {
+            Commit.useContract(job["contract"].toString())
+            println(Kernel.startup(job["autoOpen"]?.toString()))
+            return
+        }
         if (args.contains("--kernel")) {
             Commit.useContract(job["contract"].toString())
             val lines = ((job["events"] as? List<*>) ?: emptyList<Any?>())

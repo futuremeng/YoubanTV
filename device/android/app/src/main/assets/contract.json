@@ -1668,5 +1668,43 @@
         "field": "count"
       }
     ]
+  },
+  "startup": {
+    "x-note": "这台电视的固件把别的路子锁了，所以开机启动这一条由电视设置里的开机启动项指到本应用（LAYER-14、ONBOARD-11、D81）。本应用不自启：不声明 RECEIVE_BOOT_COMPLETED、不起 service——tools/check-manifest.rb 那条门守着。",
+    "spec": [
+      "LAYER-14",
+      "ONBOARD-11",
+      "ONBOARD-12"
+    ],
+    "coldStart": {
+      "collapse": true,
+      "stay": "加载完那一帧就交回前台——不给它一个可以停留的时长",
+      "fullScreenForbidden": true,
+      "why": "前台计时看的是「现在前面是什么」：自己占着全屏，就把要计时的东西挡在外面（AUTO-11、LAYER-14）",
+      "exceptions": [
+        "首启那六步没走完（AGREE-05）",
+        "只读那一屏（AGREE-14）"
+      ]
+    },
+    "bootStart": {
+      "by": "系统 / 电视设置里的开机启动项",
+      "selfStartForbidden": true,
+      "permission": null,
+      "reprobe": "重启后这条授权可能被清掉（F1、F30）：下一次打开时重探（ONBOARD-07），留不住就如实报"
+    },
+    "autoOpen": {
+      "count": 1,
+      "setBy": "adb（ONBOARDING.md §2b）；界面入口在「设备」页，推到 2.0（D80）",
+      "checklistItem": "tv.autoOpen.target",
+      "never": [
+        "把本应用锁成桌面 / device owner / Kiosk（范围之外，PRODUCT.md §2）",
+        "由外部设备或动议切源（AUTO-16）",
+        "拉起失败后重试与催促",
+        "一次拉起多个应用"
+      ],
+      "failWords": "这台设备没拉起 {pkg}",
+      "retries": 0,
+      "neverFrom": "agreement.panel.never"
+    }
   }
 }

@@ -26,6 +26,7 @@
 | `tv.auth.usageAccess` | 使用情况访问（前台布尔 + 时长） | 当前激活成员 | 引导页 | 探针：能否读到当日时长 | 角标不显示，只在应用内计时 | `AUTO-11` |
 | `tv.probe.pause` | 「请求播放器暂停」响应率 | 无需成员（后台探针） | 「设备」页显示结果 | 探针样本 ≥20 次（暂定值） | `focused` → `ambient` | D36、`LAYER-07` |
 | `tv.probe.bootReceiver` | 开机自启通道是否可用 | 无需成员 | 「设备」页 | 一次开机后探针 | 只在应用内呈现，开机后首次打开才生效 | F3 |
+| `tv.autoOpen.target` | 自动打开的那一个应用（缩起之后拉起它一次） | 当前激活成员 | 「设备」页（推到 2.0，D80）；现走 §2b 那条命令 | 探针：交回前台后的前台包名 = 指定的那个 | 不拉起，只在本机呈现，账照记 | `ONBOARD-12`、`LAYER-14` |
 | `tv.agree.plan` | 该模式的约定字段与周计划 | 该成员 + 对方 | 学习页签署卡 | `PLAN_SIGNED` | 未签署的计划不生效，按旧版跑 | `AUTO-07`、`COMMIT-08` |
 | `tv.agree.slots` | 时段用途与边界 | 双方 | 面板「规则」页 / 学习页 | `PLAN_SIGNED` | 时段不生效，全天按约定线 | `DAY-08` |
 | `tv.egress.*` | AI 批 / AI 出题 / 伴看上下文 / 诊断导出 / HA 联动各一条 | `keyHolder` | 「隐私与出网」页（当场再认证） | 开关现值 + 再认证记录 | 一律 `off` | `ONBOARD-08`、`CONTEXT-01` |
@@ -93,6 +94,18 @@ adb -s <序列号> shell appops get com.youban.tv SYSTEM_ALERT_WINDOW     # 看 
 
 # 使用情况访问（当日时长与前台）。不给就按最保守档降：角标不显示，只在应用内计时（ONBOARD-06）。
 adb -s <序列号> shell appops set com.youban.tv GET_USAGE_STATS allow
+```
+
+**开机启动那一条由电视设置指**：在这台电视的设置里把开机启动项指到本应用（别的法子被固件锁死，用户实测）。
+本应用**不声明 `RECEIVE_BOOT_COMPLETED`、不起后台服务**（`ONBOARD-11`）——被系统作为开机启动项拉起来是合法形态，
+自己找路常驻不是。起来之后加载完就把前台交回去（实测 190ms / 287ms，`facts/DEVICES.md#F36`），不占全屏。
+
+**指定自动打开的那一个应用**（`ONBOARD-12`；界面入口在「设备」页，推到 2.0）：
+
+```sh
+# 那一个应用可以是包名，也可以是 @home（这台设备的桌面，包名由设备答）
+adb -s <序列号> shell am broadcast -n com.youban.tv/.StateReceiver -a com.youban.STATE --es autoLaunch @home
+adb -s <序列号> shell am broadcast -n com.youban.tv/.StateReceiver -a com.youban.STATE --es autoLaunch ''   # 取消
 ```
 
 一台设备一本账：换设备、加设备都不合并两台的数（`DAY-10`）；手机与电视之间的关联只有体感与视觉两件事

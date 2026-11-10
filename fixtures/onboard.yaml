@@ -140,3 +140,32 @@ ONBOARD-10:
     - name: 派生来源可追溯到事件、能力与角色
       when: { get: "GET /api/checklist" }
       expect: { sameSource: [core/onboard], value: { itemSources: 1 } }
+
+ONBOARD-11:
+  spec: [spec/ONBOARD.md#ONBOARD-11, spec/LAYER.md#LAYER-14, docs/ONBOARDING.md#§2b]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 开机启动由系统指，本应用不自启、也不为自启要权限
+      when: { mode: ambient }
+      expect: { value: { startupSelfStartForbidden: true, startupCollapse: true } }
+
+    - name: 例外只有那两处，界面上不许再添第三处
+      when: { mode: ambient }
+      expect: { value: { startupExceptions: 2, startupFullScreenForbidden: true } }
+
+ONBOARD-12:
+  spec: [spec/ONBOARD.md#ONBOARD-12, spec/LAYER.md#LAYER-14]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 自动打开的应用只有一个，那批不许有的做法一次不出现
+      when: { mode: ambient }
+      expect: { value: { autoOpenCount: 1, autoOpenNeverHits: 0, autoOpenRetries: 0 } }
+
+    - name: 指定了就带上那一个包名
+      given: { autoOpenTarget: com.example.player }
+      when: { mode: ambient }
+      expect: { value: { autoOpenTarget: com.example.player, autoOpenNeverHits: 0 } }
+
+    - name: 没指定就不拉，也不空转重试
+      when: { mode: ambient }
+      expect: { value: { autoOpenTarget: '', autoOpenCount: 1 } }

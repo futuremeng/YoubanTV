@@ -22,6 +22,7 @@ require 'write'
 require 'agreement'
 require 'report'
 require 'panel'
+require 'startup'
 
 class Unsupported < StandardError; end
 
@@ -107,6 +108,9 @@ class World
     @used << 'inviteDeclined' if given.key?('inviteDeclined')
     @invitations_today = given['invitationsToday'] || 0
     @used << 'invitationsToday' if given.key?('invitationsToday')
+    # 这台设备上指定的那一个应用（ONBOARD-12）：缩起之后拉起它一次；没指定就不拉。
+    @auto_open_target = given['autoOpenTarget']
+    @used << 'autoOpenTarget' if given.key?('autoOpenTarget')
     @notify_suppressed = false
     # 这一轮的呈现档（PROFILE-01、PROFILE-05）与「谁给自己批的」（AUTO-15）：都是判定与账的输入。
     @presentation = given['presentation']
@@ -889,6 +893,15 @@ class World
       # 手机与电视的直连只为体感与视觉两件事（SENSE-06、D77）：这几项只由契约 link 那一处答。
       # 「这段时间的账」那一页（REPORT-01..04、D78）：三条开关与那批词都由契约 report 那一处答。
       # 面板那 12 页的可用性只在 panel.availability 那一处答（PANEL-02、D80）。
+      # 这台电视上的启动形态（LAYER-14、ONBOARD-11、ONBOARD-12）：只在 startup 那一处答。
+      'startupCollapse' => Core::Startup.collapse?,
+      'startupFullScreenForbidden' => Core::Startup.full_screen_forbidden?,
+      'startupSelfStartForbidden' => Core::Startup.self_start_forbidden? && !Core::Startup.boot_permission_declared?,
+      'startupExceptions' => Core::Startup.exceptions.size,
+      'autoOpenCount' => Core::Startup.auto_open_count,
+      'autoOpenNeverHits' => Core::Startup.never_hits(@auto_open_target),
+      'autoOpenTarget' => Core::Startup.auto_open_target(@auto_open_target).to_s,
+      'autoOpenRetries' => Core::Startup.retries,
       'panelAvailable' => Core::Panel.available?,
       'panelUnavailableStated' => Core::Panel.marker_stated? && Core::Panel.marked_in_first_run?,
       'reportPush' => Core::Report.push?,

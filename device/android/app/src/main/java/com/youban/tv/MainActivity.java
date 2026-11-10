@@ -41,6 +41,10 @@ public class MainActivity extends Activity {
     static final String PROFILE_NAME = "youban-profile.txt";
     static final String PROBE_NAME = "youban-probe.json";
     static final String OVERLAY_NAME = "youban-overlay.json";
+    /** 这台设备指定的那一个应用（ONBOARD-12）：缩起之后拉起它一次；空就是没指定。 */
+    static final String AUTOLAUNCH_NAME = "youban-autolaunch.txt";
+    /** 启动形态的自证：这一轮缩没缩、隔了多少毫秒、那一个应用拉起成没成（LAYER-14、设备自检第 11 道）。 */
+    static final String STARTUP_NAME = "youban-startup.json";
     static final String PANEL_NAME = "youban-panel.json"; // 那一屏只读的条目：设备自检第 10 道读它 // 那一张到底出没出、落在哪儿：设备自检第 9 道读它 // 上一次到前台是什么时候：证据不过期那一条的凭据（ONBOARD-07）
     /** 公共目录做兜底：装了存储权限的开发机可以 adb push 到那儿直接看效果。 */
     static final String PUBLIC_DIR = "/sdcard/Download";
@@ -51,6 +55,10 @@ public class MainActivity extends Activity {
     // static 是有意的：广播用 CLEAR_TOP 起Activity 时可以另起一个实例，实例字段会让按键落到
     // 另一个实例上、看到的是自己那份旧结论（真机上就是「按键像没被听见」，见 F22）。
     private static String displayed = null;
+    // 从桌面或开机启动项那一路进来的才算冷启动（LAYER-14）：用 `am start -n` 点名的调试启动不缩，
+    // 那样设备测试那两道「真机显示」还能拍到这一屏。
+    private boolean fromLauncher = false;
+    private long coldStartAt = 0L;
     private int rosterIndex = 0; // 换那一屏的光标在第几档（名单由内核从账里给）
     private boolean noPlan = false; // 这台设备还没存过约定方案（AGREE-13）
     private TextView sentence;
@@ -77,6 +85,10 @@ public class MainActivity extends Activity {
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
+        // 冷启动那一帧（LAYER-14）：桌面/开机启动项那一路进来，加载完就把前台交回去，不占全屏。
+        // 这条不只是礼貌——前台计时看的是「现在前面是什么」（AUTO-11），自己占着全屏就看不见要计时的东西。
+        fromLauncher = getIntent() != null && Intent.ACTION_MAIN.equals(getIntent().getAction());
+        coldStartAt = android.os.SystemClock.elapsedRealtime();
         setContentView(R.layout.status);
         useBundledContract();
         useDeviceCjkFont();
@@ -89,6 +101,116 @@ public class MainActivity extends Activity {
         // .notdef。也就是说：到达 TextView 的码位不是 dex 里那串汉字（dex 里的字节已逐字核过）。
         // 下一步不靠像素猜：把这一屏句子的码位写到设备上，用 adb 读回来看（F17）。
         render();
+        if (sentence != null && fromLauncher) {
+            sentence.post(new Runnable() {
+                @Override
+                public void run() {
+                    maybeHandBack();
+                }
+            });
+        }
+    }
+
+    /**
+     * 加载完那一帧之后把前台交回去（LAYER-14、ONBOARD-11、ONBOARD-12、D81）。
+     * 例外只有契约 startup.coldStart.exceptions 那两处，这里不自己添第三处：
+     * 首启那六步那一步（内核给 nextAction = agreement）留在这一屏给人走完；
+     * 只读那一屏是按键走进来的，那一屏不归冷启动管。
+     */
+    private void maybeHandBack() {
+        if (!fromLauncher) {
+            return;
+        }
+        fromLauncher = false;
+        String target = readOneLine(AUTOLAUNCH_NAME);
+        String shape = Kernel.startup(target);
+        long ms = android.os.SystemClock.elapsedRealtime() - coldStartAt;
+        String action = field(displayed == null ? stateJson() : displayed, "nextAction", "");
+        if ("agreement".equals(action)) {
+            write(path(this, STARTUP_NAME, true),
+                    "{\"collapse\":false,\"why\":\"agreement\",\"ms\":" + ms + ",\"target\":null,\"launched\":null}");
+            return;
+        }
+        Boolean launched = null;
+        if (target != null && !target.isEmpty()) {
+            launched = launchTarget(target);
+            if (!launched) {
+                // 拉起失败只说一句事实，重试次数由 startup.autoOpen.retries 那一处给（0）：这里不排退避表。
+                String said = field(shape, "failLine", "");
+                if (!said.isEmpty()) {
+                    OverlayCard.show(getApplicationContext(), said);
+                }
+            }
+        }
+        write(path(this, STARTUP_NAME, true), "{\"collapse\":true,\"ms\":" + ms + ",\"target\":"
+                + (target == null || target.isEmpty() ? "null" : ("\"" + target + "\""))
+                + ",\"launched\":" + (launched == null ? "null" : launched.toString()) + "}");
+        finish();
+    }
+
+    /** 拉起那一个应用：本机用户指定的一次拉起，不是切源、不是 L5、也不是动议（AUTO-16）。 */
+    private boolean launchTarget(String pkg) {
+        try {
+            Intent it = getPackageManager().getLaunchIntentForPackage(pkg);
+            if (it == null) {
+                // 桌面这类包不一定带 LAUNCHER 那一项，带的是 HOME（本机答出的那一个就是这种）。
+                Intent home = new Intent(Intent.ACTION_MAIN);
+                home.addCategory(Intent.CATEGORY_HOME);
+                java.util.List<android.content.pm.ResolveInfo> rs =
+                        getPackageManager().queryIntentActivities(home, android.content.pm.PackageManager.MATCH_DEFAULT_ONLY);
+                for (android.content.pm.ResolveInfo r : rs) {
+                    if (r.activityInfo != null && pkg.equals(r.activityInfo.packageName)) {
+                        it = new Intent(Intent.ACTION_MAIN);
+                        it.addCategory(Intent.CATEGORY_HOME);
+                        it.setClassName(r.activityInfo.packageName, r.activityInfo.name);
+                        break;
+                    }
+                }
+            }
+            if (it == null) {
+                return false;
+            }
+            it.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK);
+            startActivity(it);
+            return true;
+        } catch (Exception e) {
+            return false;
+        }
+    }
+
+    private String readOneLine(String name) {
+        try {
+            String body = read(path(this, name, false));
+            if (body == null) {
+                return null;
+            }
+            String s = body.trim();
+            return s.isEmpty() ? null : s;
+        } catch (Exception e) {
+            return null;
+        }
+    }
+
+    /**
+     * 桌面与开机启动项那一路进来的是 MAIN/LAUNCHER；singleTask 下第二次进来走的是这里，
+     * 不是 onCreate——只在一处设那个标记的话，第二次打开就赖着不走了（真机上就是这个现象）。
+     */
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        boolean launcher = intent != null && Intent.ACTION_MAIN.equals(intent.getAction());
+        coldStartAt = android.os.SystemClock.elapsedRealtime();
+        if (launcher && sentence != null) {
+            fromLauncher = true;
+            render();
+            sentence.post(new Runnable() {
+                @Override
+                public void run() {
+                    maybeHandBack();
+                }
+            });
+        }
     }
 
     @Override

@@ -215,6 +215,27 @@ object Kernel {
      * 条目与取值只从两处来——契约那张默认表垫底 + 这一档存过的那份盖上；签署那一行取自账里的 PLAN_SIGNED。
      * 契约 agreement.panel.never 那些词一个都不许出现在这一屏上（设备自检逐条扫一遍）。
      */
+    /** 这台电视上的启动形态（LAYER-14、ONBOARD-11、ONBOARD-12、D81）：只在契约 startup 那一处答。
+     *  与 Ruby 的 Core::Startup.startup_shape 同源，由 tools/align-core.rb 逐字段比。 */
+    @JvmStatic
+    fun startup(autoOpenPkg: String?): String {
+        val node = Json.parse(java.io.File(contractPathFile()).readText()) as Map<*, *>
+        val st = node["startup"] as Map<*, *>
+        val cold = st["coldStart"] as Map<*, *>
+        val boot = st["bootStart"] as Map<*, *>
+        val open = st["autoOpen"] as Map<*, *>
+        val pkg = if (autoOpenPkg == null || autoOpenPkg.trim().isEmpty()) null else autoOpenPkg.trim()
+        val out = LinkedHashMap<String, Any?>()
+        out["collapse"] = cold["collapse"]
+        out["fullScreenForbidden"] = cold["fullScreenForbidden"]
+        out["exceptions"] = (cold["exceptions"] as List<*>).size.toLong()
+        out["selfStartForbidden"] = boot["selfStartForbidden"] == true && boot["permission"] == null
+        out["autoOpen"] = pkg
+        out["retries"] = open["retries"]
+        out["failLine"] = if (pkg == null) null else open["failWords"].toString().replace("{pkg}", pkg)
+        return Json.write(out)
+    }
+
     /** 面板那 12 页在 1.0 里只有这张表、没有界面（D80）：指向某一页的那一句得带上这一句（PANEL-02）。
      *  可用与否只在契约 panel.availability 那一处答；Ruby 那边是 Core::Panel.where_text。 */
     private fun panelWhere(where: String): String {
