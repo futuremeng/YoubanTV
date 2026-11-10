@@ -47,6 +47,7 @@ public class MainActivity extends Activity {
     // static 是有意的：广播用 CLEAR_TOP 起Activity 时可以另起一个实例，实例字段会让按键落到
     // 另一个实例上、看到的是自己那份旧结论（真机上就是「按键像没被听见」，见 F22）。
     private static String displayed = null;
+    private boolean noPlan = false; // 这台设备还没存过约定方案（AGREE-13）
     private TextView sentence;
     private TextView badge;
     private TextView foot;
@@ -122,6 +123,14 @@ public class MainActivity extends Activity {
             case KeyEvent.KEYCODE_BACK:
                 key = "decline";
                 break;
+            case KeyEvent.KEYCODE_DPAD_RIGHT:
+            case KeyEvent.KEYCODE_DPAD_UP:
+                key = "next";
+                break;
+            case KeyEvent.KEYCODE_DPAD_LEFT:
+            case KeyEvent.KEYCODE_DPAD_DOWN:
+                key = "prev";
+                break;
             case KeyEvent.KEYCODE_INFO:
                 key = "about";
                 break;
@@ -131,12 +140,88 @@ public class MainActivity extends Activity {
         if (key == null) {
             return super.onKeyDown(code, event);
         }
+        if (setupPlan != null) {
+            setupKey(key);
+            return true;
+        }
         record(key);
-        // 按键不许变成回执、签到或第二次提醒（契约 commitState.pendingMotion 那句）。
-        // 它唯一能生效的前提：内核说这会儿真挂着一条要受理的动议（AGREE-11、D34）。
-        settle(key);
+        // 按键在账上只有一条生路：挂着一条要受理的动议时，确认键就是那一次受理（AGREE-11、D34）。
+        // 除此之外，它只能带人走屏——内核说「还缺一份约定」时，确认键进那六步，一个字段都不写。
+        // 回执、签到、第二次提醒这三样一律不进账（契约 commitState.pendingMotion 那句）。
+        if (settle(key)) {
+            render();
+            return true;
+        }
+        if ("accept".equals(key) && "agreement".equals(field(displayed == null ? stateJson() : displayed, "nextAction", ""))) {
+            openSetup();
+            return true;
+        }
         render();
         return true;
+    }
+
+    // 首启那六步。这一层不认字段名：屏幕上问什么、现在是什么、有哪些可选，全是内核从契约里给的（AGREE-05）。
+    private String setupPlan = null;
+    private int setupIndex = 0;
+    private String setupField = null;
+
+    private void openSetup() {
+        setupPlan = read(path(this, PLAN_NAME, false));
+        if (setupPlan == null) {
+            setupPlan = "{}";
+        }
+        setupIndex = 0;
+        renderSetup();
+    }
+
+    private void renderSetup() {
+        String screen = Kernel.setupScreen(setupPlan, setupIndex,
+                Kernel.signingVersion(eventsOrEmpty()), false);
+        write(path(this, "youban-setup-screen.json", true), screen);
+        sentence.setText(array(screen, "lines"));
+        panels.setText("");
+        setupField = field(screen, "field", "");
+        badge.setText("立约定 · 未签");
+        foot.setText(field(screen, "foot", "") + " · 结论来自设备上的内核");
+        dumpCodepoints(sentence.getText().toString());
+    }
+
+    private void setupKey(String key) {
+        if ("next".equals(key) || "prev".equals(key)) {
+            if (setupField != null && !setupField.isEmpty()) {
+                setupPlan = Kernel.cycle(setupPlan, setupField, "prev".equals(key));
+                // 选中的值当场写进方案（未签）：中途走开也只是「按这些还没签的值跑」（AGREE-06）。
+                write(path(this, PLAN_NAME, true), setupPlan);
+                renderSetup();
+            }
+            return;
+        }
+        if ("decline".equals(key)) {
+            if (setupIndex > 0) {
+                setupIndex--;
+            } else {
+                setupPlan = null;
+            }
+            if (setupPlan == null) {
+                render();
+            } else {
+                renderSetup();
+            }
+            return;
+        }
+        String screen = Kernel.setupScreen(setupPlan, setupIndex,
+                Kernel.signingVersion(eventsOrEmpty()), false);
+        if (!screen.contains("\"last\":true")) {
+            setupIndex++;
+            renderSetup();
+            return;
+        }
+        // 最后一步才是签署：这里往账里写 PLAN_SIGNED，下一屏的「没签」那一栏就消失了（AGREE-05）。
+        long version = Kernel.signingVersion(eventsOrEmpty());
+        append(path(this, EVENTS_NAME, true), "{\"kind\":\"PLAN_SIGNED\",\"profile\":\"" + profile()
+                + "\",\"fields\":{\"version\":" + version + "}}");
+        setupPlan = null;
+        render();
     }
 
     /**
@@ -144,9 +229,10 @@ public class MainActivity extends Activity {
      * 理由这一句是「用遥控器受理」——遥控器打不出字，写明来源比编一句理由诚实（AUTO-03）。
      * 没挂着动议的时候，这里什么都不写：婉拒与未受理在账上是同一件事（D34）。
      */
-    private void settle(String key) {
+    /** @return 是否真的落了一条受理（落了就不用再看「缺约定」那一支）。 */
+    private boolean settle(String key) {
         if (!"accept".equals(key)) {
-            return;
+            return false;
         }
         String pending = pendingMotion();
         // 排查用：按键那一刻看到了什么。「没挂着动议」与「没读到结论」在屏上是同一件事，病因不同。
@@ -155,7 +241,7 @@ public class MainActivity extends Activity {
                 + (displayed == null ? "\"没有一份算好的结论\""
                    : "\"" + slice(displayed, "\"pendingMotion\":") + "\"") + "}");
         if (pending == null) {
-            return;
+            return false;
         }
         StringBuilder line = new StringBuilder("{\"kind\":\"MOTION_SETTLED\",\"profile\":\"").append(profile())
                 .append("\",\"fields\":{\"kind\":\"").append(pending).append("\",\"reason\":\"用遥控器受理\"");
@@ -164,6 +250,7 @@ public class MainActivity extends Activity {
             line.append(',').append(extra);
         }
         append(path(this, EVENTS_NAME, true), line.append("}}").toString());
+        return true;
     }
 
     /** 内核算出来的那份结论里，挂着要受理的动议是哪一种（子对象，不看屏上那句话，也不自己判）。 */
@@ -245,15 +332,21 @@ public class MainActivity extends Activity {
         if (plan == null) {
             plan = read(PUBLIC_DIR + "/" + PLAN_NAME);
         }
-        if (plan != null) {
-            try {
-                String events = read(path(this, EVENTS_NAME, false));
-                String local = Kernel.state(events == null ? "" : events, plan, profile(), strength(), null);
-                debugSource = null;
-                displayed = local;
-                write(path(this, STATE_OUT_NAME, true), local); // 给设备测试读回去比一遍
-                return local;
-            } catch (RuntimeException e) {
+        if (plan == null) {
+            // 这台设备还没存过配置：不是错误，按契约那张默认表跑，屏幕上写明（AGREE-13）。
+            plan = "{}";
+            noPlan = true;
+        }
+        // 到这里一定有方案可算：没存过就按契约那张默认表算。结论一律是设备自己算的，
+        // adb 塞进来的那份（STATE_NAME）不再当结论用——它只在这台设备上算不出来时当排版兜底。
+        try {
+            String events = read(path(this, EVENTS_NAME, false));
+            String local = Kernel.state(events == null ? "" : events, plan, profile(), strength(), null);
+            debugSource = null;
+            displayed = local;
+            write(path(this, STATE_OUT_NAME, true), local); // 给设备测试读回去比一遍
+            return local;
+        } catch (RuntimeException e) {
                 debugSource = "内核没跑起来：" + e.getClass().getSimpleName();
                 // 异常原文落到设备上：不写出来的话，屏幕上只剩一句兜底话，等于把病因藏起来。
                 StringBuilder trace = new StringBuilder(debugSource).append(" | ").append(String.valueOf(e.getMessage()));
@@ -262,13 +355,17 @@ public class MainActivity extends Activity {
                     if (trace.length() > 1200) break;
                 }
                 write(path(this, "youban-kernel-error.txt", true), trace.toString());
-                return null;
-            }
+                // 设备上算不出来才退到调试来源，并在角标下面写明它是调试塞进来的，不是设备算的。
+            String pushed = read(path(this, STATE_NAME, false));
+            debugSource = pushed != null ? "调试来源：adb 塞好的结论（不是设备算的）" : null;
+            return pushed != null ? pushed : read(PUBLIC_DIR + "/" + STATE_NAME);
         }
-        // 没有当日方案时退到调试来源：这一屏会在角标下面写明它是调试塞进来的，不是设备算的。
-        String json = read(path(this, STATE_NAME, false));
-        debugSource = json != null ? "调试来源：adb 塞好的结论（不是设备算的）" : null;
-        return json != null ? json : read(PUBLIC_DIR + "/" + STATE_NAME);
+    }
+
+    /** 账还没有第一条的时候交 ""，不交 null：Kotlin 那边这个参数是非空的（真机上就这么炸过一次，见 F22）。 */
+    private String eventsOrEmpty() {
+        String events = read(path(this, EVENTS_NAME, false));
+        return events == null ? "" : events;
     }
 
     private String profile() {
@@ -370,6 +467,7 @@ public class MainActivity extends Activity {
         foot.setText("落层 " + tier + " · 强度天花板 " + ceiling
                 + (reason.isEmpty() ? "" : " · " + reason)
                 + (debugSource == null ? " · 结论来自设备上的内核" : " · " + debugSource)
+                + (noPlan ? " · 这台设备还没读到已存的约定，按默认跑" : "")
                 + (fontNote == null ? "" : " · " + fontNote));
     }
 

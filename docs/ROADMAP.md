@@ -87,6 +87,8 @@ Kotlin 一份，连「默认算不算在时段内」都只有一边写）。
 进得来，缺的只是「谁问、问几步、签没签」这一层；再往后的 M5 / M5.5 都建立在「这台设备这一档
 受哪几条例约约束」之上。
 
+**已落**：首启那六步在设备上能走（确认键进流程、最后一屏写 `PLAN_SIGNED`，设备自检第 7 道 `setup`，见 `facts/DEVICES.md#F23`）。
+
 **活清单**：`fixtures/agree.yaml` 现在故意红着——8 条未支持（`defaultsOnly` / `signaturePending` /
 `switchTo` / `otherProfileUnchanged` / `agreementStep`），那就是 M3.5 的全部实现面。验收两条设备测试：
 首启走到签署后，设备上算出的结论与规范模型逐字段一致；切到另一身份后加载的是另一组约定。

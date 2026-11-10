@@ -28,6 +28,22 @@ object Main {
         }
         val job = Json.parse(text) as? Map<*, *>
             ?: error("任务不是一份 JSON 对象：${text.take(60)}")
+        // --kernel：走设备端那一条入口（Kernel.state），不是 align 那条（Main.run）。
+        // 两条入口对「没存过方案」的处理以前不一样，这条入口以前没人测过——所以留着它。
+        if (args.contains("--setup")) {
+            Commit.useContract(job["contract"].toString())
+            println(Kernel.setupScreen(Json.write(job["plan"] as? Map<*, *> ?: emptyMap<String, Any>()),
+                Day.num(job["step"] ?: 0), Day.num(job["version"] ?: 1), false))
+            return
+        }
+        if (args.contains("--kernel")) {
+            Commit.useContract(job["contract"].toString())
+            val lines = ((job["events"] as? List<*>) ?: emptyList<Any?>())
+                .joinToString("\n") { Json.write(it as Map<*, *>) }
+            println(Kernel.state(lines, Json.write(job["plan"] as? Map<*, *> ?: emptyMap<String, Any>()),
+                job["profile"].toString(), job["strength"] as? String ?: "negotiated", job["mode"] as? String))
+            return
+        }
         println(Json.write(run(job)))
     }
 

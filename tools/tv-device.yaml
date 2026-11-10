@@ -33,6 +33,8 @@ probes:
     why: 这一屏句子的码位必须是真汉字（不许 U+FFFD）（F17）
   - probe: key
     why: 确认键要落进事件账并让设备上的内核重算——落一条回执不算（AGREE-11、D34）
+  - probe: setup
+    why: 首启那六步要在真机上走到签署——问什么、有哪些可选都由设备上的内核给（AGREE-05）
   - probe: apk
     why: 装到设备上的包必须是这份编译产物——装了旧包会伪装成「内核少实现一条」（F20）
   - probe: glyphs

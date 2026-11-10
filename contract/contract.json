@@ -785,12 +785,57 @@
     "x-note": "约定怎么立、谁签哪一条、什么生效——这一节是那份约定的单一来源（spec/AGREE.md、docs/AGREEMENT.md）。装机后第一次打开要做的就是把这份约定立起来；其它条目都是可选的（ONBOARDING §4）。",
     "fields": [
       {
+        "id": "audience",
+        "kind": "profile",
+        "uiWords": "这一档是谁",
+        "spec": [
+          "PROFILE-02"
+        ],
+        "choices": [
+          {
+            "value": "child",
+            "label": "学龄"
+          },
+          {
+            "value": "grown-up",
+            "label": "成年"
+          },
+          {
+            "value": "senior",
+            "label": "长辈"
+          }
+        ],
+        "default": "child"
+      },
+      {
         "id": "allowanceMs",
         "kind": "joint",
         "uiWords": "每天约定使用时长",
         "spec": [
           "DAY-01",
           "AUTO-07"
+        ],
+        "choices": [
+          {
+            "value": 900000,
+            "label": "15 分钟"
+          },
+          {
+            "value": 1800000,
+            "label": "30 分钟"
+          },
+          {
+            "value": 3600000,
+            "label": "1 小时"
+          },
+          {
+            "value": 7200000,
+            "label": "2 小时"
+          },
+          {
+            "value": 10800000,
+            "label": "3 小时"
+          }
         ]
       },
       {
@@ -800,6 +845,24 @@
         "spec": [
           "COMMIT-04",
           "AUTO-04"
+        ],
+        "choices": [
+          {
+            "value": 0,
+            "label": "不额外"
+          },
+          {
+            "value": 900000,
+            "label": "15 分钟"
+          },
+          {
+            "value": 1800000,
+            "label": "30 分钟"
+          },
+          {
+            "value": 3600000,
+            "label": "1 小时"
+          }
         ]
       },
       {
@@ -809,6 +872,24 @@
         "spec": [
           "DAY-01",
           "SENSE-05"
+        ],
+        "choices": [
+          {
+            "value": 0,
+            "label": "一开始就要"
+          },
+          {
+            "value": 1800000,
+            "label": "30 分钟后"
+          },
+          {
+            "value": 3600000,
+            "label": "1 小时后"
+          },
+          {
+            "value": 7200000,
+            "label": "2 小时后"
+          }
         ]
       },
       {
@@ -888,7 +969,22 @@
         "spec": [
           "AUTO-07",
           "PROFILE-03"
-        ]
+        ],
+        "choices": [
+          {
+            "value": "accompanied",
+            "label": "陪伴式"
+          },
+          {
+            "value": "negotiated",
+            "label": "协商式"
+          },
+          {
+            "value": "selfManaged",
+            "label": "自管式"
+          }
+        ],
+        "default": "negotiated"
       },
       {
         "id": "inSlot",
@@ -902,7 +998,8 @@
     "signers": {
       "joint": "共意条目：双方签署才生效（PLAN_SIGNED(profile,version,by:[self,counterparty])）。",
       "self": "自管条目：本人写，与强度与角色无关；不参与收紧比较。",
-      "device": "设备条目：当前激活成员确认；未完成只降级，不阻断（ONBOARD-06）。"
+      "device": "设备条目：当前激活成员确认；未完成只降级，不阻断（ONBOARD-06）。",
+      "profile": "受众属于身份那一层（PROFILE-02）：首启第二步问它，改了它就把那一档的默认整行换掉。"
     },
     "defaults": {
       "x-note": "装机后先按这张表跑，界面写明「这是默认值，还没签」（AGREE-04）。默认值本身不进签署记录。",
@@ -951,7 +1048,9 @@
         "spec": [
           "PROFILE-01",
           "PROFILE-06"
-        ]
+        ],
+        "asks": [],
+        "note": "遥控器打不出名字：这一台先叫「这一台设备上的这一档」，名字在另一处改（PROFILE-01）。"
       },
       {
         "step": 2,
@@ -959,6 +1058,9 @@
         "writes": "audience",
         "spec": [
           "PROFILE-02"
+        ],
+        "asks": [
+          "audience"
         ]
       },
       {
@@ -968,6 +1070,11 @@
         "spec": [
           "DAY-01",
           "AUTO-07"
+        ],
+        "asks": [
+          "allowanceMs",
+          "graceMs",
+          "moveFromMs"
         ]
       },
       {
@@ -977,7 +1084,9 @@
         "spec": [
           "DAY-08",
           "DAY-03"
-        ]
+        ],
+        "asks": [],
+        "note": "时段表在电视遥控器上改不好：这一步按默认，写清楚去哪儿改（DAY-08）。"
       },
       {
         "step": 5,
@@ -986,6 +1095,9 @@
         "spec": [
           "AUTO-07",
           "PROFILE-03"
+        ],
+        "asks": [
+          "strength"
         ]
       },
       {
@@ -995,7 +1107,8 @@
         "spec": [
           "AUTO-07",
           "AGREE-05"
-        ]
+        ],
+        "asks": []
       }
     ],
     "firstRunEscape": "每一步都可以「先用默认」；用了默认的条目在界面上标「未签·默认」，不弹催签、不进周报、不打分（AGREE-04、ONBOARD-05）。",
@@ -1026,6 +1139,25 @@
       "AGREE-12",
       "AGREE-13"
     ],
-    "defaultsNote": "没有任何一份签过的约定时：nextAction 是 agreement，常驻一栏写明「未签·按默认」，档位仍是 L1 那一条提示（AGREE-04、AGREE-06）。"
+    "defaultsNote": "没有任何一份签过的约定时：nextAction 是 agreement，常驻一栏写明「未签·按默认」，档位仍是 L1 那一条提示（AGREE-04、AGREE-06）。",
+    "remoteOnly": {
+      "x-note": "电视遥控器只能选这些：每步的asks 都在 fields.choices 里；ask 不了的步骤屏幕上写明按默认与去哪儿改。",
+      "asks": [
+        "audience",
+        "allowanceMs",
+        "graceMs",
+        "moveFromMs",
+        "strength"
+      ]
+    },
+    "ui": {
+      "header": "第 {step}/{total} 步 · {do}",
+      "field": "{label}：{value}",
+      "hint": "←→ 改这一项 · 确认键下一步 · 返回上一步",
+      "noteOnly": "这一步没有要选的 · {note}",
+      "sign": "确认后写入这一份约定（v{version}）",
+      "signing": "已写入 v{version}",
+      "leave": "没走完也一样能用，条目按默认跑（AGREE-06）"
+    }
   }
 }

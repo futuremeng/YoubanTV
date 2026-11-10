@@ -24,7 +24,9 @@ object Day {
         val row = table["$audience $dayType"] as? Map<*, *> ?: table["child schoolday"]
         val out = linkedMapOf<String, Any>()
         (row as Map<*, *>).forEach { (k, v) ->
-            out[k.toString()] = if (k.toString().endsWith("Ms")) Day.num(v) * MINUTE else v as Any
+            // 契约那张表里存的就是毫秒（agreement.defaults 写的 60*M 那种）：这里再乘一次 60000，
+            // 屏幕上就成了「还剩 1800000 分钟」——单位在契约那边定，两边不许各自换算一次（D45）。
+            out[k.toString()] = v as Any
         }
         out["inSlot"] = true // 默认全天都在时段内（DAY-08）；时段本身要签了才有。
         return out

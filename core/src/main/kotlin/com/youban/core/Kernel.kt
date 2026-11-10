@@ -7,6 +7,8 @@ package com.youban.core
  * 设备只是把它念出来。现在设备自己拿着事件账跑内核，adb 只能往里**追加事件**。
  */
 object Kernel {
+    /** 契约的位置：设备端指一次，setup/nextPlan 这些也走它。 */
+    private val contractPath get() = Day.contractPath
     /** 契约路径在 Android 上没法用相对路径，装包时由界面层指一次。 */
     @JvmStatic
     fun useContract(path: String) = Commit.useContract(path)
@@ -33,8 +35,13 @@ object Kernel {
             // 动议是哪一种（pause / extend / …）也在这一行里，Ledger 的 fields 只存数字，另记一笔。
             ((e["fields"] as? Map<*, *>)?.get("kind") as? String)?.let { motionKind[added] = it }
         }
+        // 没存过方案不是错误：先按契约那张默认表垫底，再让设备存的那份盖上来（AGREE-13）。
+        // 不垫这一层，一台新设备上 allowanceMs 会是 0，屏幕上就成了「超出 0 分钟」（真机上就是这样）。
         val plan = LinkedHashMap<String, Any>()
-        (Json.parse(planJson) as? Map<*, *>)?.forEach { (k, v) -> if (v != null) plan[k.toString()] = v }
+        val given = Json.parse(planJson) as? Map<*, *>
+        Day.defaultPlan(given?.get("audience")?.toString() ?: "child",
+            given?.get("dayType")?.toString() ?: "schoolday").forEach { (k, v) -> plan[k] = v }
+        given?.forEach { (k, v) -> if (v != null) plan[k.toString()] = v }
         // 已受理的暂停是一条事实（MOTION_SETTLED），但**受理了的「延一延」不是暂停**：
         // 只看有没有 MOTION_SETTLED，COMMIT-04 那一步就会从 due 掉回 honored。要看那一条带的是哪一种动议，
         // 而动议的种类在 fields.kind 里——账里的 fields 只放数字，所以这里直接看原始那行。
@@ -56,6 +63,153 @@ object Kernel {
         return Json.write(Commit.state(profile, plan, ledger.project(profile), strength, mode, paused, pauseMs,
             signed = hasSignature, pending = pending))
     }
+
+    /**
+     * 首启那六步的屏幕内容：一步一问，问什么、有哪些可选、按默认是什么，全在契约里（AGREE-05）。
+     * 壳层只做一件事——把这些字串起来。之前界面上自己拼句子，就成了「一处有一条没有」（D47）。
+     */
+    @JvmStatic
+    fun setup(planJson: String): String {
+        val node = Json.parse(java.io.File(contractPath).readText()) as Map<*, *>
+        val agreement = node["agreement"] as Map<*, *>
+        val fields = (agreement["fields"] as List<*>).map { it as Map<*, *> }.associate { it["id"].toString() to it }
+        val ui = (agreement["ui"] as Map<*, *>).mapKeys { it.key.toString() }.mapValues { it.value as Any }
+        val plan = LinkedHashMap<String, Any>()
+        (Json.parse(planJson) as? Map<*, *>)?.forEach { (k, v) -> if (v != null) plan[k.toString()] = v }
+        val steps = (agreement["firstRun"] as List<*>).map { raw ->
+            val step = raw as Map<*, *>
+            val asks = (step["asks"] as? List<*> ?: emptyList<Any?>()).map { it.toString() }
+            val out = LinkedHashMap<String, Any?>()
+            out["step"] = Day.num(step["step"])
+            out["do"] = step["do"] as Any
+            out["asks"] = asks
+            out["note"] = step["note"]
+            out["fields"] = asks.map { id ->
+                val f = fields.getValue(id)
+                val choices = (f["choices"] as List<*>).map { ch ->
+                    val c = ch as Map<*, *>
+                    linkedMapOf<String, Any?>("value" to c["value"], "label" to c["label"])
+                }
+                val current = plan[id] ?: f["default"]
+                linkedMapOf<String, Any?>(
+                    "id" to id,
+                    "label" to f["uiWords"],
+                    "choices" to choices,
+                    "value" to (current ?: defaultsFor(plan)[id]),
+                    "valueLabel" to labelFor(choices, current ?: defaultsFor(plan)[id])
+                )
+            }
+            out
+        }
+        return Json.write(linkedMapOf<String, Any?>("ui" to ui, "total" to steps.size, "steps" to steps))
+    }
+
+    /**
+     * 首启的第 index 屏：一步可能出好几屏（一项一屏，遥控器上一屏只改一项）。
+     * 抬头、每一项那句「现在是什么」、脚下提示，全都来自契约 agreement.ui（AGREE-05）。
+     * 界面上不出现任何字段名：要改哪一项，屏幕上带着 field 这个键，壳层原样交回 cycle。
+     */
+    @JvmStatic
+    fun setupScreen(planJson: String, index: Long, version: Long, signed: Boolean): String {
+        val described = Json.parse(setup(planJson)) as Map<*, *>
+        val ui = described["ui"] as Map<*, *>
+        val screens = screens(described)
+        val at = screens.getOrElse(index.toInt().coerceIn(0, screens.size - 1)) { screens.last() }
+        val total = screens.size.toLong()
+        val lines = ArrayList<String>()
+        lines.add(ui["header"].toString().replace("{step}", (index + 1).toString())
+            .replace("{total}", total.toString()).replace("{do}", at["do"].toString()))
+        if (at["note"] != null) {
+            lines.add(ui["noteOnly"].toString().replace("{note}", at["note"].toString()))
+        } else if (at["id"] != null) {
+            lines.add(ui["field"].toString().replace("{label}", at["label"].toString())
+                .replace("{value}", at["valueLabel"].toString()))
+        }
+        if (index + 1 == total) {
+            lines.add((if (signed) ui["signing"] else ui["sign"]).toString().replace("{version}", version.toString()))
+        }
+        return Json.write(linkedMapOf<String, Any?>(
+            "title" to at["do"], "lines" to lines, "field" to at["id"],
+            "foot" to if (at["id"] == null) ui["leave"] as Any else ui["hint"] as Any,
+            "last" to (index + 1 == total)
+        ))
+    }
+
+    /** 把「六步」摊成屏：不用选的步骤出一屏说明，要选的每项出一屏，最后一屏是签署。 */
+    private fun screens(described: Map<*, *>): List<Map<String, Any?>> {
+        val out = ArrayList<Map<String, Any?>>()
+        (described["steps"] as List<*>).forEach { raw ->
+            val step = raw as Map<*, *>
+            val asks = (step["asks"] as? List<*> ?: emptyList<Any?>()).map { it.toString() }
+            if (asks.isEmpty()) {
+                out += linkedMapOf<String, Any?>(
+                    "do" to step["do"], "note" to step["note"], "id" to null,
+                    "label" to null, "valueLabel" to step["do"]
+                )
+            } else {
+                (step["fields"] as List<*>).forEach { f ->
+                    val field = f as Map<*, *>
+                    out += linkedMapOf<String, Any?>(
+                        "do" to step["do"], "note" to null, "id" to field["id"],
+                        "label" to field["label"], "valueLabel" to field["valueLabel"]
+                    )
+                }
+            }
+        }
+        // 契约最后一步就是「双方签署」，不再另加一屏；那一屏没有要选的项，只出「确认后写入第几份」那句。
+        return out
+    }
+
+    /** 左右键在一项的可选值里走一步：可选值在契约 fields.choices，顺序也在那儿（界面上不许另列一份）。 */
+    @JvmStatic
+    fun cycle(planJson: String, fieldId: String, backward: Boolean): String {
+        val described = Json.parse(setup(planJson)) as Map<*, *>
+        val step = (described["steps"] as List<*>).firstOrNull { s ->
+            ((s as Map<*, *>)["asks"] as? List<*> ?: emptyList<Any?>()).contains(fieldId)
+        } as Map<*, *>? ?: return planJson
+        val f = ((step["fields"] as List<*>).first { (it as Map<*, *>)["id"] == fieldId }) as Map<*, *>
+        val choices = f["choices"] as List<*>
+        val values = choices.map { (it as Map<*, *>)["value"] }
+        val plan = LinkedHashMap<String, Any>()
+        (Json.parse(planJson) as? Map<*, *>)?.forEach { (k, v) -> if (v != null) plan[k.toString()] = v }
+        val current = if (fieldId == "audience") plan["audience"] ?: "child" else plan[fieldId]
+        val at = values.indexOfFirst { it == current }.let { if (it < 0) 0 else it }
+        val next = values[((at + if (backward) -1 else 1) % values.size + values.size) % values.size]
+        return nextPlan(planJson, fieldId, next!!)
+    }
+
+    /**
+     * 改一项之后的方案。换受众要把那一档的默认整行换掉（DAY-01）——这条规则在界面上再写一遍
+     * 就是第二个来源，所以给了内核。
+     */
+    @JvmStatic
+    fun nextPlan(planJson: String, fieldId: String, value: Any): String {
+        val plan = LinkedHashMap<String, Any>()
+        (Json.parse(planJson) as? Map<*, *>)?.forEach { (k, v) -> if (v != null) plan[k.toString()] = v }
+        if (fieldId == "audience") {
+            val merged = LinkedHashMap<String, Any>()
+            (Day.defaultPlan(value.toString(), plan["dayType"]?.toString() ?: "schoolday"))
+                .forEach { (k, v) -> merged[k] = v }
+            merged["audience"] = value
+            plan.keys.filter { it == "inSlot" }.forEach { merged[it] = plan[it] as Any }
+            return Json.write(merged)
+        }
+        plan[fieldId] = value
+        return Json.write(plan)
+    }
+
+    /** 这是第几份约定：账里签过几份，下一份就是几（AGREE-05）。 */
+    @JvmStatic
+    fun signingVersion(eventsJson: String): Long =
+        eventsJson.lineSequence().count { it.contains("\"PLAN_SIGNED\"") }.toLong() + 1
+
+    private fun defaultsFor(plan: Map<String, Any>): Map<String, Any> =
+        Day.defaultPlan(plan["audience"]?.toString() ?: defaultsAudience(plan), plan["dayType"]?.toString() ?: "schoolday")
+
+    private fun defaultsAudience(plan: Map<String, Any>) = "child"
+
+    private fun labelFor(choices: List<Map<String, Any?>>, value: Any?): String =
+        choices.firstOrNull { it["value"] == value }?.get("label")?.toString() ?: value.toString()
 
     /** 事件账里每条动议的种类（fields.kind）：Ledger 的 fields 只存数字，种类另记在这儿。 */
     private val motionKind = HashMap<Event, String>()

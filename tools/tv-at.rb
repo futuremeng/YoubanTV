@@ -301,9 +301,55 @@ def probe_key(args)
   [true, "确认键落账→内核重算：受理前挂着 pause，受理后 #{after['status']} · #{after['tier']}，"         "#{fields.size} 个字段与规范模型逐位相同"]
 end
 
+# 首启那六步在真机上走完：确认键进流程 → 一路确认到底 → PLAN_SIGNED 落账 → 「未签」那一栏消失。
+# 这一条不许用 Mac 画好的卡代替：问什么、有哪些可选，都得是设备上的内核从契约里给的（AGREE-05）。
+def probe_setup(args)
+  return [false, '没装 com.youban.tv：先 sh device/android/build-apk.sh && adb install -r'] if
+    shell(args, "pm list packages #{APK_PACKAGE}").strip.empty?
+
+  shell(args, "am force-stop #{APK_PACKAGE}")
+  shell(args, "rm -f #{APK_FILES}/#{EVENTS_FILE} #{APK_FILES}/youban-plan.json")
+  shell(args, 'input keyevent 224') # 用 WAKEUP，不用 POWER：见 F22
+  shell(args, "am start -n #{APK_PACKAGE}/.MainActivity")
+  sleep 4
+  before = device_state(args)
+  return [false, '起屏没出结论'] unless before
+  unless before['nextAction'].to_s == 'agreement'
+    return [false, "什么约定都没有时起屏该指向立约定：#{before['nextAction'].inspect}"]
+  end
+
+  pressed = 0
+  until shell(args, "grep -c PLAN_SIGNED #{APK_FILES}/#{EVENTS_FILE}").to_i.positive?
+    break if pressed >= 12
+
+    shell(args, 'input keyevent 23')
+    pressed += 1
+    sleep 1
+  end
+  ledger = shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}")
+  return [false, "按了 #{pressed} 次确认键，账里还是没有 PLAN_SIGNED"] unless ledger.include?('PLAN_SIGNED')
+
+  after = device_state(args)
+  return [false, '签完之后设备没重算出结论'] unless after
+  if after['nextAction'].to_s == 'agreement'
+    return [false, '签过了却还指着立约定那一步']
+  end
+  if Array(after['panels']).any? { |x| x.to_s.include?('未签') }
+    return [false, "签过了那一栏还在：#{after['panels'].inspect}"]
+  end
+
+  mine = KernelFromEvents.call(ledger)
+  fields = JSON.parse(File.read(File.join(ROOT, 'contract/contract.json')))['commitState']['fields']
+  diff = fields.reject { |k| JSON.parse(JSON.generate(mine[k] || mine[k.to_sym])) == after[k] }
+  return [false, "签完之后与规范模型不同：#{diff.join(', ')}"] unless diff.empty?
+
+  [true, "六步走完写了 PLAN_SIGNED(v1)（#{pressed} 下确认键），"         "签过之后 #{fields.size} 个字段与规范模型逐位相同，那一栏消失了"]
+end
+
 PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text),
            'glyphs' => method(:probe_glyphs), 'state' => method(:probe_state),
-           'apk' => method(:probe_apk), 'key' => method(:probe_key) }.freeze
+           'apk' => method(:probe_apk), 'key' => method(:probe_key),
+           'setup' => method(:probe_setup) }.freeze
 
 args = parse_args(ARGV)
 if args[:facts]
