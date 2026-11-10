@@ -7,13 +7,15 @@ PROFILE-01:
       when: { capability: { overlay: granted } }
       expect:
         absent: [audienceAllowance, audienceGate, audienceLock, selfManagedCap, capabilityCeiling]
-        sameSource: [core/commit, core/day, core/enforcement, core/task]
+        sameSource: [core/commit, core/day, device/enforcement, core/task]
         value: { branchInForbiddenSites: 0 }
     - name: 内容绑定与默认值可以按 audience 取值
       when: { audience: child }
       expect: { allowed: true, value: { allowedBranchSites: [内容绑定解析, 默认值挑选] } }
     - name: 呈现按 audience 放大字号与提高对比度
-      given: { audience: child, presentation: standard }
+      # 这一条要钉的就是「按受众挑默认呈现档」：given 里不摆 presentation，
+      # 摆了就等于自己把被测的那一步跳过了（byAudience 那张表）。
+      given: { audience: child }
       when: { mode: ambient }
       expect: { value: { bodyFontSp: 24, contrastRaised: true }, identicalAcross: { dimension: audience, fields: [status] } }
 
@@ -111,9 +113,11 @@ PROFILE-06:
   given: { profile: "member:kid", strength: selfManaged, watchedMs: 2400000, inSlot: true }
   cases:
     - name: 参数下调即时生效，题目数量随之减少
-      given: { actor: "member:kid", groupsPerTask: 2, questionsPerGroup: 2, questionsPerTaskCap: 4 }
+      # 组数是自己定的两档，所以 effectiveGroups 就是 2；每次最多 4 题是「2×2 再被自己定的上限截住」。
+      # 上限这条以前从没进过模型（questionsPerTaskCap 一直记未支持），所以这里的数以前是猜的。
+      given: { actor: "member:kid", groupsPerTask: 2, questionsPerGroup: 2, questionsPerTaskCap: 4, kpState: shaky }
       when: { mode: ambient }
-      expect: { value: { effectiveGroups: 4, maxQuestions: 4 }, kpState: shaky }
+      expect: { value: { effectiveGroups: 2, maxQuestions: 4 }, kpState: shaky }
     - name: 补一补优先可关，关后池不清空
       given: { actor: "member:kid", clearBacklogFirst: false, backlogSize: 12 }
       when: { mode: ambient }
@@ -279,7 +283,7 @@ AUTO-05:
     - name: 清单不是成就页
       given: { pendingItems: 12 }
       when: { get: "GET /api/checklist" }
-      expect: { absent: [streak, badge, unlock], sameSource: [device/onboard, panel/checklist] }
+      expect: { absent: [streak, badge, unlock], sameSource: core/onboard }
 
 AUTO-14:
   spec: [spec/AUTONOMY.md#AUTO-14, spec/DAY.md#DAY-05]

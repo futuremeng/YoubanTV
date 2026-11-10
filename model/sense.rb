@@ -19,6 +19,31 @@ module Core
     # 老人那几类动作项目安不安全、能练多久，只由这一处答（SENSE-05）。
     # safety 缺了不是「按默认跑」，是这一项无效：无效就退回通用目标，且把这个事实显示出来。
     SAFETY = CONTRACT.fetch('sense').fetch('exerciseSafety')
+    RHYTHM = CONTRACT.fetch('sense').fetch('rhythm')
+
+    # 什么算一次节律：周期与幅度都要落在登记过的那一段里，缺一项就不算（SENSE-01）。
+    def self.rhythm_counted?(spec)
+      period = spec['periodMs'].to_i
+      amp = spec['amplitude'].to_i
+      RHYTHM.fetch('fields').all? { |f| !spec[f].nil? } &&
+        period.between?(RHYTHM.fetch('minPeriodMs'), RHYTHM.fetch('maxPeriodMs')) &&
+        amp >= RHYTHM.fetch('minAmplitude')
+    end
+
+    # 「这一层的说法有没有被当成健康诊断用」——只由契约那一处语言表答（SENSE-03）。
+    # 自检不通过要指出是哪一项（SENSE-04）：项与提示的对应只在契约那一处。
+    def self.self_test_failed_hints(record)
+      CONTRACT.dig('sense', 'selfTest', 'failHintBySignal').to_s.gsub('{}', '') # 让 nil 的情况也走得下去
+      hints = CONTRACT.dig('sense', 'selfTest', 'failHintBySignal') || {}
+      out = []
+      out << hints['falseCountRate'] if record['falseCountRate'].to_f > FALSE_COUNT_MAX
+      out << hints['attempts'] if record['attempts'].to_i < SELF_TEST_ATTEMPTS && out.empty?
+      out.compact
+    end
+
+    def self.used_as_health_diagnosis
+      CONTRACT.dig('sense', 'language', 'usedAsHealthDiagnosis') == true
+    end
     def self.project(safety:, tasks: [], session_ms: 0, rounds: 0)
       cap_s = SAFETY.fetch('sessionCapMs')
       cap_d = SAFETY.fetch('dailyCapMs')

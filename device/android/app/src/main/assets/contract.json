@@ -25,7 +25,8 @@
       "AUTO-10",
       "PROFILE-01",
       "PROFILE-10"
-    ]
+    ],
+    "anyAudienceMayHold": true
   },
   "scopes": {
     "values": [
@@ -548,6 +549,13 @@
       "byTrigger": {
         "contentBindingChanged": "contentBinding"
       }
+    },
+    "profileDomain": {
+      "x-note": "profile 这个位置能取的两类值：某个成员，或者没有人（none）——空转会话就是它（COMMIT-11、PROFILE-04）。",
+      "values": [
+        "member",
+        "none"
+      ]
     }
   },
   "profile": {
@@ -565,7 +573,46 @@
     "rolesField": "roles 住在成员身上，不在 Profile 里（PROFILE-01）",
     "spec": [
       "PROFILE-01"
-    ]
+    ],
+    "defaults": {
+      "x-note": "8 档字号阶梯见 docs/ARCHITECTURE.md §字号（正文 ≥20f 是门禁，见 minSp）。呈现档只改字号所在的那一档、对比度与遥控键位收敛，不改规则、功能与文案集合（PROFILE-01、PROFILE-05）。按受众挑默认档是允许的两处分支之一（默认值挑选）。",
+      "tiers": {
+        "standard": {
+          "label": "标准",
+          "bodyFontSp": 20,
+          "contrastRaised": false,
+          "remoteKeys": "standard",
+          "ladderIndex": 2
+        },
+        "large": {
+          "label": "大字",
+          "bodyFontSp": 24,
+          "contrastRaised": true,
+          "remoteKeys": "reduced",
+          "ladderIndex": 4
+        }
+      },
+      "minSp": 20,
+      "byAudience": {
+        "child": "large",
+        "grown-up": "standard",
+        "senior": "large"
+      },
+      "spec": [
+        "PROFILE-01",
+        "PROFILE-05"
+      ],
+      "ladder": [
+        16,
+        18,
+        20,
+        22,
+        24,
+        26,
+        28,
+        30
+      ]
+    }
   },
   "selfManagedFields": {
     "values": [
@@ -629,7 +676,19 @@
       "ACHIEVED",
       "STREAK",
       "CHECKIN"
-    ]
+    ],
+    "kinds": {
+      "x-note": "禁用的字段按用途分一下类：「这一台实际应用了几个能力上限」这类结论只读这一处（AUTO-01、PROFILE-01）。这些名字都来自下面那张 values 表，不是另一份清单。",
+      "ceiling": [
+        "allowanceCeiling",
+        "capabilityCeiling",
+        "selfManagedCap",
+        "audienceAllowance",
+        "featureToggleByAudience",
+        "ageLimit",
+        "selfManageRequiresAge"
+      ]
+    }
   },
   "writeGuards": {
     "profileParameter": "写入口的 profile 参数只能取当前激活身份或 none",
@@ -1023,7 +1082,7 @@
         ]
       },
       "self": {
-        "note": "自管条目：本人写，与强度与角色无关；不参与收紧比较。",
+        "note": "自管条目：本人写，与强度与角色无关，不参与收紧比较。项的名字不在这里列——那一份清单在 selfManagedFields.values（一处一名）。",
         "fields": [
           "groupsPerTask",
           "questionsPerGroup",
@@ -1298,6 +1357,74 @@
       "spec": [
         "SENSE-05"
       ]
+    },
+    "rhythm": {
+      "x-note": "体感计次的输入形状只在这里登记：帧不落盘，只有这几项进事件（SENSE-01、PRIVACY §1）。",
+      "fields": [
+        "kind",
+        "periodMs",
+        "amplitude"
+      ],
+      "minPeriodMs": 400,
+      "maxPeriodMs": 3000,
+      "minAmplitude": 6,
+      "spec": [
+        "SENSE-01"
+      ]
+    },
+    "language": {
+      "x-note": "体感那一层的说法只由这一处给：只用即时身体效果的说法，不进健康判定、不作诊断（SENSE-03）。",
+      "say": [
+        "即时身体效果的说法",
+        "计次误差区间"
+      ],
+      "never": [
+        "姿态矫正",
+        "康复",
+        "治疗"
+      ],
+      "usedAsHealthDiagnosis": false,
+      "spec": [
+        "SENSE-03"
+      ]
+    },
+    "selfTest": {
+      "x-note": "自检不通过要给出具体是哪一项，不给泛泛的失败提示（SENSE-04）：项与对应提示只在这里登记。",
+      "items": [
+        "站位/坐位",
+        "距离",
+        "光照",
+        "遮挡"
+      ],
+      "failHintBySignal": {
+        "falseCountRate": "光照",
+        "attempts": "距离"
+      },
+      "spec": [
+        "SENSE-04"
+      ]
     }
+  },
+  "motion": {
+    "x-note": "动议这一层的数字与生效时机只在这一处答（DAY-07、AUTO-03、AUTO-16）。",
+    "tightening": {
+      "kinds": [
+        "planChange"
+      ],
+      "effective": "nextDay",
+      "x-note": "收紧类动议次日生效（D37）；延一延不是收紧：它当场生效，也不进收紧比较（selfManagedFields.inTighteningComparison）。"
+    },
+    "httpCreated": 201,
+    "httpAccepted": 204,
+    "whereAccepted": {
+      "self": "selfSurface",
+      "other": "targetOwnSurface"
+    },
+    "spec": [
+      "DAY-07",
+      "AUTO-03",
+      "AUTO-16",
+      "PROFILE-10"
+    ]
   }
 }

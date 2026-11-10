@@ -448,3 +448,41 @@
   **这条用例真正要钉的是「协商式的边界是默认值不是上限」＝不阻断**，`blocked: false` 一个字没动。
   这种「整条一直没跑、期望互相矛盾」的用例，比红着的更贵：它看起来是绿的清单里的一行。
 - 全局：`通过 634 → 640`，`未支持 33 → 30`。
+
+## F29 夹具的「未支持」清到 0：706 条全部真的在跑；两处一直没跑的用例期望自相矛盾
+
+这一轮把最后 30 条「未支持」一条条问到底，结论大多不是「规则难」，而是**没有人答这道题**：
+
+| 那一题 | 以前怎么答 | 现在由哪一处答 |
+|---|---|---|
+| 邀请频率与打扰上限 | 三处 `notify = 'none'` 常量占着同一个键 | 契约 `sense.invite` + `Core::Sense.invite` |
+| 老人动作项目安全上限 | 哪儿都不在 | 契约 `sense.exerciseSafety` + `Core::Sense.project` |
+| 实际应用了几个能力上限 | 没人知道哪些字段算上限 | 契约 `forbiddenFields.kinds.ceiling` + `Core::Enforcement.ceiling_applied`（表空着直接 raise） |
+| 谁来改这一份约定 | 四处各写一点，两处是常量 | `model/write.rb`（路径/跨身份/令牌范围/面板/操作者/生效时间） |
+| 每次任务最多几题 | 上限从没进过模型 | `Core::Day.max_questions`（组数×每组，再被自管上限截住） |
+| 收紧类什么时候生效 | 动议一律 `now` | 契约 `motion.tightening`（`planChange+tighten` → 次日；延一延当场） |
+| 修订与「查阅更新说明」 | 动作键没人认 | `revision()` 一处：不改约定的修订走 REVISION，查阅走 REMOTE，都不装东西 |
+| 计次的输入形状 | `rhythm` 动作没人接 | 契约 `sense.rhythm.fields` + `Core::Sense.rhythm_counted?` |
+| 呈现档的字号与对比度 | 数字不在任何一处 | 契约 `profile.defaults.tiers/byAudience/ladder`（8 档阶梯、正文 ≥20f 是门禁） |
+| 按受众的分支位点 | 那道 CI 门压根没写 | 代码里的 `audience-site:` 标记 + 执行器一处扫描（断言与门读同一处） |
+| 两台设备的事件流 | `sessions` 只是被摆着 | 每段落成带 `device` 的 `WATCHED`，按段相加（PROFILE-04、DAY-04b） |
+
+清的过程中值得记下的四类：
+
+1. **常量当结论**（第三次撞上）：`writable`、`httpStatus`、`notify`、`stars` 都曾在 `derived_values`
+   里是常量——断言在跟常量比，`PROFILE-02.3`、`AUTO-14.2`、`ASK-04.x` 这类一直绿。
+   `stars` 这个键还同时答两件事（数量 vs 状态词），已拆：数量走 `value: {stars: N}`，状态词走断言。
+2. **两条一直没跑的用例，期望自己打架**：`AUTO-01.1`（没越边界却要 `OVER`，又断言 `due`）与
+   `PROFILE-06.1`（`effectiveGroups: 4` 其实是 `组×每题` 的数）✓ 按模型自身的规则摆正，
+   每条都留下真正承重的那半边（`blocked: false`、「自己定的两档组数当场生效」）✓ 这类用例比红着的贵：
+   它是绿清单里看着绿的一行。
+3. **两处触发把不该改的条目打回待确认**：`memberAdded` 的模式 `*.agree.plan` 会把**别人那一组**
+   已签的约定也重开（AGREE-08 明写一份不改另一组）✓ 现在「关于某个成员的触发只追加、不重开」。
+4. **`probe_status` 里 `unknown` 与 `pending` 是两件事**（ONBOARD-06）：从没探过是 `unknown`，
+   探过了不过/证据过期是 `pending`——后者走的是「重开那一条路」（`derive(reopened:)`），不改能力现值。
+5. 扫描那条也踩了一次：窗口写成了 `lines[start, i]`（长度而不是区间），把后面某处标记当成了前面的标记，
+   整片洗白 ✓ 反证「删掉一处标记」把它逼了出来 ✓
+
+**现在的状态**：`合计：通过 706，失败 0，未支持 0`；Kotlin 对齐 261 个 case × 13 个字段；
+两台设备各 8 步判定 + 8 道自检全绿。反证都跑过：删标记、加没标记的受众分支、上限截断拆掉、
+收紧时机拆掉、`forbiddenFields.kinds.ceiling` 清空、`selfTestFailed` 重开拆掉、修订不写 REVISION。

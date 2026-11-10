@@ -26,7 +26,8 @@ module Core
     end
 
     def self.self_fields
-      @self_fields ||= Array(CONTRACT.dig('agreement', 'signers', 'self', 'fields')).freeze
+      # 自管那几项的名字只有 selfManagedFields 那一处清单；signers.self 那边只说「谁来签」。
+      @self_fields ||= Array(CONTRACT.dig('selfManagedFields', 'values')).freeze
     end
 
     # endpoint: 'PUT /api/myPlan'；profile: 写入口的 profile 参数（nil = 没带）；

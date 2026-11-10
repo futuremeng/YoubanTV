@@ -81,6 +81,7 @@ object Kernel {
         // 不垫这一层，一台新设备上 allowanceMs 会是 0，屏幕上就成了「超出 0 分钟」（真机上就是这样）。
         val plan = LinkedHashMap<String, Any>()
         val given = Json.parse(planJson) as? Map<*, *>
+        // audience-site: 默认值挑选（设备端按这一档的受众挑默认那一行）（PROFILE-01）
         Day.defaultPlan(given?.get("audience")?.toString() ?: "child",
             given?.get("dayType")?.toString() ?: "schoolday").forEach { (k, v) -> plan[k] = v }
         given?.forEach { (k, v) -> if (v != null) plan[k.toString()] = v }
@@ -216,6 +217,7 @@ object Kernel {
         val values = choices.map { (it as Map<*, *>)["value"] }
         val plan = LinkedHashMap<String, Any>()
         (Json.parse(planJson) as? Map<*, *>)?.forEach { (k, v) -> if (v != null) plan[k.toString()] = v }
+        // audience-site: 默认值挑选（换受众就是换那一行默认）（PROFILE-01）
         val current = if (fieldId == "audience") plan["audience"] ?: "child" else plan[fieldId]
         val at = values.indexOfFirst { it == current }.let { if (it < 0) 0 else it }
         val next = values[((at + if (backward) -1 else 1) % values.size + values.size) % values.size]
@@ -230,10 +232,12 @@ object Kernel {
     fun nextPlan(planJson: String, fieldId: String, value: Any): String {
         val plan = LinkedHashMap<String, Any>()
         (Json.parse(planJson) as? Map<*, *>)?.forEach { (k, v) -> if (v != null) plan[k.toString()] = v }
+        // audience-site: 默认值挑选（换受众就是换那一行默认）（PROFILE-01）
         if (fieldId == "audience") {
             val merged = LinkedHashMap<String, Any>()
             (Day.defaultPlan(value.toString(), plan["dayType"]?.toString() ?: "schoolday"))
                 .forEach { (k, v) -> merged[k] = v }
+            // audience-site: 默认值挑选（换受众=换那一行默认，这里只是把它写回这一份方案）
             merged["audience"] = value
             plan.keys.filter { it == "inSlot" }.forEach { merged[it] = plan[it] as Any }
             return Json.write(merged)
@@ -248,6 +252,7 @@ object Kernel {
         eventsJson.lineSequence().count { it.contains("\"PLAN_SIGNED\"") }.toLong() + 1
 
     private fun defaultsFor(plan: Map<String, Any>): Map<String, Any> =
+        // audience-site: 默认值挑选（换受众就是换那一行默认）（PROFILE-01）
         Day.defaultPlan(plan["audience"]?.toString() ?: defaultsAudience(plan), plan["dayType"]?.toString() ?: "schoolday")
 
     private fun defaultsAudience(plan: Map<String, Any>) = "child"

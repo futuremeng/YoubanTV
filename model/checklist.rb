@@ -40,7 +40,9 @@ module Core
       'egressAdded' => { 'any' => %w[*.egress.*] },
       'clockChanged' => { 'any' => %w[*.time.clockDrift] },
       'cameraChannelOn' => { 'mobile' => %w[*.device.calibrate] },
-      'l5PairChanged' => { 'tv' => %w[*.device.pair] }
+      'l5PairChanged' => { 'tv' => %w[*.device.pair] },
+      # 自检不过 → 标定那条回到待确认：证据不过期这一条走的是重开，不是提醒（ONBOARD-07、SENSE-04）。
+      'selfTestFailed' => { 'any' => %w[*.device.calibrate] }
     }.freeze
     # 一台设备一份清单，但约定与命名是「某个成员在这台设备上」的事，要多一段前缀（PROFILE-10）。
     MEMBER_SCOPED = %w[agree profile].freeze
@@ -115,11 +117,14 @@ module Core
     end
 
     # 唯一的条目来源：固定项 + 触发追加。除此之外代码不得凭空生成条目（ONBOARD-03）。
-    def derive(assembly:, events: [], roles: {}, capability: {}, paired: nil, extra: [],
+    # reopened：这一轮被某个触发重开的条目。「重开」就是回到待确认，与那条通道的能力现值无关
+    # （SENSE-04 自检不过、ONBOARD-07 证据过期走的都是这一条）。
+    def derive(assembly:, events: [], roles: {}, capability: {}, paired: nil, extra: [], reopened: [],
                bootAt: nil, probedAt: nil)
       stale = bootAt && probedAt && probedAt < bootAt
       (fixed(assembly) + extra).uniq { |i| i['id'] }.map do |i|
-        st = status_of(i, events: events, roles: roles, capability: capability, paired: paired, stale: stale)
+        st = reopened.include?(i['id']) ? 'pending' :
+             status_of(i, events: events, roles: roles, capability: capability, paired: paired, stale: stale)
         i.merge('status' => st)
       end
     end

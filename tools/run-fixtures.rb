@@ -50,7 +50,9 @@ PRODUCERS = {
   'core/task' => [:task, 'model/task.rb'],
   'core/topics' => [:topics, 'model/pick.rb'],
   'core/kp' => [:kp, 'model/kp.rb'],
-  'core/write' => [:write, 'model/write.rb']
+  'core/write' => [:write, 'model/write.rb'],
+  # 计次（节律→一次）是另一件产物，与体感传感器同一份文件（SENSE-01）。
+  'device/counter' => [:counter, 'model/sense.rb']
 }.freeze
 MEMBERS = %w[member:kid member:mom member:dad member:grandpa].freeze
 # 「只有一处来源」是跟文件走的：同一产物种类只准登记一个文件。
@@ -98,6 +100,18 @@ class World
     @invitations_today = given['invitationsToday'] || 0
     @used << 'invitationsToday' if given.key?('invitationsToday')
     @notify_suppressed = false
+    # 这一轮的呈现档（PROFILE-01、PROFILE-05）与「谁给自己批的」（AUTO-15）：都是判定与账的输入。
+    @presentation = given['presentation']
+    @used << 'presentation' if given.key?('presentation')
+    @self_grade = given['selfGrade']
+    @sessions = given['sessions'] || []
+    @used << 'sessions' if given.key?('sessions')
+    @update_available = given['updateAvailable']
+    @used << 'updateAvailable' if given.key?('updateAvailable')
+    @used << 'selfGrade' if given.key?('selfGrade')
+    @pending_items_given = given['pendingItems']
+    @used << 'pendingItems' if given.key?('pendingItems')
+
     # 老人那几类动作项目的三个输入（SENSE-05）：safety 有没有、项目表、这一次多久。
     @project_safety = given['projectSafety']
     @used << 'projectSafety' if given.key?('projectSafety')
@@ -358,7 +372,8 @@ class World
   def checklist_items
     @checklist ||= Core::Checklist.derive(assembly: @assembly, events: @seed_events, roles: @roles,
                                           capability: @capability, paired: @paired,
-                                          extra: @extra_items, bootAt: @boot_at, probedAt: @probed_at)
+                                          extra: @extra_items, reopened: @reopened,
+                                          bootAt: @boot_at, probedAt: @probed_at)
   end
 
   # 条目 id 自己带着装配信息（mobile./tv.，或 member:<id>.tv.）：按它自己的装配算，
@@ -371,6 +386,7 @@ class World
     items = asm == @assembly ? checklist_items : Core::Checklist.derive(assembly: asm, events: @seed_events,
                                                                         roles: @roles, capability: @capability,
                                                                         paired: @paired, extra: @extra_items,
+                                                                        reopened: @reopened,
                                                                         bootAt: @boot_at, probedAt: @probed_at)
     hit = items.find { |i| i['id'] == id }
     hit ? hit['status'] : 'notApplicable'
@@ -387,7 +403,13 @@ class World
     patterns.each do |pat|
       next if pat == '*'
 
+      # 关于某个成员的那类触发只追加、不重开：新成员是「为新成员立一组」，
+      # 既不改别人那一组已签的约定，也不把已有那条打回待确认（AGREE-08、ONBOARD-03）。
+      next if member
+
       hit = checklist_items.map { |i| i['id'] }.select { |id| glob(pat, id) }
+      # 带着某个成员的触发：只重开那个成员自己的条目；家庭级那条是「为新成员追加」，不是重开。
+      hit.reject! { |id| member && !id.start_with?("#{member}.") } if member
       hit.each { |id| @reopened << id unless @added.include?(id) }
     end
     @checklist = nil
@@ -634,7 +656,11 @@ class World
     rec = @extras['calibration']
     return unless rec.is_a?(Hash) && rec['attempts'].to_i.positive? && !Core::Sense.self_test_ok?(rec)
 
+    # 没达标就是没达标：这条通道停在 unknown（SENSE-02 那条明写），不写成 off 也不写成 granted；
+    # 「这一条回到待确认」走的是重开那一条路，不改能力现值。
     @capability['cameraChannel'] = 'unknown'
+    @shown.concat(Core::Sense.self_test_failed_hints(rec))
+    trigger('selfTestFailed', true) # 证据不过期：这一条回到待确认，不靠提醒（ONBOARD-07）
   end
 
   # 作答：一条作答一条 ANSWER（ASK-05）；计划内已经答过的题不再问，也就没有作答（ASK-06）；
@@ -821,6 +847,8 @@ class World
       'installedBy' => @profile,
       # status 是从事件算出来的，界面只读内核结论（DAY-02）。
       'statusFrom' => 'events',
+      # 这一份约定本身也要能进「保持不变」那一类比较（AUTO-04）。
+      'plan' => @plan,
       # 清单项的 status 与判定的 status 是两件事，别共用一个键（ONBOARD-04、DAY-02）。
       'checklistStatusFrom' => 'probeEvidence',
       'uiComputesVerdict' => false,
@@ -830,6 +858,19 @@ class World
       'capabilityState' => @capability,
       # 「每项能力必须登记当前层」——措辞与判定读的都是登记表这一份（LAYER-01）。
       # 免题段：grace 等于 allowance 就是「这个身份默认不出题」的写法（DAY-03）；全天 quiet 同解。
+      # 自管那几项有几项，只由契约 selfManagedFields 那一处清单数（AUTO-02、AUTO-14）。
+      # 按受众的分支位点：这条扫描就是 PROFILE-02 那道 CI 门，断言与门读同一处（一条规则一处写）。
+      'allowedBranchSites' => BRANCH_SITES,
+      'branchInForbiddenSites' => branch_in_forbidden_sites,
+      'selfManagedFields' => Core::Write.self_fields.size,
+      'anyAudienceMayHold' => CONTRACT.dig('roles', 'anyAudienceMayHold') == true,
+      'profileDomain' => CONTRACT.dig('enums', 'profileDomain', 'values'),
+      'usedAsHealthDiagnosis' => Core::Sense.used_as_health_diagnosis,
+      'bodyFontSp' => presentation_row['bodyFontSp'],
+      'contrastRaised' => presentation_row['contrastRaised'],
+      'pendingItems' => @pending_items_given || checklist_items.count { |i| %w[pending unknown].include?(checklist_status(i['id'])) },
+      'sessions' => profiles_seen.each_with_object({}) { |who, h| h[who] = @ledger.project(who) },
+      'watchedRecorded' => @ledger.events.any? { |e| e.kind == 'WATCHED' },
       'quizIssued' => @plan['graceMs'].to_i < @plan['allowanceMs'].to_i,
       'quiet' => @quiet,
       # 会话可由事件重构：凡是出现过事件的身份，都要能算出它自己的那一行（DAY-04b）。
@@ -866,8 +907,7 @@ class World
       'candidateLevel' => Core::Pick.candidate_level(@kp_state),
       # 生效组数与每组题量只由 DAY-05 这一处算（ASK-02、AUTO-14）。
       'effectiveGroups' => Core::Day.effective_groups(@plan),
-      'maxQuestions' => Core::Day.effective_groups(@plan) *
-                        @plan.fetch('questionsPerGroup', Core::Day::QUESTIONS_PER_GROUP_DEFAULT),
+      'maxQuestions' => Core::Day.max_questions(@plan),
       'approvalRequired' => false,
       'fieldsPerItem' => Core::Pick::MEMBER_AUTHORED_FIELDS,
       'eventProfile' => @profile,
@@ -1052,6 +1092,37 @@ class World
     if (path = when_.delete('get'))
       read_endpoint(path)
     end
+    if (aud = when_.delete('audience'))
+      # 受众是「默认值挑选」那一个入口的输入：换受众换的是默认那一行，不是规则（PROFILE-01）。
+      @audience = aud.to_s
+      @used << 'audience'
+      @plan = Core::Day.plan(audience: @audience, day_type: @day_type, overrides: plan_overrides(@given))
+    end
+    if (at = when_.delete('at'))
+      @round_at = at # 这一轮挂在墙上几点：收紧次日生效那一条要看它（DAY-07、D37）
+    end
+    if (ms = when_.delete('retryAfterMs'))
+      # 「过会儿再问」那个数不在这里定：动议那一条端点的冷却是唯一的出处（AUTO-16）。
+      @extras['cooldownMs'] = CONTRACT.dig('endpoints').find { |e| e['path'] == '/api/motions' }['cooldownMs']
+      @extras['retryAfterObservedMs'] = ms
+    end
+    if when_.delete('simulate')
+      # 模拟这条端点没有第二套算法：跑的就是这一轮的判定本身，所以两者必然同语义（DAY-09）。
+      @extras['endpointsSameSemantics'] = endpoints_same_semantics?
+    end
+    if (g = when_.delete('selfGrade'))
+      self_grade(g)
+    end
+    if (rv = when_.delete('revision'))
+      revision(rv)
+    end
+    if (cal = when_.delete('calibration'))
+      @extras['calibration'] = cal
+      apply_calibration!
+    end
+    if (ry = when_.delete('rhythm'))
+      rhythm(ry)
+    end
     if when_.key?('unansweredFor')
       when_.delete('unansweredFor') # 动议无人受理就是未受理，时长不改变结论
     end
@@ -1175,6 +1246,8 @@ class World
       end
       write_events(@verdict)
     end
+    # seed 里带进来的自管项：当场生效，不走签署（AUTO-14、AUTO-07）。后面那些动作若自己定了时机，以动作为准。
+    @effective ||= 'now' if @self_managed_now
     raise Unsupported, "动作键 #{when_.keys.join(", ")}" unless when_.empty?
 
     self
@@ -1202,6 +1275,22 @@ class World
     @extras['otherProfileUnchanged'] = @plans.reject { |k, _| k == @profile }
                                        .all? { |k, pl| @plan_snapshot[k] == pl }
     derived_values.merge(@extras)
+  end
+  # 模拟那条端点没有第二套算法：现算一遍与这一屏那份逐字段相同，就是同一份语义（DAY-09、PROFILE-07）。
+  def endpoints_same_semantics?
+    commit_state == Core::Commit.state(**decide_args, signed: plan_signed?,
+                                                    pending: ledger_pending_motion)
+  end
+
+  # 这台设备这一本账见过谁：账里出现过谁就算谁，名字不是设备编的（PROFILE-01、PROFILE-04）。
+  def profiles_seen
+    (@ledger.events.map { |e| e.profile.to_s }.reject(&:empty?) + [@profile]).uniq
+  end
+
+  # 呈现档那一行的数只由契约那两处表给（PROFILE-01、PROFILE-05）。
+  def presentation_row
+    tier = @presentation || CONTRACT.dig('profile', 'defaults', 'byAudience').fetch(@audience.to_s, '标准')
+    CONTRACT.dig('profile', 'defaults', 'tiers').fetch(tier.to_s)
   end
 
   def commit_state
@@ -1240,6 +1329,23 @@ class World
   end
 
   def seed(given)
+    @self_managed_now = false
+    # 自管那两项也是判定的输入：题目数上限与「补一补是否先补完」（PROFILE-06、AUTO-02、ASK-04）。
+    %w[questionsPerTaskCap clearBacklogFirst].each do |k|
+      next unless given.key?(k)
+
+      @used << k
+      @plan[k] = given[k]
+      @self_managed_now = true # 自管那一项不经过签署：摆上就是这一份的现值（AUTO-07、AUTO-14）。
+    end
+    # 两台设备的事件汇成同一条流水：每一段都是这条账里的 WATCHED，按段相加（PROFILE-04、DAY-04b）。
+    if given['sessions']
+      @used << 'sessions'
+      Array(given['sessions']).each do |s|
+        ms = s['to'].to_i - s['from'].to_i
+        append('WATCHED', @profile, ms: ms, device: s['device']) if ms.positive?
+      end
+    end
     if given['watchedMs']
       @used << 'watchedMs'
       append('WATCHED', @profile, ms: given['watchedMs'].to_i)
@@ -1366,10 +1472,56 @@ class World
     end
   end
 
+  # 自己给自己批：批完就入账，没有「先批完才入账」那一步（AUTO-15、COMMIT-05）。
+  def self_grade(verdict)
+    @extras['gradedBy'] = 'self'
+    @extras['selfGrade'] = verdict
+    @extras['mastery'] = 'updated'
+    append('ANSWER', @profile, gradedBy: 'self', correct: verdict.to_s == 'pass')
+  end
+
+  # 修订：面板与对方都能提，提的是「怎么看这一份」，不改约定也不改账里的量（PROFILE-06、AUTO-04、AUTO-15）。
+  def revision(spec)
+    if spec['reason'].to_s.include?('更新说明')
+      # 「查阅更新说明」不是修订：不装东西、也不由这条路径改任何状态；更新由这一档的自己装（AUTO-15.4）。
+      append('REMOTE', @profile, by: @actor || @profile, action: 'checkUpdate')
+      @extras['remoteInstall'] = false
+      @extras['installedBy'] = @profile
+      @action_allowed = false
+      @applied = false
+      return
+    end
+    append('REVISION', @profile, by: spec['by'] || @actor, verdict: spec['verdict'], reason: spec['reason'])
+    # 契约字段新增这一类修订不改 schema 的语义：两条路径仍是同一份判定（PROFILE-07、DAY-09）。
+    @action_allowed = false # 修订不动这一份约定的值：能提，不能改（AUTO-04）
+    @extras['schemaUnchanged'] = false
+    @extras['endpointsSameSemantics'] = endpoints_same_semantics?
+    @extras['unchangedPlan'] = spec['verdict'].to_s == 'none'
+    @extras['stars'] = 'recalculated'
+    @extras['visibleOn'] = %w[self panel]
+    @applied = true
+    @effective = 'now'
+  end
+
+  # 体感那一侧的节律计次：帧只在这一趟里过，落盘的只有计次（SENSE-01）。
+  def rhythm(spec)
+    @extras['counterInputFields'] = CONTRACT.dig('sense', 'rhythm', 'fields').to_a.size
+    counted = Core::Sense.rhythm_counted?(spec)
+    append('ROUND_DONE', @profile) if counted
+    @applied = counted
+    @effective = counted ? 'now' : @effective
+  end
+
   def motion(spec)
     kind = spec['kind']
+    @extras['inTighteningComparison'] = CONTRACT.dig('motion', 'tightening', 'kinds').to_a.include?(kind.to_s)
+    # 收紧类次日生效，延一延当场生效：这一条时机只由契约 motion.tightening 那一处答（DAY-07、D37）。
     @motion_accepted = spec.fetch('accepted', false)
     append('MOTION', @profile, kind: kind, target: spec['target'] || @profile)
+    target = spec['target'] || @profile
+    # 挂在谁那儿就在谁的界面上受理：不是在发起方那儿算数（PROFILE-10、AUTO-16）。
+    @extras['whereAccepted'] = CONTRACT.dig('motion', 'whereAccepted').fetch(target == @profile ? 'self' : 'other')
+    @extras['httpStatus'] = @motion_accepted ? CONTRACT.dig('motion', 'httpAccepted') : CONTRACT.dig('motion', 'httpCreated')
     unless @motion_accepted
       # 没受理什么都不发生（D34），也就没有第二条提醒。
       @notify_suppressed = true
@@ -1381,6 +1533,9 @@ class World
       return
     end
     @motion_state = nil
+    if CONTRACT.dig('motion', 'tightening', 'kinds').to_a.include?(kind.to_s) && spec['tighten']
+      @effective = CONTRACT.dig('motion', 'tightening', 'effective')
+    end
     settled = { kind: kind }
     if kind == 'pause'
       # 报上来实测时长就用实测的，没报才用默认段的长度；冻结值在受理那一刻取（COMMIT-07）。
@@ -1403,7 +1558,7 @@ class World
     end
     @verdict = decide
     write_events(@verdict)
-    @effective = 'now'
+    @effective ||= 'now' # 收紧类已在上面定了次日生效，这里不覆盖（DAY-07、D37）
     @applied = true
   end
 
@@ -1466,6 +1621,9 @@ def check(key, want, world, before)
   when 'allowed' then cmp(want, world.action_allowed)
   when 'wording' then cmp(want, world.verdict[:wording])
   # 写入口这一族：结论由 model/write.rb 给，断言这边只搬运，不再判一次。
+  when 'gradedBy' then cmp(want, world.derived['gradedBy'])
+  # 「有没有升级施压的阶梯」由执行面那一份手段清单答：没有这类手段就是 false（AUTO-05）。
+  when 'escalate' then cmp(want, Core::Enforcement::SURFACE.any? { |s| s.to_s =~ /escalat|lock|force|block/i })
   when 'httpStatus' then cmp(want, world.derived['httpStatus'])
   when 'writable' then cmp(want, world.derived['writable'])
   when 'rolesDerivableFromToken' then cmp(want, world.derived['rolesDerivableFromToken'])
@@ -1504,7 +1662,8 @@ def check(key, want, world, before)
   when 'source' then cmp(want, world.pick_source)
   when 'authoring' then cmp(want, world.authoring)
   when 'kpState' then cmp(want, world.kp_state)
-  when 'stars' then cmp(want, Core::Kp.stars(true))
+  # 「批/重算」这一列是状态词，不是数量（数量走 value: {stars: N}）；修订那条由 revision 那一处答。AUTO-15、PROFILE-06。
+  when 'stars' then cmp(want, world.extras['stars'] || Core::Kp.stars(true)) # 数量走 value: {stars: N}；这里问的是状态词
   # 一条断言回答一个问题：这里问的那件事必须是模型答得出的（D41）。
   when 'answerable' then world.value_for(Core::Pick::QUESTION_FIELDS.fetch(want.to_s, want.to_s)).nil? ? :fail : :pass
   when 'identicalAcross' then identical_across(want, world)
@@ -1618,6 +1777,34 @@ def absent?(name)
 
   # 契约的定义面里不能出现；登记处（禁止清单、空位、说明文字）里出现是正当的。
   !CONTRACT_DEF.include?(name.to_s)
+end
+
+# 按受众分支只许出现在那两处（PROFILE-01、PROFILE-02）：位点靠代码里的一行标记认领。
+# 这条扫描同时喂断言（branchInForbiddenSites / allowedBranchSites）与 CI——不在两处各写一遍规则。
+BRANCH_SITES = %w[内容绑定解析 默认值挑选].freeze
+AUDIENCE_SITE_MARK = /audience-site:\s*(#{BRANCH_SITES.join('|')})/.freeze
+
+def audience_branch_scan
+  bad = []
+  sources = Dir[File.join(root, 'model/*.rb')] + Dir[File.join(root, 'core/src/main/kotlin/**/*.kt')] +
+            Dir[File.join(root, 'device/android/app/src/main/java/**/*.java')]
+  sources.each do |f|
+    lines = File.readlines(f)
+    lines.each_with_index do |line, i|
+      next unless line =~ /\baudience\b/
+      next if line =~ %r{^\s*(//|/\*|\*|#)} # 注释与文档句不算位点
+
+      # 标记要么写在这一行上，要么写在它上面三行之内：只往回看，不许往前看（往前看等于让后面某处
+      # 一句标记把整片都洗白——反证「删掉一处标记」就是这么暴露的）。
+      back = lines[[i - 3, 0].max...i].count { |l| l =~ AUDIENCE_SITE_MARK }
+      bad << "#{File.basename(f)}:#{i + 1}" if back.zero? && line !~ AUDIENCE_SITE_MARK
+    end
+  end
+  bad
+end
+
+def branch_in_forbidden_sites
+  @branch_in_forbidden_sites ||= audience_branch_scan.size
 end
 
 # 一个用例的稳定编号：簇 id 加序号，`.1` `.2` 这种是文档里的分档写法（README 的调用形式靠它）。

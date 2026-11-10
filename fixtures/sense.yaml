@@ -52,7 +52,8 @@ SENSE-04:
   given: { profile: "member:kid", assembly: mobile, inSlot: true }
   cases:
     - name: 自检不通过时指出具体一项
-      given: { capability: { ambientLight: denied } }
+      # 问的是「标定那一条」回到待确认：断言要点名是哪一项，不靠猜（ONBOARD-04、SENSE-04）。
+      given: { capability: { ambientLight: denied }, item: mobile.device.calibrate }
       when: { calibration: { attempts: 1, falseCountRate: 1.0 } }
       expect: { shown: [光照], notShown: [泛泛的失败提示], checklistStatus: pending }
     - name: 误计率按区间描述并始终保留手动确认

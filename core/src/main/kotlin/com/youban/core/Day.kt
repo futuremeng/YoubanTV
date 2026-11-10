@@ -19,6 +19,7 @@ object Day {
      * 这张表原来 Ruby 一份、Kotlin 一份，连「默认是不是在时段内」都只有一边写——那正是对齐门要抓的（D45）。
      * 存过配置的设备沿用原值，由调用方合并 overrides 处理。
      */
+    // audience-site: 默认值挑选 —— 与 Ruby 那份同一个位点，允许按受众挑默认那一行（PROFILE-01、PROFILE-02）。
     fun defaultPlan(audience: String, dayType: String): MutableMap<String, Any> {
         val table = agreementDefaults()
         val row = table["$audience $dayType"] as? Map<*, *> ?: table["child schoolday"]

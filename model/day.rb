@@ -19,12 +19,14 @@ module Core
 
     module_function
 
+    # audience-site: 默认值挑选 —— 按受众挑默认那一行，是允许的两处分支之一（PROFILE-01、PROFILE-02）。
     def default_plan(audience, day_type)
       row = DEFAULTS[[audience.to_s, day_type.to_s]] || DEFAULTS[%w[child schoolday]]
       row.dup
     end
 
     # 合并该身份已存过的配置：存过的一律沿用原值（DAY-03 末段）。
+    # audience-site: 默认值挑选 —— 就是上面那一处的外层，不是新的分支（PROFILE-01）。
     def plan(audience:, day_type:, stored: {}, overrides: {})
       default_plan(audience, day_type).merge(stored).merge(overrides)
     end
@@ -45,8 +47,17 @@ module Core
 
     # DAY-05：生效组数 = max(自设组数, ceil((moveFrom − grace) ÷ 每组预计分钟))
     # 当日方案里有哪些量：写入口与断言都读这一处，别在两边各列一张清单。
+    # 一次任务最多几题：组数 × 每组题量，再由那一档自己定的上限截住（ASK-04、PROFILE-06、AUTO-14）。
+    # 这个截断只在这一处算，界面上与断言里不再各算一次。
+    def max_questions(plan)
+      n = effective_groups(plan) * plan.fetch('questionsPerGroup', QUESTIONS_PER_GROUP_DEFAULT).to_i
+      cap = plan.fetch('questionsPerTaskCap', 0).to_i
+      cap.positive? ? [n, cap].min : n
+    end
+
     def day_keys
-      @day_keys ||= plan(audience: 'child', day_type: 'schoolday', overrides: {}).keys.freeze
+      # 不问是哪一档：这一张表的形状对谁都一样，所以这里不按受众分支（PROFILE-01）。
+      @day_keys ||= DEFAULTS.values.first.keys
     end
 
     def effective_groups(plan)
