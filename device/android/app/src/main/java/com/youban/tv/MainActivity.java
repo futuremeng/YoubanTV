@@ -122,8 +122,10 @@ public class MainActivity extends Activity {
                 said = field(state, "text", "");
                 if (said.isEmpty()) {
                     said = null;
-                } else if (OverlayCard.show(this, said)) {
-                    // 布局落在下一帧：等到量到真实落点为止，量不到就用预测值。
+                } else if (OverlayCard.show(getApplicationContext(), said)) {
+                    // 用 application context：在 onStop 里加窗时 activity 的窗口令牌正在拆，
+                    // 用 activity 加进去的窗只有记录没有画面（mHasSurface=false，F30）。
+                                        // 布局落在下一帧：等到量到真实落点为止，量不到就用预测值。
                     int[] box = OverlayCard.rect();
                     int waited = 0;
                     while (waited < 20 && (box == null || box[3] <= box[1])) {

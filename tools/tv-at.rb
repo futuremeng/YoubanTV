@@ -526,15 +526,80 @@ def probe_overlay(args)
   # 悬浮窗那一层的窗口在窗口管理器里长这样：Window #N Window{... u0 Sys2038:com.youban.tv/...}
   # 2038 是 TYPE_APPLICATION_OVERLAY（API 26+），2002 是 TYPE_PHONE（这台手机是 API 25）；
   # 它带着 activity 的名字，因为窗口令牌挂在 activity 上。截图拍不到这一层（F30）。
-  mine = windows.to_s.split(/^Window #/).find do |w|
-    w.include?(APK_PACKAGE) && (w =~ /Sys20(02|38)/ || w =~ /TYPE_APPLICATION_OVERLAY|TYPE_PHONE|type=20(02|38)/i)
-  end
+  mine = overlay_window(windows)
   return [false, "窗口列表里找不到这一张：#{windows.to_s.lines.grep(/youban/).first.to_s.strip}"] if mine.nil?
-  visible = mine =~ /mViewVisibility=0|mIsVisible=true|mHasSurface=true/
-  return [false, "那一张的窗口在，但可见性不对：#{mine.lines.grep(/Visib|Surface/).join.strip[0, 160]}"] if visible.nil?
+  vis = overlay_visibility(mine)
+  return [false, "那一张的窗口在，但可见性不对：#{vis.inspect}"] unless vis[:visible]
 
+  before_vis = vis
+  # 真实遮挡：换一个前台应用上去，那一张该还在（L3 的定义就是「离开本应用仍可见」，
+  # 它在应用之上，不是被内容盖住的那一层）。这一条以前只在文档里写着。
+  shell(args, 'am start -a android.settings.SETTINGS')
+  sleep 3
+  over = shell(args, 'dumpsys window windows')
+  mine2 = overlay_window(over)
+  if mine2.nil?
+    return [false, "换到别的应用后那一张不见了：#{over.to_s.lines.grep(/youban/).first.to_s.strip}"]
+  end
+  vis2 = overlay_visibility(mine2)
+  unless vis2[:visible]
+    return [false, "换到别的应用后那一张不显示了：之前 #{before_vis.inspect} · 现在 #{vis2.inspect}"]
+  end
+
+  shot_diff, = snap_pair(args)
   [true, "离开本应用那一张出来了（#{text}），落在字幕带以上（下边缘 #{box[3]} ≤ #{band}），" \
-        '且不抢焦点——装完默认不开也验了']
+        "且不抢焦点；换到别的应用后那一张还在；截图里那一层有画面（整屏差 #{shot_diff}）——" \
+        '装完默认不开也验了']
+end
+
+# 悬浮窗那一格在窗口管理器里的名字有几种写法：带 activity 的（Sys2038:包名/组件）、
+# 用 application context 加的直接是包名。三种都认，认不出就是「没有这一格」。
+def overlay_window(dump)
+  dump.to_s.split(/^\s*Window #/).find do |w|
+    head = w[/\A[^\n]*/].to_s
+    next false unless head.include?(APK_PACKAGE)
+
+    head =~ /Sys20(02|38)/ || !head.include?("#{APK_PACKAGE}/")
+  end
+end
+
+# 窗口管理器里那一格的可见性：mViewVisibility 是 View 的可见性常量（0 是 VISIBLE，
+# 8 是 INVISIBLE、4 是 GONE），拿字符串前缀去比会把 0x8 当成 0——这一条是实测踩出来的（F30）。
+def overlay_visibility(entry)
+  v = entry[/mViewVisibility=0x([0-9a-f]+)/i, 1]&.to_i(16)
+  { visible: v.zero?, viewVisibility: v,
+    isVisible: entry[/mIsVisible=(true|false)/, 1], hasSurface: entry[/mHasSurface=(true|false)/, 1],
+    obscured: entry[/mObscured=(true|false)/, 1] }
+end
+
+# 顺带量一次「截图拍不拍得到这一层」：只报数，不当依据（依据是窗口管理器那一格）。
+# 这条是 F30 的教训：早先那两次「两张截图逐格一样」其实是因为那一格 mHasSurface=false——
+# 截图没骗人，是那一格根本没画出来。
+def snap_pair(args)
+  on = snap(args, 'on')
+  shell(args, "am force-stop #{APK_PACKAGE}") # 那一张随进程走：这就是「没有那一张」的对照照
+  sleep 2
+  off = snap(args, 'off')
+  [mean_diff(gray_all(on), gray_all(off)), gray_all(on)]
+end
+
+def snap(args, tag)
+  FileUtils.mkdir_p(SHOT_DIR)
+  file = File.join(SHOT_DIR, "overlay-#{tag}-#{Process.pid}.png")
+  shell(args, 'screencap -p /sdcard/Download/yb-ov.png')
+  IO.popen(['adb', '-s', args[:serial].to_s, 'pull', '/sdcard/Download/yb-ov.png', file],
+           err: %i[child out], &:read)
+  file
+end
+
+def gray_all(path)
+  IO.popen(['magick', path, '-colorspace', 'gray', '-resize', '32x32!', '-depth', '8', 'gray:-'],
+           err: File::NULL, &:read).bytes
+end
+
+def mean_diff(a, b)
+  return 999.0 if a.empty? || a.size != b.size
+  ((0...a.size).sum { |i| (a[i] - b[i]).abs } / a.size.to_f).round(2)
 end
 
 def overlay_record(args)

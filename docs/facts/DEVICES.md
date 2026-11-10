@@ -506,12 +506,18 @@
 
 三个只在真机上才遇到的坑，都伪装成「那一张没出来」：
 
-1. **这台电视用 `screencap` 拍不到悬浮窗那一层**：同一台、同一个状态，有那一张与没那一张的
-   两张截图压成 16×16 灰度格子后**逐格一样**（右上角那一块平均差 0.74，等于噪声）。
-   所以「画出来了没有」不靠截图判，读窗口管理器：那条窗口长这样——
+1. **先前那句「这台电视 `screencap` 拍不到悬浮窗层」是我说错了**，这里收回。
+   当时两张截图逐格一样，不是截图的问题，是**那一格根本没有画面**：窗口是在 `onStop()` 里用
+   activity 的 context 加的，那时候 activity 的窗口令牌正在拆，窗口进了窗口管理器但
+   `mHasSurface=false`——记录写着显示了，屏上什么都没有。改成 application context 之后，
+   同一个比对立刻有数（整屏平均差：电视 1.42、手机 14.4；那张卡只占一角，所以电视的数小）。
+   教训：**程序自己报的「显示了」不能当依据**，得看窗口管理器那一格（长这样——
    `Window #1 Window{c672f25 u0 Sys2038:com.youban.tv/com.youban.tv.MainActivity}`，
    2038 就是 `TYPE_APPLICATION_OVERLAY`，它带着 activity 的名字是因为窗口令牌挂在 activity 上
-   （同一台手机 API 25 上那条是 `Sys2002:`，即 `TYPE_PHONE`）；
+   （同一台手机 API 25 上那条是 `Sys2002:`，即 `TYPE_PHONE`；用 application context 加的那格
+   直接写着包名，不带组件名）；再要求可见性字段成立——`mViewVisibility` 是 `View` 的常量，
+   0 才是 VISIBLE，8 是 INVISIBLE。拿字符串前缀去比会把 `0x8` 当成 `0`，这一条把一次「其实没画出来」
+   洗成了通过，直到把「换到别的应用后那一张还在不在」这条加上去才露出来（真实遮挡那条）。
    再要求可见性字段（`mViewVisibility=0` / `mIsVisible=true` / `mHasSurface=true`）里至少有一个成立。
 2. **这条授权的时限在这台机器上被压到约 4 秒**（`appops get` 里写着 `duration=+3s876ms`，
    给它 `1d` 也照样压）——于是「那一张出没出」会变成看运气。自检的做法是**重新授权后立刻离开前台**，
