@@ -141,7 +141,12 @@ class World
       @used << 'plan'
       @pending_version = given['plan']['version']
       @plan_signed = !!given['plan']['signed']
+      # 约定条目本身也是这一轮之前的事实：夹具在 given.plan 里给了数值就直接用（AGREE-06）。
+      @plan_overrides_given = given['plan'].reject { |k, _| %w[version signed].include?(k.to_s) }
     end
+    # 「这一屏的条目是不是全来自默认值」= 没有任何一份签署过的约定（AGREE-04）。
+    @agreement_step = given['agreementStep']
+    @used << 'agreementStep' if given.key?('agreementStep')
     @running_version = given['planVersion'] || 6
     @used << 'planVersion' if given.key?('planVersion')
     # 时间完整性这三项是设备端带上来的一手事实，模型不自己造（DAY-07）。
@@ -214,6 +219,22 @@ class World
     @motion_accepted = nil
     @action_allowed = true
     @plan = Core::Day.plan(audience: @audience, day_type: @day_type, overrides: plan_overrides(given))
+    # 约定按身份各立一组（AGREE-08）：切身份就是换一组约定，一份的收紧不改另一组。
+    @plans = { @profile => @plan }
+    @plan_snapshot = { @profile => @plan.dup }
+    # 夹具可以直接摆好每人一组（AGREE-08）：没摆的那一组在切到时按契约默认立起来。
+    if given['plans']
+      @used << 'plans'
+      given['plans'].each do |prof, pl|
+        base = Core::Day.plan(audience: default_audience(prof), day_type: @day_type, overrides: {})
+        base.merge!(pl) # 版本与签署状态跟着这一组一起放（AGREE-08）
+        @plans[prof] = base
+        @plan = base if prof == @profile
+  
+      end
+      @plan_snapshot = @plans.transform_values(&:dup)
+    end
+    @plan.merge!(@plan_overrides_given) if @plan_overrides_given
     @plan['form'] = @plan_form_seed if @plan_form_seed
     # 免题段这类时段形态要进方案，判定才说得出那句理由（DAY-03、LAYERING §4）。
     @plan['quiet'] = @quiet if @quiet
@@ -447,6 +468,7 @@ class World
       else
         @effective = 'never'
         @applied = false
+        @pending_version = pc['version'] # 停在「待对方签署」这一格就是这么来的（AGREE-06）
       end
       @verdict_stale = true
       return
@@ -828,6 +850,9 @@ class World
     if when_.key?('switch')
       switch(when_.delete('switch'))
     end
+    if when_.key?('switchTo') # 夹具里写成「这一轮切到某个身份」（AGREE-08、AGREE-09）
+      switch('to' => when_.delete('switchTo'))
+    end
     if when_.key?('crossedMidnight')
       roll!(when_.delete('crossedMidnight'))
     end
@@ -1026,6 +1051,15 @@ class World
   # 断言侧要读派生视图里的少数几项（visibleOn 这类），走这个出口，别开内部变量。
   # 与快照同一份：extras 里那些「这一轮算出来的东西」也要能读到。
   def derived
+    # 「这一屏是不是全按默认跑」「是不是停在待对方签署」这两条从账与方案算出来，
+    # 不在夹具里写第二遍（AGREE-04、AGREE-06）。
+    signed = @ledger.events.any? { |e| e.kind.to_s == 'PLAN_SIGNED' }
+    @extras['defaultsOnly'] = !signed && @plan_signed != true
+    @extras['signaturePending'] = !@pending_version.nil? && @plan_signed != true
+    @extras['agreementStep'] = @agreement_step
+    # 别人的那一组约定不受这一份的收紧影响（AGREE-08）：拿开局快照比，不看这一份改了什么。
+    @extras['otherProfileUnchanged'] = @plans.reject { |k, _| k == @profile }
+                                       .all? { |k, pl| @plan_snapshot[k] == pl }
     derived_values.merge(@extras)
   end
 
@@ -1232,8 +1266,24 @@ class World
     @applied = true
   end
 
+  # 切换身份 = 换一组约定（AGREE-08、AGREE-09）：目标身份有已生效的约定就加载，没有就走那六步的起点。
   def switch(spec)
     to = spec['to']
+    if @plans.key?(to)
+      @plan = @plans[to]
+      # 加载那一组的生效版本与签署状态——约定是按身份各立一组（AGREE-08）。
+      @running_version = @plan['version'] if @plan.key?('version')
+      @plan_signed = !!@plan['signed'] if @plan.key?('signed')
+    else
+      @plans[to] = Core::Day.plan(audience: default_audience(to), day_type: @day_type, overrides: {})
+      @plan = @plans[to]
+      @agreement_step = 1
+    end
+    @plan_snapshot[to] ||= @plan.dup
+    switch_body(spec, to)
+  end
+
+  def switch_body(spec, to)
     append('PROFILE_SWITCH', to == 'none' ? 'none' : to, from: spec['from'], to: to)
     @profile = to
     @extras['eventProfile'] = to
@@ -1294,6 +1344,11 @@ def check(key, want, world, before)
   when 'accepted' then cmp(want, world.motion_accepted)
   when 'applied' then cmp(want, world.applied)
   when 'effective' then cmp(want, world.effective)
+  # —— 约定怎么立（spec/AGREE.md）：这四条由模型答，不在夹具里写第二遍。
+  when 'defaultsOnly' then cmp(want, world.derived['defaultsOnly'])
+  when 'signaturePending' then cmp(want, world.derived['signaturePending'])
+  when 'agreementStep' then cmp(want, world.derived['agreementStep'])
+  when 'otherProfileUnchanged' then cmp(want, world.derived['otherProfileUnchanged'])
   else
     raise Unsupported, "断言键 #{key}"
   end

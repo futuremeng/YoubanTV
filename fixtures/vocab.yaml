@@ -44,6 +44,7 @@ symbols:
 
 fields:
   # —— 约定怎么立
+  plans: {type: kv, note: "按身份各立一组约定：{member:kid: {version, signed, ...}}"}
   firstRun: {type: boolean}
   switchTo: {type: profile}
   agreementStep: {type: number}

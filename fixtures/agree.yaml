@@ -32,20 +32,23 @@ AGREE-06:
     - name: 改了约定没签 → 旧版本继续生效，且不算谁的违规
       given: {plan: {version: 7, signed: false, allowanceMs: 3600000, graceMs: 1800000}}
       when: {planChange: {version: 7}}
-      expect: {status: honored, signaturePending: true, effective: nextPlanVersion}
+      expect: {status: honored, signaturePending: true, effective: never}
 
 AGREE-08:
   spec: [AGREE-08]
   given: {profile: "member:kid", watchedMs: 600000}
   cases:
-    - name: 切到成年身份，加载那一组约定，另一组不受影响
-      given: {plan: {version: 3, signed: true, allowanceMs: 3600000, graceMs: 1800000}}
+    - name: 切到成年身份，加载的是那一组的生效版本
+      given: {plans: {"member:kid": {version: 3, signed: true, allowanceMs: 3600000},
+                      "member:dad": {version: 9, signed: true, allowanceMs: 7200000}}}
       when: {switchTo: "member:dad"}
-      expect: {status: honored, otherProfileUnchanged: true}
-    - name: 这一份的收紧不会改掉另一份
+      expect: {status: honored, otherProfileUnchanged: true, value: {runningVersion: 9}}
+    # 收紧本身的生效路径已在 COMMIT-04 / PROFILE / SENSE 那几处断言过，这里不重复写第二遍（D45）；
+    # 这一条只回答一件事：改自己这一组，会不会串到别人那一组。
+    - name: 这一份改过了，切到另一身份看到的还是那一组
       given: {plan: {version: 3, signed: true, allowanceMs: 3600000, graceMs: 1800000}}
-      when: {planChange: {allowanceMs: 1800000}, switchTo: "member:dad"}
-      expect: {otherProfileUnchanged: true, effective: nextPlanVersion}
+      when: {planChange: {version: 4, allowanceMs: 1800000}, switchTo: "member:dad"}
+      expect: {otherProfileUnchanged: true}
 
 AGREE-09:
   spec: [AGREE-09]
