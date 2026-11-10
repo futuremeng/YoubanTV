@@ -32,7 +32,7 @@ module Core
 
     # 内核输出的形状：字段名就是契约 commitState.fields 那一行，电视端读的是这一份（M1.4）。
     def state(profile:, plan:, q:, strength: 'negotiated', mode: nil, motion_state: {}, capability: {},
-              probe: nil, requested: false)
+              probe: nil, requested: false, signed: true)
       v = decide(profile: profile, plan: plan, q: q, strength: strength, mode: mode,
                  motion_state: motion_state, capability: capability, probe: probe, requested: requested)
       {
@@ -42,12 +42,14 @@ module Core
         'due' => due_shape(v, q, plan),
         'tier' => v[:tier],
         'tierCeiling' => v[:tierCeiling],
-        'nextAction' => v[:next_action],
+        # 一份签过的约定都没有：下一步就是去把它立起来（AGREE-01、AGREE-04）。
+        # 这一条不抬档位——界面上仍是 L1 那一行提示加常驻的一栏（AGREE-04）。
+        'nextAction' => (signed || v[:due] ? v[:next_action] : 'agreement'),
         'wording' => v[:wording],
         'surface' => v[:surface],
         'fallbackReason' => v[:fallbackReason],
         'text' => text_of(v, q, plan),
-        'panels' => panels_of(v, q, plan)
+        'panels' => panels_of(v, q, plan) + (signed ? [] : [PANELS.fetch('约定未立')])
       }
     end
 

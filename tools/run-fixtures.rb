@@ -1050,6 +1050,12 @@ class World
   # 电视端要读的那一份：契约 commitState 的形状（M1.4）。工具与设备端读的都是这个出口。
   # 断言侧要读派生视图里的少数几项（visibleOn 这类），走这个出口，别开内部变量。
   # 与快照同一份：extras 里那些「这一轮算出来的东西」也要能读到。
+  # 有没有一份签过的约定：方案标了签过、账里有 PLAN_SIGNED，或某一组是签过的（AGREE-01）。
+  def plan_signed?
+    @plan_signed == true || @ledger.events.any? { |e| e.kind.to_s == 'PLAN_SIGNED' } ||
+      @plans.values.any? { |pl| pl['signed'] == true }
+  end
+
   def derived
     # 「这一屏是不是全按默认跑」「是不是停在待对方签署」这两条从账与方案算出来，
     # 不在夹具里写第二遍（AGREE-04、AGREE-06）。
@@ -1064,7 +1070,7 @@ class World
   end
 
   def commit_state
-    Core::Commit.state(**decide_args)
+    Core::Commit.state(**decide_args, signed: plan_signed?)
   end
 
   private
@@ -1298,7 +1304,7 @@ def check(key, want, world, before)
   when 'status' then cmp(want, world.verdict[:status])
   when 'tier' then cmp(want, world.verdict[:tier])
   when 'mode' then cmp(want, world.verdict.fetch(:mode, 'ambient'))
-  when 'nextAction' then cmp(want, world.verdict[:next_action])
+  when 'nextAction' then cmp(want, world.commit_state['nextAction']) # 与设备读的是同一份 CommitState（D47）
   when 'blocked' then cmp(want, world.verdict[:blocked])
   when 'allowed' then cmp(want, world.action_allowed)
   when 'wording' then cmp(want, world.verdict[:wording])

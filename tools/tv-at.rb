@@ -14,6 +14,7 @@
 #   ruby tools/tv-at.rb --serial=… --facts                      # 只读设备一手事实，看它们怎么进内核
 #   ruby tools/tv-at.rb --serial=… --cycle=3                    # 调试：连播三轮（遥控器坏了也能换页）
 #   ruby tools/tv-at.rb --serial=… --keep-facts                 # 顺手把读到的事实写进 facts 那份样本
+require 'digest'
 require 'json'
 require 'yaml'
 require 'fileutils'
@@ -212,8 +213,33 @@ EVENTS_FILE = 'youban-events.jsonl'
 require_relative 'kernel-from-events'
 KernelFromEvents = method(:kernel_from_events)
 
+# 装到设备上的包不许比仓库里编译出来的那份旧：装错了版本会伪装成「判定错了」（F20 那一类坑，
+# 这次是手机装了旧包，8 步全红，看着像内核少实现了一条）。
+def probe_apk(args)
+  local = File.join(ROOT, 'device/android/out/youban-tv.apk')
+  return [false, "本地没有编译产物 #{local}（先跑 device/android/build-apk.sh）"] unless File.exist?(local)
+
+  path = (shell(args, 'dumpsys package com.youban.tv').gsub(/
+/, ''))[/codePath=(\S+)/, 1]
+  return [false, '读不到设备上这个包装在哪（装了吗？）'] unless path
+
+  remote = (shell(args, "md5sum #{path}/base.apk")[/\h{32}/])
+  if remote
+    mine = Digest::MD5.file(local).hexdigest
+    return [false, "设备上装的不是这份编译产物（md5 不同），先 install -r 再测"] unless remote == mine
+    [true, "装的就是这份编译产物（md5 一致）"]
+  else
+    size = (shell(args, "stat -c %s #{path}/base.apk")[/\d+/]).to_i
+    return [false, '设备上算不了 md5，也比不出大小'] if size.zero?
+    mine = File.size(local)
+    return [false, "设备上装的包大小 #{size}，与这份编译产物 #{mine} 不同，先 install -r 再测"] unless size == mine
+    [true, "md5 这条设备不认，退而比大小：#{mine} 字节一致"]
+  end
+end
+
 PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text),
-           'glyphs' => method(:probe_glyphs), 'state' => method(:probe_state) }.freeze
+           'glyphs' => method(:probe_glyphs), 'state' => method(:probe_state),
+           'apk' => method(:probe_apk) }.freeze
 
 args = parse_args(ARGV)
 if args[:facts]

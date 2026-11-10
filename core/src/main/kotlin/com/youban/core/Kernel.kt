@@ -17,7 +17,9 @@ object Kernel {
      * @return 这份 `CommitState` 的 JSON，界面层照着画，不自己判层级
      */
     @JvmStatic
-    fun state(eventsJson: String, planJson: String, profile: String, strength: String, mode: String?): String {
+    @JvmOverloads
+    fun state(eventsJson: String, planJson: String, profile: String, strength: String, mode: String?,
+                signed: Boolean? = null): String {
         motionKind.clear()
         val ledger = Ledger()
         eventsJson.lineSequence().forEach { line ->
@@ -41,7 +43,10 @@ object Kernel {
         }
         val paused = settled.isNotEmpty()
         val pauseMs = settled.sumOf { it.fields["pauseMs"] ?: 0 }
-        return Json.write(Commit.state(profile, plan, ledger.project(profile), strength, mode, paused, pauseMs))
+        // 有没有一份签过的约定：设备端看账里的 PLAN_SIGNED；比对器把这一轮的方案状态直接带过来（AGREE-01）。
+        val hasSignature = signed ?: ledger.events.any { it.kind == "PLAN_SIGNED" }
+        return Json.write(Commit.state(profile, plan, ledger.project(profile), strength, mode, paused, pauseMs,
+            signed = hasSignature))
     }
 
     /** 事件账里每条动议的种类（fields.kind）：Ledger 的 fields 只存数字，种类另记在这儿。 */

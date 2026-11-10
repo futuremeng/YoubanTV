@@ -73,7 +73,8 @@ object Commit {
         pauseMs: Long = 0,
         caps: CapabilityView? = null,
         probeOk: Boolean? = null,
-        requested: Boolean = false
+        requested: Boolean = false,
+        signed: Boolean = true
     ): Map<String, Any?> {
         val watched = q["watchedMs"] ?: 0
         val out = linkedMapOf<String, Any?>(
@@ -192,7 +193,8 @@ object Commit {
         pauseMs: Long = 0,
         caps: CapabilityView? = null,
         probeOk: Boolean? = null,
-        requested: Boolean = false
+        requested: Boolean = false,
+        signed: Boolean = true
     ): Map<String, Any?> {
         val v = decide(profile, plan, q, strength, mode, paused, pauseMs, caps, probeOk, requested)
         return linkedMapOf<String, Any?>(
@@ -202,12 +204,14 @@ object Commit {
             "due" to dueShape(v, plan, q),
             "tier" to v["tier"],
             "tierCeiling" to v["tierCeiling"],
-            "nextAction" to v["next_action"],
+            // 一份签过的约定都没有：下一步就是去把它立起来，界面上仍是 L1 那一行 + 常驻一栏（AGREE-01、AGREE-04）。
+            "nextAction" to if (!signed && v["due"] == null) "agreement" else v["next_action"],
             "wording" to v["wording"],
             "surface" to v["surface"],
             "fallbackReason" to v["fallbackReason"],
             "text" to textOf(v, plan, q),
-            "panels" to panelsOf(v, plan, q)
+            "panels" to panelsOf(v, plan, q) +
+                if (signed) emptyList() else listOf((commitState["panels"] as Map<String, String>).getValue("约定未立"))
         )
     }
 

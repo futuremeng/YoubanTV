@@ -6,11 +6,16 @@ AGREE-01:
   cases:
     - name: 装机后第一次打开，什么约定都没有，按默认跑
       when: {}
-      expect: {status: honored, defaultsOnly: true}
+      expect: {status: honored, defaultsOnly: true, nextAction: agreement, tier: L1}
     - name: 六步走到第三步也能用，只是条目还是默认的
       given: {agreementStep: 3}
       when: {}
-      expect: {status: honored, defaultsOnly: true}
+      expect: {status: honored, defaultsOnly: true, nextAction: agreement}
+    # 有一条到期项要做时，下一步仍是那件事——「没签」只加一栏常驻说明，不抢下一步、不抬档位（AGREE-04）。
+    - name: 已经有一条到期项要做，缺约定不抢下一步
+      given: {profile: "member:kid", graceMs: 1800000, moveFromMs: 3600000, watchedMs: 2400000}
+      when: {}
+      expect: {status: due, nextAction: quiz, tier: L2}
 
 AGREE-04:
   spec: [AGREE-04]

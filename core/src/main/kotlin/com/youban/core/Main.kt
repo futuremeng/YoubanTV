@@ -60,7 +60,9 @@ object Main {
             paused = job["paused"] as? Boolean ?: false,
             pauseMs = Day.num(job["pauseMs"] ?: 0),
             probeOk = job["probeOk"] as? Boolean,
-            requested = job["requested"] as? Boolean ?: false
+            requested = job["requested"] as? Boolean ?: false,
+            // 有没有一份签过的约定：比对器带过来；没带就看账里的 PLAN_SIGNED（AGREE-01）。
+            signed = job["signed"] as? Boolean ?: ledger.events.any { it.kind == "PLAN_SIGNED" }
         )
         return state
     }
