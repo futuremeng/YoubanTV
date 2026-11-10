@@ -233,6 +233,11 @@ predicates:
   # 扫描抓到也不红——顶层断言键才是真在看这一处（F33）。
   branchInForbiddenSites: {type: number}
   allowedBranchSites: {type: list}
+  # —— 页面清单那一处扫出来的数（PANEL-01、PANEL-02）：页名只由契约那张表答。
+  pageRefsUnresolved: {type: number} # 文档与契约里查不到的页名有几处
+  panelPages: {type: number} # 那张表里有几页
+  pageAnswersStated: {type: boolean} # 每一页都写明了它回答哪个问题
+  wherePagesResolve: {type: boolean} # 首启那句「要改去」的页名出自那张表
   # —— 计次那一条数出来的是什么（SENSE-01、F31）：三个数都由模型答，执行器不自己数。
   countedReps: {type: number}
   ambiguousReps: {type: number}
@@ -295,6 +300,7 @@ metricNames: [watchedMs, allowanceMs, graceMs, moveFromMs, pauseMs, overMs, roun
   ceilingApplied, poolSame, poolSize, evicted, httpStatus, endpoint, writeEndpoint, apiExists, writePathExists,
   commitStateTier,
   newEndpointNeeded, allowed, writable, allowedBranchSites, branchInForbiddenSites,
+  pageRefsUnresolved, panelPages, pageAnswersStated, wherePagesResolve,
   selfManagedFields, selfManagedMayLowerGrace, acknowledgementOnlyItems, humanAction,
   profileDomain, activeMemberProfile, eventProfile, eventSequenceOrder, inheritedWatchedMs,
   watchedRecorded, sessionsReconstructable, whereAccepted, motionRequired, playerPaused,

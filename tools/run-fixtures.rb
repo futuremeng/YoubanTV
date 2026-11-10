@@ -865,6 +865,11 @@ class World
       # 按受众的分支位点：这条扫描就是 PROFILE-02 那道 CI 门，断言与门读同一处（一条规则一处写）。
       'allowedBranchSites' => BRANCH_SITES,
       'branchInForbiddenSites' => branch_in_forbidden_sites,
+      # 页面清单：页名只由契约那张表答（PANEL-01、PANEL-02，与上面那条扫描同一个路子）。
+      'pageRefsUnresolved' => page_refs_unresolved,
+      'panelPages' => CONTRACT.dig('panel', 'pages').to_a.size,
+      'pageAnswersStated' => CONTRACT.dig('panel', 'pages').to_a.all? { |g| g['title'].to_s != '' && g['answers'].to_s != '' },
+      'wherePagesResolve' => where_pages_resolve,
       'selfManagedFields' => Core::Write.self_fields.size,
       'anyAudienceMayHold' => CONTRACT.dig('roles', 'anyAudienceMayHold') == true,
       'profileDomain' => CONTRACT.dig('enums', 'profileDomain', 'values'),
@@ -1840,6 +1845,34 @@ end
 
 def branch_in_forbidden_sites
   @branch_in_forbidden_sites ||= audience_branch_scan.size
+end
+
+# 页名与每页回答哪个问题，只在 contract.panel.pages 那一处（PANEL-01）。
+PAGE_TITLES = CONTRACT.dig('panel', 'pages').to_a.map { |g| g['title'].to_s }.freeze
+PAGE_REF = /「([\p{L}\p{N}][^」]{0,7})」(?:那一)?页/u.freeze # 首字符得是字或数字：省略号那种占位写法不算页名（\W 在 Ruby 里只管 ASCII，别拿它挡 CJK）
+
+def page_refs
+  where = []
+  sources = Dir[File.join(root, 'docs/**/*.md')] + Dir[File.join(root, 'spec/*.md')] +
+            [File.join(root, 'contract/contract.json')]
+  sources.sort.each do |f|
+    File.readlines(f).each_with_index do |line, i|
+      line.scan(PAGE_REF) { |(name)| where << [name.to_s, "#{File.basename(f)}:#{i + 1}"] unless PAGE_TITLES.include?(name.to_s) }
+    end
+  end
+  where
+end
+
+def page_refs_unresolved
+  page_refs.size
+end
+
+# 首启那句「要改去……」的页名出自那张表（PANEL-02）：一张表也没有就红，不许绿着空转。
+def where_pages_resolve
+  wheres = CONTRACT.dig('agreement', 'firstRun').to_a.map { |s| s['where'] }.compact
+  return false if wheres.empty?
+
+  wheres.all? { |w| w.scan(PAGE_REF).flatten.all? { |name| PAGE_TITLES.include?(name.to_s) } }
 end
 
 # 一个用例的稳定编号：簇 id 加序号，`.1` `.2` 这种是文档里的分档写法（README 的调用形式靠它）。

@@ -21,6 +21,7 @@
 | `CONTEXT` | 伴看上下文：取值边界、出网条件、出题时机 | [`CONTEXT.md`](CONTEXT.md) |
 | `LAYER` | 层的取值、默认层、升层与回退、措辞规则 | [`LAYER.md`](LAYER.md) |
 | `AUTO` | 自主性规则、协商强度与签署、主体权限、自管字段与查阅修订 | [`AUTONOMY.md`](AUTONOMY.md) |
+| `PANEL` | 面板的页面清单：页名只有一处、每页回答哪个问题、「要改去哪儿」的页名从这张表取 | [`PANEL.md`](PANEL.md) |
 | `ONBOARD` | 设备待确认清单：派生与装配差、随加入扩充、降级与再认证 | [`ONBOARD.md`](ONBOARD.md)（清单本体见 [`../docs/ONBOARDING.md`](../docs/ONBOARDING.md)） |
 | 隐私（无 id） | 数据存放与去向、出网清单、系统能力取值 | [`../docs/PRIVACY.md`](../docs/PRIVACY.md)——引用时写 `AUTO-11` / `CONTEXT-02` 或该页节号，**不得写 `PRIV-*`** |
 | ~~`GATE`~~ | 退役编号的迁移映射 | [`GATE.md`](GATE.md) |

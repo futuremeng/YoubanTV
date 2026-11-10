@@ -30,7 +30,7 @@
 | `tv.agree.slots` | 时段用途与边界 | 双方 | 面板「规则」页 / 学习页 | `PLAN_SIGNED` | 时段不生效，全天按约定线 | `DAY-08` |
 | `tv.egress.*` | AI 批 / AI 出题 / 伴看上下文 / 诊断导出 / HA 联动各一条 | `keyHolder` | 「隐私与出网」页（当场再认证） | 开关现值 + 再认证记录 | 一律 `off` | `ONBOARD-08`、`CONTEXT-01` |
 | `tv.role.holder` | 当前 `ruleEditor` 与 `keyHolder` 是谁 | 现任持有人 | 「家庭」页 + 对方自己的模式 | `ROLE_CHANGE` | 无 `ruleEditor` 时约定字段只读，放宽仍需签署 | `AUTO-09`、`AUTO-10` |
-| `tv.pack.license` | 每个已装内容包的许可与来源 | 无需成员 | 「内容包」页 | 包校验通过 + 许可清单在册 | 该包不取题 | `PACK-01`、D5 |
+| `tv.pack.license` | 每个已装内容包的许可与来源 | 无需成员 | 「内容库」页 | 包校验通过 + 许可清单在册 | 该包不取题 | `PACK-01`、D5 |
 | `tv.time.clockDrift` | 系统时间是否被改过 | 无需成员 | 「设备」页 | 单调时钟核对记录 | 当日不重放，只显示提示 | F11、`DAY-07` |
 | `tv.device.pair`（可选） | L5 外部设备配对 | `keyHolder` | 「设备」页 | 配对记录 + 能力摘要 | L5 条目 `notApplicable` | `COMMITMENTS.md §5` |
 

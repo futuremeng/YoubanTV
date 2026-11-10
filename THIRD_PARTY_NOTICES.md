@@ -13,6 +13,8 @@
 | 种子题库 `starter-cc0` | CC0（本项目原创） | 否，作为首个内容包 | 自建、可自由使用 |
 | 摄像头相关库 | 若引入必须 Apache/MIT 且**在 API 25 上可加载** | 待定 | 实测：MediaPipe Tasks 的 `.so` 在 Android 7.1 缺 API 26 locale 符号，`dlopen` 直接失败；引入前先跑可行性 spike |
 
+| 外部技能（本机的 agent skill）`mblode/agent-skills@product-design` | MIT | **否** | 开发期装在本机技能目录，只作产品判据（D75）；不进仓库、不进 APK、不参与判定 |
+
 明确**不使用**的东西：任何专有崩溃上报 SDK、任何第三方统计脚本、任何随仓库提交的 `.aar` / `.so` 二进制。
 历史上存在过的那类做法（仓库内放 AAR、页面加载第三方统计）在本项目里被 CI 门挡住。
 
