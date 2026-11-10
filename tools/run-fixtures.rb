@@ -1055,9 +1055,11 @@ class World
   # 断言侧要读派生视图里的少数几项（visibleOn 这类），走这个出口，别开内部变量。
   # 与快照同一份：extras 里那些「这一轮算出来的东西」也要能读到。
   # 有没有一份签过的约定：方案标了签过、账里有 PLAN_SIGNED，或某一组是签过的（AGREE-01）。
+  # 签没签是**按身份**算的（AGREE-08）： kid 签过不等于切到 dad 之后也有一份签过的约定。
   def plan_signed?
-    @plan_signed == true || @ledger.events.any? { |e| e.kind.to_s == 'PLAN_SIGNED' } ||
-      @plans.values.any? { |pl| pl['signed'] == true }
+    @plan_signed == true ||
+      @ledger.events.any? { |e| e.kind.to_s == 'PLAN_SIGNED' && e.profile.to_s == @profile.to_s } ||
+      @plans.dig(@profile, 'signed') == true
   end
 
   def derived
@@ -1291,6 +1293,26 @@ class World
     end
     @plan_snapshot[to] ||= @plan.dup
     switch_body(spec, to)
+  end
+
+  # 两端同源用的一条：把按身份各存的那几份方案摆进来，并按账里的 PROFILE_SWITCH 换到人（AGREE-08）。
+  # 不这么读，设备切到了 dad、Mac 这边还拿 kid 的方案算——那是比对器的错，不是内核的分歧。
+  def load_plans(plans)
+    plans.each do |who, plan|
+      base = Core::Day.plan(audience: plan['audience'] || default_audience(who), day_type: @day_type, overrides: {})
+      base.merge!(plan)
+      @plans[who] = base
+    end
+    @plan = @plans[@profile] if @plans.key?(@profile)
+    @plan_signed = !!@plan['signed'] if @plan.key?('signed')
+  end
+
+  def activate(to)
+    return if to == @profile
+
+    @profile = to
+    @plan = @plans[to] if @plans.key?(to)
+    @plan_signed = !!@plan['signed'] if @plan.key?('signed')
   end
 
   def switch_body(spec, to)

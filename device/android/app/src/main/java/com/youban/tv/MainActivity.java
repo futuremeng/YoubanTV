@@ -38,6 +38,7 @@ public class MainActivity extends Activity {
     static final String STATE_NAME = "youban-state.json";
     /** 遥控器按键落在这儿：设备测试从 adb 读回它，验「按键真的到了设备」。 */
     static final String INPUT_NAME = "youban-input.json";
+    static final String PROFILE_NAME = "youban-profile.txt";
     /** 公共目录做兜底：装了存储权限的开发机可以 adb push 到那儿直接看效果。 */
     static final String PUBLIC_DIR = "/sdcard/Download";
 
@@ -47,6 +48,7 @@ public class MainActivity extends Activity {
     // static 是有意的：广播用 CLEAR_TOP 起Activity 时可以另起一个实例，实例字段会让按键落到
     // 另一个实例上、看到的是自己那份旧结论（真机上就是「按键像没被听见」，见 F22）。
     private static String displayed = null;
+    private int rosterIndex = 0; // 换那一屏的光标在第几档（名单由内核从账里给）
     private boolean noPlan = false; // 这台设备还没存过约定方案（AGREE-13）
     private TextView sentence;
     private TextView badge;
@@ -132,7 +134,7 @@ public class MainActivity extends Activity {
                 key = "prev";
                 break;
             case KeyEvent.KEYCODE_INFO:
-                key = "about";
+                key = "switch"; // 换这一档：这一屏只挑人，改不了任何约定（AGREE-08）
                 break;
             default:
                 break;
@@ -142,6 +144,10 @@ public class MainActivity extends Activity {
         }
         if (setupPlan != null) {
             setupKey(key);
+            return true;
+        }
+        if ("switch".equals(key)) {
+            switchKey();
             return true;
         }
         record(key);
@@ -211,7 +217,7 @@ public class MainActivity extends Activity {
         }
         String screen = Kernel.setupScreen(setupPlan, setupIndex,
                 Kernel.signingVersion(eventsOrEmpty()), false);
-        if (!screen.contains("\"last\":true")) {
+        if (!flag(screen, "last")) {
             setupIndex++;
             renderSetup();
             return;
@@ -363,6 +369,53 @@ public class MainActivity extends Activity {
     }
 
     /** 账还没有第一条的时候交 ""，不交 null：Kotlin 那边这个参数是非空的（真机上就这么炸过一次，见 F22）。 */
+    // 换这一档：切过去加载那一组的方案与版本（AGREE-08）。壳层不判谁签过——那一屏的内容也是内核给的。
+    private boolean rosterOn = false;
+
+    private void renderSwitch() {
+        String screen = Kernel.rosterScreen(planJsonOrEmpty(), eventsOrEmpty(), profile(), rosterIndex);
+        sentence.setText(array(screen, "lines"));
+        panels.setText(field(screen, "head", ""));
+        badge.setText("换这一档");
+        foot.setText(field(screen, "foot", "") + " · 名单从设备上的事件账里读，不在这里编（PROFILE-01）");
+        write(path(this, "youban-setup-screen.json", true), screen);
+        dumpCodepoints(sentence.getText().toString());
+    }
+
+    private void switchKey() {
+        if (!rosterOn) {
+            rosterOn = true;
+            rosterIndex = 0;
+            renderSwitch();
+            return;
+        }
+        String screen = Kernel.rosterScreen(planJsonOrEmpty(), eventsOrEmpty(), profile(), rosterIndex);
+        if (flag(screen, "changed")) {
+            // 切换是一条事件，不改任何约定：切过去之后那一组显示什么，由内核按那一组的方案算（AGREE-08）。
+            String target = field(screen, "target", profile());
+            append(path(this, EVENTS_NAME, true), "{\"kind\":\"PROFILE_SWITCH\",\"profile\":\"" + target
+                    + "\",\"fields\":{},\"from\":\"" + profile() + "\",\"to\":\"" + target + "\"}");
+            write(path(this, PROFILE_NAME, true), target);
+            rosterOn = false;
+            render();
+            return;
+        }
+        // 光标还停在当前这一档：←→ 先挪到另一档，确认键才切。
+        rosterIndex = rosterIndex == 0 ? 1 : 0;
+        renderSwitch();
+    }
+
+    private String planJsonOrEmpty() {
+        String plan = read(planPath());
+        return plan == null ? "{}" : plan;
+    }
+
+    /** 方案按身份各存一份；没有那一份就退到旧的那一份，再退到契约那张默认表（AGREE-13）。 */
+    private String planPath() {
+        String named = path(this, PLAN_NAME.replace(".json", "") + "-" + profile().replace(":", "_") + ".json", false);
+        return new java.io.File(named).exists() ? named : path(this, PLAN_NAME, false);
+    }
+
     private String eventsOrEmpty() {
         String events = read(path(this, EVENTS_NAME, false));
         return events == null ? "" : events;
@@ -621,6 +674,14 @@ public class MainActivity extends Activity {
             }
         }
         return sb.toString();
+    }
+
+    /**
+     * 布尔得用布尔的读法。field() 只认字符串，读布尔一律退回兜底——同一类坑在「最后一屏」上
+     * 犯过一次（F23），换这一档时又犯了一次：确认键永远切不过去。所以别再拿 field() 读 true/false。
+     */
+    static boolean flag(String json, String key) {
+        return json.contains("\"" + key + "\":true");
     }
 
     static String field(String json, String key, String fallback) {

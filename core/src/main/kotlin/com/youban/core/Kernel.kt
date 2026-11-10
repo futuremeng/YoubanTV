@@ -8,6 +8,48 @@ package com.youban.core
  */
 object Kernel {
     /** 契约的位置：设备端指一次，setup/nextPlan 这些也走它。 */
+    /**
+     * 换这一档的那一屏：这一台设备上见过谁来用，是从账里读出来的（契约 agreement.perProfile.rosterSource）——
+     * 设备上没有成员表，名字也不在这儿编（PROFILE-01）。每一档带着它的版本与签没签（AGREE-08）。
+     */
+    @JvmStatic
+    fun rosterScreen(planJson: String, eventsJson: String, current: String, index: Long): String {
+        val node = Json.parse(java.io.File(contractPathFile()).readText()) as Map<*, *>
+        val ui = ((node["agreement"] as Map<*, *>)["ui"] as Map<*, *>).mapKeys { it.key.toString() }
+        val events = eventsJson.lineSequence().map { it.trim() }.filter { it.startsWith("{") }
+            .mapNotNull { Json.parse(it) as? Map<*, *> }.filter { it["profile"] != null }.toList()
+        val roster = ArrayList<String>()
+        if (!roster.contains(current)) roster.add(current)
+        events.forEach { e ->
+            val who = e["profile"].toString()
+            if (!roster.contains(who)) roster.add(who)
+        }
+        val lines = ArrayList<String>()
+        roster.forEach { who ->
+            val signed = events.lastOrNull { it["kind"] == "PLAN_SIGNED" && it["profile"] == who }
+            val state = if (signed == null) "未签·按默认" else "已签"
+            val version = if (signed == null) {
+                "v—"
+            } else {
+                "v" + (((signed["fields"] as? Map<*, *>)?.get("version")) ?: 1).toString().removeSuffix(".0")
+            }
+            lines.add(ui["switchRow"].toString().replace("{profile}", who).replace("{state}", state)
+                .replace("{version}", version))
+        }
+        val target = roster.getOrElse(index.toInt().coerceIn(0, roster.size - 1)) { roster.last() }
+        return Json.write(linkedMapOf<String, Any?>(
+            "lines" to lines,
+            "title" to ui["switchDo"],
+            "head" to ui["switchHeader"].toString().replace("{from}", current).replace("{to}", target),
+            "foot" to ui["switchHint"],
+            "target" to target,
+            "current" to current,
+            "changed" to (target != current)
+        ))
+    }
+
+    private fun contractPathFile(): String = Day.contractPath
+
     private val contractPath get() = Day.contractPath
     /** 契约路径在 Android 上没法用相对路径，装包时由界面层指一次。 */
     @JvmStatic
@@ -51,7 +93,9 @@ object Kernel {
         val paused = settled.isNotEmpty()
         val pauseMs = settled.sumOf { it.fields["pauseMs"] ?: 0 }
         // 有没有一份签过的约定：设备端看账里的 PLAN_SIGNED；比对器把这一轮的方案状态直接带过来（AGREE-01）。
-        val hasSignature = signed ?: ledger.events.any { it.kind == "PLAN_SIGNED" }
+        // 签没签按身份算：kid 签过不代表切到 dad 之后也有一份签过的约定（AGREE-08）。
+        val hasSignature = signed
+            ?: ledger.events.any { it.kind == "PLAN_SIGNED" && it.profile == profile }
         // 挂着一条要受理的动议：提过、没受理、之后也没落定（AUTO-03、D34）。设备端的确认键只看这个。
         val unanswered = ledger.events.filter { it.kind == "MOTION_UNANSWERED" && it.profile == profile }
         val settledKinds = ledger.events.filter { it.kind == "MOTION_SETTLED" && it.profile == profile }

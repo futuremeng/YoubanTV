@@ -1115,7 +1115,9 @@
     "perProfile": {
       "x-note": "约定按身份各立一组： PROFILE_SWITCH 之后加载那一组的 plan/版本/签署记录，互不影响（AGREE-08）。",
       "loadOnSwitch": "已有该身份的约定 → 直接加载生效版本；没有 → 走 firstRun 那六步（设备条目不重复问）。",
-      "independent": "一份约定的收紧不影响另一份；共意条目的对方可以不同。"
+      "independent": "一份约定的收紧不影响另一份；共意条目的对方可以不同。",
+      "rosterSource": "电视上的这一台设备认得出谁来用：账里出现过的人（PROFILE_SWITCH / PLAN_SIGNED / 任何带 profile 的事件）＋当前这一档。名字不在设备上编（PROFILE-01）。",
+      "planStore": "每台设备按身份各存一份方案文件；没有那一份就先按契约那张默认表垫底，界面上写明（AGREE-13）。切过去之后加载那一组的版本与签署状态（AGREE-08）。"
     },
     "never": [
       "时长兑换成题目数或反过来（D24、D31）",
@@ -1157,7 +1159,11 @@
       "noteOnly": "这一步没有要选的 · {note}",
       "sign": "确认后写入这一份约定（v{version}）",
       "signing": "已写入 v{version}",
-      "leave": "没走完也一样能用，条目按默认跑（AGREE-06）"
+      "leave": "没走完也一样能用，条目按默认跑（AGREE-06）",
+      "switchHeader": "换这一档 · {from} → {to}",
+      "switchRow": "{profile} · {state} · {version}",
+      "switchHint": "←→ 选另一档 · 确认键切过去 · 返回不切",
+      "switchDo": "切换身份"
     }
   }
 }

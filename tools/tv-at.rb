@@ -45,6 +45,26 @@ def broadcast(args, extra)
             '-a', 'com.youban.STATE', *extra], err: %i[child out], &:read).to_s
 end
 
+# 设备上按身份各存一份方案；没存过的那一档退到公共那一份（AGREE-13）——Mac 这边要喂同样的输入。
+def device_plans(args)
+  legacy_raw = shell(args, "cat #{APK_FILES}/youban-plan.json").gsub(/\r\n?/, '')[/\{.*\}/]
+  legacy = legacy_raw ? JSON.parse(legacy_raw) : nil
+  who = shell(args, "cat #{APK_FILES}/youban-profile.txt").to_s[/member:\S+/].to_s.strip
+  plans = {}
+  listing = shell(args, "ls #{APK_FILES}").to_s
+  listing.each_line do |name|
+    next unless name =~ /youban-plan-member_(\w+)\.json/
+
+    raw = shell(args, "cat #{APK_FILES}/#{name.strip}").gsub(/\r\n?/, '')[/\{.*\}/]
+    plans["member:#{$1}"] = JSON.parse(raw) if raw
+  end
+  roster = plans.keys + [who.empty? ? nil : who].compact
+  roster.each { |k| plans[k] ||= legacy } if legacy
+  plans
+rescue JSON::ParserError
+  {}
+end
+
 def device_state(args)
   raw = shell(args, "cat #{APK_FILES}/youban-state-out.json").gsub(/\r\n?/, '')[/\{.*\}/]
   raw && JSON.parse(raw)
@@ -198,6 +218,8 @@ SEED_EVENTS = [['WATCHED', 3_600_000]].freeze
 def probe_state(args)
   shell(args, "am force-stop #{APK_PACKAGE}")
   shell(args, "rm -f #{APK_FILES}/#{EVENTS_FILE}")
+  # 这一道自己声明输入：账清空了就把「现在是哪一档」也摆回去——前一道自检（换这一档）会把它留在别人身上。
+  shell(args, "echo member:kid > #{APK_FILES}/youban-profile.txt")
   shell(args, "am start -n #{APK_PACKAGE}/.MainActivity")
   sleep 2
   SEED_EVENTS.each do |kind, ms|
@@ -208,7 +230,7 @@ def probe_state(args)
   events = shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}").gsub(/\r/, '')
   return [false, '设备上没有事件账，算不出结论'] if events.strip.empty?
 
-  mine = KernelFromEvents.call(events)
+  mine = KernelFromEvents.call(events, device_plans(args))
   return [false, "Mac 这边的规范模型没出结论：#{mine}"] unless mine.is_a?(Hash)
 
   theirs_raw = (shell(args, "cat #{APK_FILES}/youban-state-out.json").gsub(/\r\n?/, ''))[/\{.*\}/]
@@ -293,7 +315,8 @@ def probe_key(args)
     return [false, "受理后结论没跟着变：#{after['status']} · #{after['tier']}"]
   end
 
-  mine = KernelFromEvents.call(ledger)
+  mine = KernelFromEvents.call(ledger, device_plans(args))
+  return [false, "Mac 这边的规范模型没出结论：%s" % mine] unless mine.is_a?(Hash)
   fields = JSON.parse(File.read(File.join(ROOT, 'contract/contract.json')))['commitState']['fields']
   diff = fields.reject { |k| JSON.parse(JSON.generate(mine[k] || mine[k.to_sym])) == after[k] }
   return [false, "按键之后的结论与规范模型不同：#{diff.join(', ')}"] unless diff.empty?
@@ -338,7 +361,8 @@ def probe_setup(args)
     return [false, "签过了那一栏还在：#{after['panels'].inspect}"]
   end
 
-  mine = KernelFromEvents.call(ledger)
+  mine = KernelFromEvents.call(ledger, device_plans(args))
+  return [false, "Mac 这边的规范模型没出结论：%s" % mine] unless mine.is_a?(Hash)
   fields = JSON.parse(File.read(File.join(ROOT, 'contract/contract.json')))['commitState']['fields']
   diff = fields.reject { |k| JSON.parse(JSON.generate(mine[k] || mine[k.to_sym])) == after[k] }
   return [false, "签完之后与规范模型不同：#{diff.join(', ')}"] unless diff.empty?
@@ -346,10 +370,63 @@ def probe_setup(args)
   [true, "六步走完写了 PLAN_SIGNED(v1)（#{pressed} 下确认键），"         "签过之后 #{fields.size} 个字段与规范模型逐位相同，那一栏消失了"]
 end
 
+# 换这一档在真机上是一条事件加一组约定的加载：另一档没签过，下一步又回到立约定（AGREE-08、AGREE-09）。
+def probe_switch(args)
+  return [false, '没装 com.youban.tv：先 sh device/android/build-apk.sh && adb install -r'] if
+    shell(args, "pm list packages #{APK_PACKAGE}").strip.empty?
+
+  shell(args, "am force-stop #{APK_PACKAGE}")
+  shell(args, "rm -f #{APK_FILES}/#{EVENTS_FILE} #{APK_FILES}/youban-plan*.json #{APK_FILES}/youban-profile.txt")
+  shell(args, 'input keyevent 224')
+  shell(args, "am start -n #{APK_PACKAGE}/.MainActivity")
+  sleep 3
+  [['WATCHED', 'member:kid', '--el ms 1800000'],
+   ['PLAN_SIGNED', 'member:kid', '--el version 3'],
+   ['WATCHED', 'member:dad', '--el ms 600000']].each do |kind, who, extra|
+    broadcast(args, ['--es', 'kind', kind, '--es', 'profile', who] + extra.split(' '))
+    sleep 1
+  end
+  before = device_state(args)
+  return [false, '起屏没出结论'] unless before
+  return [false, "起屏该在 #{before['activeProfile']}"] unless before['activeProfile'].to_s.end_with?('kid')
+
+  # INFO 打开那一屏 → INFO 挪到另一档 → INFO 切过去（壳层上确认键只管选与签）。
+  3.times do
+    shell(args, 'input keyevent 165') # INFO：开那一屏 → 挪到另一档 → 切过去
+    sleep 1
+  end
+  ledger = shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}")
+  return [false, '换这一档没落 PROFILE_SWITCH'] unless ledger.include?('PROFILE_SWITCH')
+  unless ledger.include?('"to":"member:dad"')
+    return [false, "PROFILE_SWITCH 没写到另一档：#{ledger.lines.last.to_s.strip}"]
+  end
+
+  after = device_state(args)
+  return [false, '切过去之后设备没重算出结论'] unless after
+  unless after['activeProfile'].to_s.end_with?('dad')
+    return [false, "切了但这一屏还是 #{after['activeProfile'].inspect}"]
+  end
+  unless after['nextAction'].to_s == 'agreement'
+    return [false, "另一档没签过，下一步该指回立约定：#{after['nextAction'].inspect}"]
+  end
+  unless Array(after['panels']).any? { |x| x.to_s.include?('未签') }
+    return [false, "另一档没签过却没有那一栏：#{after['panels'].inspect}"]
+  end
+
+  mine = KernelFromEvents.call(ledger, device_plans(args))
+  return [false, "Mac 这边的规范模型没出结论：%s" % mine] unless mine.is_a?(Hash)
+  fields = JSON.parse(File.read(File.join(ROOT, 'contract/contract.json')))['commitState']['fields']
+  diff = fields.reject { |k| JSON.parse(JSON.generate(mine[k] || mine[k.to_sym])) == after[k] }
+  return [false, "切过去之后与规范模型不同：#{diff.join(', ')}"] unless diff.empty?
+
+  [true, "PROFILE_SWITCH 落账→加载那一组：kid 签过的不算 dad 签的，下一步回到立约定，" \
+        "#{fields.size} 个字段与规范模型逐位相同"]
+end
+
 PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text),
            'glyphs' => method(:probe_glyphs), 'state' => method(:probe_state),
            'apk' => method(:probe_apk), 'key' => method(:probe_key),
-           'setup' => method(:probe_setup) }.freeze
+           'setup' => method(:probe_setup), 'switch' => method(:probe_switch) }.freeze
 
 args = parse_args(ARGV)
 if args[:facts]

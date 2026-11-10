@@ -59,6 +59,18 @@ AGREE-09:
   spec: [AGREE-09]
   given: {profile: "member:kid"}
   cases:
-    - name: 切到还没有约定的身份 → 走同样的六步，从第一步开始
+    - name: 切到还没有约定的身份 → 下一步又是立约定，按默认跑
+      given: {plans: {"member:kid": {version: 3, signed: true, allowanceMs: 3600000}}}
       when: {switchTo: "member:mom"}
-      expect: {defaultsOnly: true}
+      expect: {defaultsOnly: true, nextAction: agreement}
+    # kid 签过不等于切到 dad 之后也有一份签过的约定——按身份算（AGREE-08）。
+    - name: 另一档签过了不算这一档签过
+      given: {plans: {"member:kid": {version: 3, signed: true, allowanceMs: 3600000},
+                      "member:dad": {version: 1, signed: false, allowanceMs: 7200000}}}
+      when: {switchTo: "member:dad"}
+      expect: {nextAction: agreement}
+    - name: 那一档本来就签过 → 切过去不用再立
+      given: {plans: {"member:kid": {version: 3, signed: true, allowanceMs: 3600000},
+                      "member:dad": {version: 1, signed: true, allowanceMs: 7200000}}}
+      when: {switchTo: "member:dad"}
+      expect: {status: honored, defaultsOnly: false}

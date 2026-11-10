@@ -30,6 +30,13 @@ object Main {
             ?: error("任务不是一份 JSON 对象：${text.take(60)}")
         // --kernel：走设备端那一条入口（Kernel.state），不是 align 那条（Main.run）。
         // 两条入口对「没存过方案」的处理以前不一样，这条入口以前没人测过——所以留着它。
+        if (args.contains("--roster")) {
+            Commit.useContract(job["contract"].toString())
+            println(Kernel.rosterScreen(Json.write(job["plan"] as? Map<*, *> ?: emptyMap<String, Any>()),
+                (job["events"] as? List<*> ?: emptyList<Any?>()).joinToString("\n") { Json.write(it as Map<*, *>) },
+                job["profile"].toString(), Day.num(job["index"] ?: 0)))
+            return
+        }
         if (args.contains("--setup")) {
             Commit.useContract(job["contract"].toString())
             println(Kernel.setupScreen(Json.write(job["plan"] as? Map<*, *> ?: emptyMap<String, Any>()),
