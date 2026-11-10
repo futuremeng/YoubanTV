@@ -98,6 +98,13 @@ class World
     @invitations_today = given['invitationsToday'] || 0
     @used << 'invitationsToday' if given.key?('invitationsToday')
     @notify_suppressed = false
+    # 老人那几类动作项目的三个输入（SENSE-05）：safety 有没有、项目表、这一次多久。
+    @project_safety = given['projectSafety']
+    @used << 'projectSafety' if given.key?('projectSafety')
+    @project_tasks = given['exerciseTasks']
+    @used << 'exerciseTasks' if given.key?('exerciseTasks')
+    @project_session_ms = given['sessionMs'] || 0
+    @used << 'sessionMs' if given.key?('sessionMs')
     @used << 'profile' if given.key?('profile')
     @strength = given['strength'] || 'negotiated'
     @used << 'strength' if given.key?('strength')
@@ -267,6 +274,7 @@ class World
     @ledger.events.each { |e| e.fields[:version] ||= @running_version }
     apply_calibration!
     refresh_invite!
+    refresh_project!
     @verdict = decide
     snapshot
   end
@@ -581,6 +589,29 @@ class World
   # 标过但没过线，这条通路就是 unknown，不能当它可用（SENSE-02、SENSE-04）。
   # 邀请这一条只由 Core::Sense.invite 答（SENSE-07）；这一轮的动作若说不推，就不推（D34）。
   # 以前这里是三处 @extras['notify'] = 'none'——那是把「不推」当常量写，邀请那一档从来没被答过。
+  # 项目安不安全、能练多久，只由 Core::Sense.project 答（SENSE-05）。
+  # 缺 safety 不是按默认跑：这一项无效，退回通用目标，并且把这个事实在屏上说出来。
+  def refresh_project!
+    return if @project_safety.nil? # 这一轮没问项目这一条：不去答，也不去盖别人的答案（D41）
+
+    pr = Core::Sense.project(safety: @project_safety, tasks: Array(@project_tasks),
+                             session_ms: @project_session_ms, rounds: @ledger.project(@profile)['roundsDone'])
+    pr.each { |k, v| @extras[k] = v unless v.nil? }
+    return if pr['projectValid'] == false && @project_safety.nil?
+
+    unless pr['projectValid']
+      @external_allowed = false
+      @shown << '通用目标（该项目缺安全说明）'
+      return
+    end
+    @shown << pr['promptName'] if pr['promptCount'].to_i.positive?
+    return unless pr['allowed'] == false
+
+    # 达当日轮数上限：不再邀请，也不再排新的组（SENSE-05）。两个都听模型的，这里不再各判一次。
+    @notify_suppressed = pr['notify'] == 'none'
+    @external_allowed = false
+  end
+
   def refresh_invite!
     inv = Core::Sense.invite(tier: @invite_tier, declined: @invite_declined, today: @invitations_today)
     @invite_view = inv
@@ -788,7 +819,6 @@ class World
       'uiComputesVerdict' => false,
       'probeSampleCount' => Core::Sense::SELF_TEST_ATTEMPTS,
       'falseCountMax' => Core::Sense::FALSE_COUNT_MAX,
-      'writable' => false,
       'item' => @item ? "#{@item}:#{checklist_status(@item)}" : nil,
       'capabilityState' => @capability,
       # 「每项能力必须登记当前层」——措辞与判定读的都是登记表这一份（LAYER-01）。

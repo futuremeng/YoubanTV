@@ -16,6 +16,34 @@ module Core
     # 邀请这一条只由这一处答（SENSE-07）：档位决定频率，quiet 不主动邀请；
     # 拒绝只让本档内不再邀请——不改档位、不减次数、也不参与任何「今天表现」的记录。
     # 在场形态与它无关：presence 不进这里的任何一支。
+    # 老人那几类动作项目安不安全、能练多久，只由这一处答（SENSE-05）。
+    # safety 缺了不是「按默认跑」，是这一项无效：无效就退回通用目标，且把这个事实显示出来。
+    SAFETY = CONTRACT.fetch('sense').fetch('exerciseSafety')
+    def self.project(safety:, tasks: [], session_ms: 0, rounds: 0)
+      cap_s = SAFETY.fetch('sessionCapMs')
+      cap_d = SAFETY.fetch('dailyCapMs')
+      valid = safety.to_s != 'missing'
+      row = {
+        'projectValid' => valid,
+        'fallbackApplied' => !valid,
+        'sessionCapMs' => cap_s, 'dailyCapMs' => cap_d,
+        'sessionCapped' => session_ms.to_i > cap_s,
+        'promptCount' => SAFETY.dig('prompt', 'times'),
+        'promptName' => SAFETY.dig('prompt', 'name'),
+        'dailyInviteCap' => INVITE.fetch('dailyCap'),
+        'roundsDone' => rounds.to_i,
+        'notify' => nil
+      }
+      return row unless valid
+
+      balance = Array(tasks).any? { |t| SAFETY.fetch('balanceKinds').include?(t.is_a?(Hash) ? t['safety'].to_s : t.to_s) }
+      row['balanceKind'] = balance
+      # 达当日轮数上限后不再邀请：这条走的是同一个开关，不另立一个数字（SENSE-05、SENSE-07）。
+      row['notify'] = rounds.to_i >= INVITE.fetch('dailyCap').to_i ? 'none' : nil
+      row['allowed'] = rounds.to_i < INVITE.fetch('dailyCap').to_i
+      row
+    end
+
     def self.invite(tier:, declined: false, today: 0)
       t = tier.to_s
       row = INVITE.fetch('tiers').fetch(t) do

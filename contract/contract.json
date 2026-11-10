@@ -1279,6 +1279,25 @@
       "spec": [
         "SENSE-07"
       ]
+    },
+    "exerciseSafety": {
+      "x-note": "老人那几类动作项目的安全约束只在契约里答一次（SENSE-05）：safety 字段是必填项，缺了项目就无效；平衡与单腿类的上限是硬性的，不在界面上调。",
+      "requiredField": "safety",
+      "balanceKinds": [
+        "seatedStart",
+        "singleLeg",
+        "balance"
+      ],
+      "sessionCapMs": 300000,
+      "dailyCapMs": 900000,
+      "prompt": {
+        "name": "支撑物提示",
+        "times": 1,
+        "where": "设备端可确认"
+      },
+      "spec": [
+        "SENSE-05"
+      ]
     }
   }
 }
