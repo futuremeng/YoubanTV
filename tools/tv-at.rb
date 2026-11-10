@@ -16,6 +16,8 @@
 #   ruby tools/tv-at.rb --serial=… --keep-facts                 # 顺手把读到的事实写进 facts 那份样本
 require 'digest'
 require 'json'
+require 'tmpdir'
+require 'fileutils'
 require 'yaml'
 require 'fileutils'
 require 'shellwords'
@@ -609,11 +611,66 @@ rescue JSON::ParserError
   nil
 end
 
+# 那一屏只读的条目（AGREE-14）：设备上的内核给的字，与 Mac 上规范模型逐字相同；
+# 打开这一屏不写账，契约 agreement.panel.never 那些词一个都不许出现。
+def probe_panel(args)
+  return [false, '没装 com.youban.tv：先 sh device/android/build-apk.sh && adb install -r'] if
+    shell(args, "pm list packages #{APK_PACKAGE}").strip.empty?
+
+  shell(args, "am force-stop #{APK_PACKAGE}")
+  shell(args, "rm -f #{APK_FILES}/#{EVENTS_FILE} #{APK_FILES}/youban-plan*.json #{APK_FILES}/youban-panel.json")
+  shell(args, "echo member:kid > #{APK_FILES}/youban-profile.txt")
+  shell(args, 'input keyevent 224')
+  shell(args, "am start -n #{APK_PACKAGE}/.MainActivity")
+  sleep 3
+  [['WATCHED', 'member:kid', '--el ms 600000'],
+   ['PLAN_SIGNED', 'member:kid', '--el version 3']].each do |kind, who, extra|
+    broadcast(args, ['--es', 'kind', kind, '--es', 'profile', who] + extra.split(' '))
+    sleep 1
+  end
+  ledger_before = shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}").gsub(/\r\n?/, '')
+
+  shell(args, 'input keyevent 176') # SETTINGS：那一屏只读的条目
+  sleep 2
+  raw = shell(args, "cat #{APK_FILES}/youban-panel.json").gsub(/\r\n?/, '')[/\{.*\}/]
+  return [false, '没读到 youban-panel.json：那一屏没出来'] if raw.nil?
+  mine = JSON.parse(raw)
+
+  File.write(File.join(Dir.tmpdir, 'youban-panel-events.jsonl'), ledger_before)
+  File.write(File.join(Dir.tmpdir, 'youban-panel-plans.json'), JSON.generate(device_plans(args)))
+  out = IO.popen(['ruby', File.join(ROOT, 'tools/panel-from-events.rb'),
+                  File.join(Dir.tmpdir, 'youban-panel-events.jsonl'),
+                  File.join(Dir.tmpdir, 'youban-panel-plans.json'), 'member:kid'],
+                 err: %i[child out], &:read)
+  return [false, "Mac 这边那一屏跑挂了：#{out.lines.last.to_s.strip}"] unless $?.success?
+  theirs = JSON.parse(out)
+  diff = %w[title lines foot never].reject { |k| mine[k] == theirs[k] }
+  return [false, "那一屏与规范模型不同（#{diff.join(', ')}）：#{mine['lines'].inspect}"] unless diff.empty?
+
+  never = theirs['never'].to_a
+  # 只扫屏上看得见的字：never 那一张表本身也在这份 JSON 里，把它也算进去等于自己抓自己（今天就是这样）。
+  visible = [mine['title'], mine['lines'], mine['foot']]
+  hit = never.select { |w| JSON.generate(visible).include?(w.to_s) }
+  return [false, "那一屏上出现了不许有的词：#{hit.join('、')}"] if hit.any?
+  # 界面上真正摆出来的那批码位也要扫一遍：记录里没有、界面上自己加上去的那句，只有这一路抓得到（D54）。
+  cps = shell(args, "cat #{APK_FILES}/youban-diag.json").gsub(/\r\n?/, '')[/"cps":\[([^\]]*)\]/, 1].to_s
+  rendered = cps.split(',').map { |h| [h.gsub(/[\"\s]/, '').hex].pack('U*') }.join
+  return [false, '界面上摆出来的字与记录不同（壳层自己加了一句）' ] if rendered.empty?
+  hit2 = never.select { |w| rendered.include?(w.to_s) }
+  return [false, "界面上自己加了不许有的词：#{hit2.join('、')}"] if hit2.any?
+
+  after = shell(args, "cat #{APK_FILES}/#{EVENTS_FILE}").gsub(/\r\n?/, '')
+  return [false, '打开那一屏往账里写了东西'] unless after == ledger_before
+
+  [true, "#{mine['lines'].size} 行与规范模型逐字相同；#{never.size} 个不许有的词一个没出现；开这一屏账里一个字没多"]
+end
+
 PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text),
            'glyphs' => method(:probe_glyphs), 'state' => method(:probe_state),
            'apk' => method(:probe_apk), 'key' => method(:probe_key),
            'setup' => method(:probe_setup), 'switch' => method(:probe_switch),
-           'overlay' => method(:probe_overlay) }.freeze
+           'overlay' => method(:probe_overlay),
+           'panel' => method(:probe_panel) }.freeze
 
 args = parse_args(ARGV)
 if args[:facts]

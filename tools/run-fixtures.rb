@@ -1828,9 +1828,10 @@ def audience_branch_scan
       next unless line =~ /\baudience\b/
       next if line =~ %r{^\s*(//|/\*|\*|#)} # 注释与文档句不算位点
 
-      # 标记要么写在这一行上，要么写在它上面三行之内：只往回看，不许往前看（往前看等于让后面某处
-      # 一句标记把整片都洗白——反证「删掉一处标记」就是这么暴露的）。
-      back = lines[[i - 3, 0].max...i].count { |l| l =~ AUDIENCE_SITE_MARK }
+      # 标记要么写在这一行上，要么往回看五行之内——只往回看，不许往前看（往前看等于让后面某处
+      # 一句标记把整片都洗白，反证「删掉一处标记」就是这么暴露的）。三行太紧：函数里加两行
+      # 说明就把自己钉的位点洗没了（这一条今天就是这样撞上的），五行还留着「换个函数就藏不住」这条约束。
+      back = lines[[i - 5, 0].max...i].count { |l| l =~ AUDIENCE_SITE_MARK }
       bad << "#{File.basename(f)}:#{i + 1}" if back.zero? && line !~ AUDIENCE_SITE_MARK
     end
   end

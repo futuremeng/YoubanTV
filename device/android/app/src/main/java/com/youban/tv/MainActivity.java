@@ -40,7 +40,8 @@ public class MainActivity extends Activity {
     static final String INPUT_NAME = "youban-input.json";
     static final String PROFILE_NAME = "youban-profile.txt";
     static final String PROBE_NAME = "youban-probe.json";
-    static final String OVERLAY_NAME = "youban-overlay.json"; // 那一张到底出没出、落在哪儿：设备自检第 9 道读它 // 上一次到前台是什么时候：证据不过期那一条的凭据（ONBOARD-07）
+    static final String OVERLAY_NAME = "youban-overlay.json";
+    static final String PANEL_NAME = "youban-panel.json"; // 那一屏只读的条目：设备自检第 10 道读它 // 那一张到底出没出、落在哪儿：设备自检第 9 道读它 // 上一次到前台是什么时候：证据不过期那一条的凭据（ONBOARD-07）
     /** 公共目录做兜底：装了存储权限的开发机可以 adb push 到那儿直接看效果。 */
     static final String PUBLIC_DIR = "/sdcard/Download";
 
@@ -194,6 +195,9 @@ public class MainActivity extends Activity {
             case KeyEvent.KEYCODE_INFO:
                 key = "switch"; // 换这一档：这一屏只挑人，改不了任何约定（AGREE-08）
                 break;
+            case KeyEvent.KEYCODE_SETTINGS:
+                key = "panel"; // 那一屏只读的条目（AGREE-14）：没有按钮，也不写账
+                break;
             default:
                 break;
         }
@@ -206,6 +210,10 @@ public class MainActivity extends Activity {
         }
         if ("switch".equals(key)) {
             switchKey();
+            return true;
+        }
+        if ("panel".equals(key)) {
+            panelKey();
             return true;
         }
         record(key);
@@ -439,6 +447,7 @@ public class MainActivity extends Activity {
     /** 账还没有第一条的时候交 ""，不交 null：Kotlin 那边这个参数是非空的（真机上就这么炸过一次，见 F22）。 */
     // 换这一档：切过去加载那一组的方案与版本（AGREE-08）。壳层不判谁签过——那一屏的内容也是内核给的。
     private boolean rosterOn = false;
+    private boolean panelOn = false;
 
     private void renderSwitch() {
         String screen = Kernel.rosterScreen(planJsonOrEmpty(), eventsOrEmpty(), profile(), rosterIndex);
@@ -471,6 +480,67 @@ public class MainActivity extends Activity {
         // 光标还停在当前这一档：←→ 先挪到另一档，确认键才切。
         rosterIndex = rosterIndex == 0 ? 1 : 0;
         renderSwitch();
+    }
+
+    /**
+     * 「这一档现在按哪几项跑」那一屏（AGREE-14）：全是读——没有按钮、没有红点、没有完成度，
+     * 也不往账里写任何东西。屏上那些字由设备上的内核给（契约 agreement.panel 那一处），
+     * 壳层只做一件事：把它们串起来。
+     */
+    private void renderPanel() {
+        String screen = Kernel.panel(path(this, CONTRACT_NAME, false), eventsOrEmpty(), profile(), plansJson());
+        sentence.setText(array(screen, "lines"));
+        panels.setText("");
+        badge.setText(field(screen, "title", ""));
+        foot.setText(field(screen, "foot", ""));
+        write(path(this, PANEL_NAME, true), screen);
+        dumpCodepoints(sentence.getText().toString());
+    }
+
+    private void panelKey() {
+        if (panelOn) {
+            panelOn = false;
+            render();
+            return;
+        }
+        panelOn = true;
+        renderPanel();
+    }
+
+    /** 每一档存过的那一份，按身份收在一起：那一屏读的就是这一份（AGREE-14、AGREE-08）。 */
+    private String plansJson() {
+        StringBuilder s = new StringBuilder("{");
+        java.io.File dir = getExternalFilesDir(null);
+        if (dir != null && dir.isDirectory()) {
+            java.io.File[] files = dir.listFiles();
+            if (files != null) {
+                java.util.Arrays.sort(files);
+                for (java.io.File f : files) {
+                    String n = f.getName();
+                    if (!n.startsWith("youban-plan-") || !n.endsWith(".json")) {
+                        continue;
+                    }
+                    String who = n.substring("youban-plan-".length(), n.length() - ".json".length()).replace('_', ':');
+                    String body = read(f.getAbsolutePath());
+                    if (body == null || body.indexOf('{') < 0) {
+                        continue;
+                    }
+                    if (s.length() > 1) {
+                        s.append(',');
+                    }
+                    s.append("\"").append(who).append("\":").append(body.substring(body.indexOf('{')));
+                }
+            }
+        }
+        // 当前这一档存的那一份也并进来（key 用身份本身，不是文件名——文件名里冒号换成了下划线）。
+        String own = read(planPath());
+        if (own != null && own.indexOf('{') >= 0) {
+            if (s.length() > 1) {
+                s.append(',');
+            }
+            s.append("\"").append(profile()).append("\":").append(own.substring(own.indexOf('{')));
+        }
+        return s.append('}').toString();
     }
 
     private String planJsonOrEmpty() {

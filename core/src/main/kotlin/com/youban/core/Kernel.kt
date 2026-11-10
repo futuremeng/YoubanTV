@@ -209,6 +209,57 @@ object Kernel {
         return out
     }
 
+    /**
+     * 「这一档现在按哪几项跑」那一屏（AGREE-14）：全是读，没有按钮、没有红点、没有完成度。
+     * 条目与取值只从两处来——契约那张默认表垫底 + 这一档存过的那份盖上；签署那一行取自账里的 PLAN_SIGNED。
+     * 契约 agreement.panel.never 那些词一个都不许出现在这一屏上（设备自检逐条扫一遍）。
+     */
+    @JvmStatic
+    fun panel(contractJson: String, eventsJson: String, profile: String, plansJson: String = "{}"): String {
+        val node = Json.parse(java.io.File(contractPathFile()).readText()) as Map<*, *>
+        val agreement = node["agreement"] as Map<*, *>
+        val panel = agreement["panel"] as Map<*, *>
+        val fields = (agreement["fields"] as List<*>).map { it as Map<*, *> }
+        val events = eventsJson.lineSequence().map { it.trim() }.filter { it.startsWith("{") }
+            .mapNotNull { Json.parse(it) as? Map<*, *> }.toList()
+        val stored = (Json.parse(plansJson) as? Map<*, *>)?.get(profile) as? Map<*, *>
+        val plan = LinkedHashMap<String, Any>()
+        // audience-site: 默认值挑选（这一档的受众挑默认那一行）（PROFILE-01、PROFILE-02）
+        val audience = stored?.get("audience")?.toString() ?: "child"
+        // audience-site: 默认值挑选（这一档的受众挑默认那一行）（PROFILE-01）
+        Day.defaultPlan(audience, stored?.get("dayType")?.toString() ?: "schoolday").forEach { k, v -> plan[k] = v }
+        stored?.forEach { k, v -> if (v != null) plan[k.toString()] = v }
+
+        val lines = ArrayList<String>()
+        val signed = events.lastOrNull { it["kind"] == "PLAN_SIGNED" && it["profile"] == profile }
+        if (signed == null) {
+            lines.add(panel["unsigned"].toString())
+        } else {
+            val at = ((signed["at"] as? Number)?.toLong() ?: 0L) / 1000L
+            val version = (((signed["fields"] as? Map<*, *>)?.get("version")) ?: 1).toString().removeSuffix(".0")
+            lines.add(panel["signed"].toString().replace("{version}", version)
+                .replace("{who}", signed["actor"]?.toString() ?: profile)
+                .replace("{when}", if (at > 0L) at.toString() else "—"))
+        }
+        val timeFields = (panel["timeFields"] as List<*>).map { it.toString() }
+        val minuteUnit = (panel["units"] as Map<*, *>)["minutes"].toString()
+        fields.forEach { f ->
+            val id = f["id"].toString()
+            if (!plan.containsKey(id)) return@forEach
+            val raw = plan[id]
+            val shown = when {
+                timeFields.contains(id) && raw is Number -> (raw.toLong() / 60000L).toString() + minuteUnit
+                raw is Boolean -> if (raw) panel["trueWord"].toString() else panel["falseWord"].toString()
+                else -> raw.toString()
+            }
+            lines.add(panel["row"].toString().replace("{label}", f["uiWords"].toString()).replace("{value}", shown))
+        }
+        return Json.write(linkedMapOf<String, Any?>(
+            "title" to panel["title"], "lines" to lines, "foot" to panel["timeSource"],
+            "never" to panel["never"]
+        ))
+    }
+
     /** 左右键在一项的可选值里走一步：可选值在契约 fields.choices，顺序也在那儿（界面上不许另列一份）。 */
     @JvmStatic
     fun cycle(planJson: String, fieldId: String, backward: Boolean): String {

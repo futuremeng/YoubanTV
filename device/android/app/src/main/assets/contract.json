@@ -1070,7 +1070,9 @@
         "uiWords": "当前是否在时段内",
         "spec": [
           "DAY-08"
-        ]
+        ],
+        "default": true,
+        "x-note": "这一项的默认只在这里写一次：两边建模默认方案时先并这张字段表的默认，再盖上下面那张按受众的表（DAY-08）。"
       }
     ],
     "signers": {
@@ -1274,6 +1276,35 @@
       "switchHint": "←→ 选另一档 · 确认键切过去 · 返回不切",
       "switchDo": "切换身份",
       "defaultsWhere": " · 按默认 · 要改去{where}"
+    },
+    "panel": {
+      "x-note": "这一屏只回答一个问题：这一档现在按哪几项跑、谁在什么时候签的。没有按钮、没有红点、没有提示（AUTO-14、AGREE-14）。",
+      "title": "这一档现在按这些跑",
+      "signed": "这一份签过：v{version} · {who} · {when}",
+      "unsigned": "还没签 · 现在按默认跑 · 下一步：立约定",
+      "unsignedLabel": "未签·默认",
+      "signedLabel": "已签",
+      "timeSource": "时刻来自事件账那一条 PLAN_SIGNED 的 at，不在界面上另算",
+      "row": "{label}：{value}",
+      "timeFields": [
+        "allowanceMs",
+        "graceMs",
+        "moveFromMs"
+      ],
+      "units": {
+        "minutes": "分钟"
+      },
+      "trueWord": "是",
+      "falseWord": "否",
+      "never": [
+        "催签",
+        "红点",
+        "完成度",
+        "连续天数",
+        "周报",
+        "得分",
+        "打卡"
+      ]
     }
   },
   "devicePermissions": {

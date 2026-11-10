@@ -229,6 +229,10 @@ predicates:
   noEvents: {listOf: event}
   absent: {listOf: name, note: "契约字段 / 端点 / API / 事件：不存在"}
   presentIn: {listOf: name, note: "出现在代码或契约中的位置"}
+  # 代码里按受众的分支位点扫出来的条数（PROFILE-01）：以前写成 value: {...}，读的是方案里不存在的键，
+  # 扫描抓到也不红——顶层断言键才是真在看这一处（F33）。
+  branchInForbiddenSites: {type: number}
+  allowedBranchSites: {type: list}
   # —— 计次那一条数出来的是什么（SENSE-01、F31）：三个数都由模型答，执行器不自己数。
   countedReps: {type: number}
   ambiguousReps: {type: number}

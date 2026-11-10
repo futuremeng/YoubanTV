@@ -23,13 +23,28 @@ object Day {
     fun defaultPlan(audience: String, dayType: String): MutableMap<String, Any> {
         val table = agreementDefaults()
         val row = table["$audience $dayType"] as? Map<*, *> ?: table["child schoolday"]
-        val out = linkedMapOf<String, Any>()
+        val out = LinkedHashMap<String, Any>()
+        // 先并字段表那一份默认（inSlot 这种不在那张受众表里的项，只在那儿写一次），
+        // 再盖下按受众的那一行（DAY-08、D45）——与 Ruby 的 Day.default_plan 同一顺序。
+        fieldDefaults().forEach { k, v -> out[k] = v }
         (row as Map<*, *>).forEach { (k, v) ->
             // 契约那张表里存的就是毫秒（agreement.defaults 写的 60*M 那种）：这里再乘一次 60000，
             // 屏幕上就成了「还剩 1800000 分钟」——单位在契约那边定，两边不许各自换算一次（D45）。
             out[k.toString()] = v as Any
         }
-        out["inSlot"] = true // 默认全天都在时段内（DAY-08）；时段本身要签了才有。
+        return out
+    }
+
+    /** 字段级默认只在这一处读（inSlot 那种不在受众表里的项）。 */
+    private fun fieldDefaults(): Map<String, Any> {
+        val node = Json.parse(java.io.File(contractPath).readText()) as Map<*, *>
+        val fields = ((node["agreement"] as Map<*, *>)["fields"] as? List<*>) ?: emptyList<Any?>()
+        val out = LinkedHashMap<String, Any>()
+        fields.forEach { raw ->
+            val f = raw as Map<*, *>
+            val v = f["default"]
+            if (v != null) out[f["id"].toString()] = v
+        }
         return out
     }
 

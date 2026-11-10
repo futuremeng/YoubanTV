@@ -8,7 +8,9 @@ PROFILE-01:
       expect:
         absent: [audienceAllowance, audienceGate, audienceLock, selfManagedCap, capabilityCeiling]
         sameSource: [core/commit, core/day, device/enforcement, core/task]
-        value: { branchInForbiddenSites: 0 }
+        # 这条问的是扫描那一处答出来的数，不是方案里的某个字段：以前写成 value: {...}，
+        # 读的其实是方案里那个不存在的键（永远 0），扫描抓到东西也不会红——一条「绿着但没在看」的断言。
+        branchInForbiddenSites: 0
     - name: 内容绑定与默认值可以按 audience 取值
       when: { audience: child }
       expect: { allowed: true, value: { allowedBranchSites: [内容绑定解析, 默认值挑选] } }

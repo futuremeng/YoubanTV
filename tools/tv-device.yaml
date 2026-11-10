@@ -35,6 +35,8 @@ probes:
     why: 确认键要落进事件账并让设备上的内核重算——落一条回执不算（AGREE-11、D34）
   - probe: setup
     why: 首启那六步要在真机上走到签署——问什么、有哪些可选都由设备上的内核给（AGREE-05）
+  - probe: panel
+    why: 那一屏只读的条目要与规范模型逐字相同、不许出现推力那批词、开它不写账（AGREE-14）
   - probe: overlay
     why: L3 那一张要在离开本应用后出现、说内核那句、且不进字幕带；装完默认不开这条也一起验（LAYER-14）
   - probe: switch

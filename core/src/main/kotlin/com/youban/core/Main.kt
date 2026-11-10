@@ -37,6 +37,13 @@ object Main {
                 job["profile"].toString(), Day.num(job["index"] ?: 0)))
             return
         }
+        if (args.contains("--panel")) {
+            Commit.useContract(job["contract"].toString())
+            println(Kernel.panel(job["contract"].toString(),
+                (job["events"] as? List<*> ?: emptyList<Any?>()).joinToString("\n") { Json.write(it as Map<*, *>) },
+                job["profile"].toString(), Json.write(job["plans"] as? Map<*, *> ?: emptyMap<String, Any>())))
+            return
+        }
         if (args.contains("--setup")) {
             Commit.useContract(job["contract"].toString())
             println(Kernel.setupScreen(Json.write(job["plan"] as? Map<*, *> ?: emptyMap<String, Any>()),

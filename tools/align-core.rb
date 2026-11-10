@@ -137,6 +137,34 @@ Tempfile.open(['youban-align', '.json']) do |f|
     end
   end
 
+  # 那一屏只读的条目（AGREE-14）也在这儿比：签过的与还没签的两种账，两边各算一次逐字比。
+  [
+    { 'profile' => 'member:kid',
+      'events' => [{ 'kind' => 'PLAN_SIGNED', 'profile' => 'member:kid', 'at' => 1700000000000,
+                     'fields' => { 'version' => 3 } }],
+      'plans' => { 'member:kid' => { 'audience' => 'child', 'allowanceMs' => 3600000 } }, 'tag' => '签过的' },
+    { 'profile' => 'member:dad', 'events' => [], 'plans' => { 'member:dad' => { 'audience' => 'grown-up' } },
+      'tag' => '还没签的' }
+  ].each do |job0|
+    mine_p = Core::Agreement.panel(events: job0['events'], profile: job0['profile'], plans: job0['plans'])
+    job = { 'contract' => File.join(ROOT, 'contract/contract.json') }.merge(job0.reject { |k, _| k == 'tag' })
+    Tempfile.open(['youban-panel', '.json']) do |g|
+      g.write(JSON.generate(job)); g.flush
+      raw = IO.popen(['java', '-cp', "#{CLASSES}:#{STDLIB}", 'com.youban.core.Main',
+                      '--panel', '--file', g.path], &:read)
+      unless $?.success?
+        warn raw.to_s.lines.last(4).join
+        die('Kotlin 那一屏只读的条目跑挂了')
+      end
+      theirs_p = JSON.parse(raw.to_s.lines.last.to_s.strip)
+      %w[title lines foot never].each do |k|
+        a = mine_p[k]
+        bq = theirs_p[k]
+        screen_diffs << "#{job0['tag']} 那一屏 #{k}: Ruby #{a.inspect} / Kotlin #{bq.inspect}" if a != bq
+      end
+    end
+  end
+
   if screen_diffs.any?
     puts "Kotlin 内核对齐：首启那一套 #{screen_diffs.size} 处不一致"
     screen_diffs.first(8).each { |d| puts "  #{d}" }

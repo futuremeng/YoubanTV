@@ -5,10 +5,15 @@ module Core
     # DAY-03 的默认值表在契约里（agreement.defaults）：装机后先按它跑，界面上写明「默认·未签」（AGREE-04）。
     # 原来这张表在 Ruby 写一份、Kotlin 又写一份——「一处有一条没有」正是对齐门要抓的那种（D45）。
     # 分钟数；存过配置的设备沿用原值，由调用方合并 overrides 处理。
-    DEFAULTS = JSON.parse(File.read(File.expand_path('../contract/contract.json', __dir__)))
+    CONTRACT0 = JSON.parse(File.read(File.expand_path('../contract/contract.json', __dir__)))
+    # 字段级默认只在这一处读（inSlot 那种不在受众表里的项）（DAY-08、D45）。
+    FIELD_DEFAULTS = CONTRACT0.dig('agreement', 'fields').to_a.map { |f|
+      [f['id'].to_s, f['default']]
+    }.reject { |_, v| v.nil? }.to_h.freeze
+    DEFAULTS = CONTRACT0
                    .fetch('agreement').fetch('defaults')
                    .reject { |k, _| k == 'x-note' }
-                   .transform_keys { |k| k.split(' ') }
+                   .transform_keys { |k| k.split(' ')}
                    .transform_values(&:dup)
                    .freeze
 
@@ -21,8 +26,10 @@ module Core
 
     # audience-site: 默认值挑选 —— 按受众挑默认那一行，是允许的两处分支之一（PROFILE-01、PROFILE-02）。
     def default_plan(audience, day_type)
+      # 先并字段表那一份默认（inSlot 这种不在那张受众表里的项，只在那儿写一次），
+      # 再盖下按受众的那一行（DAY-08、D45）。
       row = DEFAULTS[[audience.to_s, day_type.to_s]] || DEFAULTS[%w[child schoolday]]
-      row.dup
+      FIELD_DEFAULTS.merge(row)
     end
 
     # 合并该身份已存过的配置：存过的一律沿用原值（DAY-03 末段）。

@@ -108,6 +108,56 @@ module Core
       out
     end
 
+    PANEL = AGREEMENT.fetch('panel').to_h.freeze
+
+    # 「这一档现在按哪几项跑」那一屏（AGREE-14）：全是读——没有按钮、没有红点、没有完成度。
+    # 取值只从两处来：契约那张默认表垫底 + 这一档存过的那份盖上来；签署那一行取自账里的 PLAN_SIGNED。
+    # 取值怎么写只在这一处（timeFields / units / trueWord / falseWord 都在 agreement.panel 里）。
+    # audience-site: 默认值挑选 —— 这一档的受众挑默认那一行（PROFILE-01、PROFILE-02）。
+    def panel(events: [], profile: nil, plans: {})
+      stored = plans[profile.to_s] || plans[profile.to_sym] || {}
+      plan = Day.default_plan(stored['audience'] || stored[:audience] || 'child',
+                              stored['dayType'] || stored[:dayType] || 'schoolday')
+      stored.each { |k, v| plan[k.to_s] = v unless v.nil? }
+
+      lines = []
+      # 事件可能是符号键（模型内部）也可能是字符串键（从设备读回来的那一份）：两边一律当同一种读。
+      events = events.to_a.map do |e|
+        h = e.to_h.transform_keys(&:to_sym)
+        h[:fields] = h[:fields].to_h.transform_keys(&:to_sym) if h[:fields].is_a?(Hash)
+        h
+      end
+      signed = events.reverse.find { |e| e[:kind].to_s == 'PLAN_SIGNED' && e[:profile].to_s == profile.to_s }
+      if signed.nil?
+        lines << PANEL['unsigned']
+      else
+        at = (signed[:at].to_i / 1000).to_i
+        version = (signed[:fields].to_h[:version] || 1).to_i
+        who = signed[:actor] || profile
+        lines << PANEL['signed'].sub('{version}', version.to_s).sub('{who}', who.to_s)
+                          .sub('{when}', at.positive? ? at.to_s : '—')
+      end
+      FIELDS.each_value do |f|
+        id = f['id'].to_s
+        next unless plan.key?(id)
+
+        lines << PANEL['row'].sub('{label}', f['uiWords'].to_s).sub('{value}', shown_value(id, plan[id]))
+      end
+      { 'title' => PANEL['title'], 'lines' => lines, 'foot' => PANEL['timeSource'], 'never' => PANEL['never'] }
+    end
+
+    def shown_value(id, raw)
+      if PANEL['timeFields'].to_a.include?(id) && raw.is_a?(Numeric)
+        "#{(raw.to_i / 60_000)}#{PANEL.dig('units', 'minutes')}"
+      elsif raw == true
+        PANEL['trueWord']
+      elsif raw == false
+        PANEL['falseWord']
+      else
+        raw.to_s
+      end
+    end
+
     # 「第 N 步」与「第 N 屏」不是一回事：一步可能出好几屏（一项一屏）。
     # 这条换算只在这里写一次，界面上与夹具里都不要再数一遍（AGREE-05）。
     def screen_index_for_step(step)
