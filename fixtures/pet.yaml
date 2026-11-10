@@ -1,0 +1,58 @@
+# 角上那只小宠物（spec/PET.md）：它是读数的一种形状，不是一个需要被照顾的人。
+# 八条各钉一件事；清单与默认都不在这里再写一份。
+PET-01:
+  spec: [spec/PET.md#PET-01, docs/ONBOARDING.md#§6]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 状态不由行为推出；那批词在界面上一次不出现
+      when: { mode: ambient }
+      expect: { value: { petStateNeverFromUsage: true, petNeverStateHits: 0, petStateCarries: 3 } }
+
+    - name: 只显示账里已有的那三项；那批词是一份清单，不是一句空话
+      when: { mode: ambient }
+      expect: { value: { petStateCarries: 3, petNeverStateCount: 9 } }
+
+PET-02:
+  spec: [spec/PET.md#PET-02, spec/PET.md#PET-01]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 没有养成数值，也不许有那批词的第二份清单
+      when: { mode: ambient }
+      expect: { value: { petForbiddenSingleSource: true, petForbiddenInText: 0, petNoProgress: 8 } }
+
+PET-03:
+  spec: [spec/PET.md#PET-03, spec/AUTONOMY.md#AUTO-14]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 选、起名、换——换的代价是零
+      when: { mode: ambient }
+      expect: { value: { petAutonomy: true, petSwitchCostItems: 0 } }
+
+PET-04:
+  spec: [spec/PET.md#PET-04, spec/PROFILE.md#PROFILE-11]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 清单只有一份，默认那一只由那张表给
+      when: { mode: ambient }
+      expect: { value: { petPickable: 4, petDefaultPick: "sprout", petPersonalityNeverHits: 0, petPersonalityNeverCount: 5 } }
+
+    - name: 大人那一档的默认由表给，不是这里推的
+      given: { profile: "member:dad" }
+      when: { mode: ambient }
+      expect: { value: { petDefaultPick: "pebble" } }
+
+PET-05:
+  spec: [spec/PET.md#PET-05, spec/LAYER.md#LAYER-03, spec/LAYER.md#LAYER-10]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 它落在 L3 那一角，那批呈现手法一次不用
+      when: { mode: ambient }
+      expect: { value: { petLayer: "L3", petNeverAppearanceHits: 0, petNeverAppearanceCount: 6 } }
+
+PET-06:
+  spec: [spec/PET.md#PET-06, spec/ONBOARD.md#ONBOARD-06]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 这一层默认关；开它的唯一条件在那份实测名单上，而名单是空的
+      when: { mode: ambient }
+      expect: { value: { petDefaultOn: false, petGateRequiresMeasured: true, petMeasuredCount: 0, petEnabledHere: false, petDrawsOnlyWhenMoving: true } }

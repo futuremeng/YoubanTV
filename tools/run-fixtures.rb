@@ -24,6 +24,7 @@ require 'report'
 require 'panel'
 require 'startup'
 require 'content'
+require 'pet'
 
 class Unsupported < StandardError; end
 
@@ -910,6 +911,29 @@ class World
       'packGradeOkG5' => Core::Content.grade_ok?('child', 5),
       'packGradeOkG7' => Core::Content.grade_ok?('child', 7),
       'packGradeOkG11' => Core::Content.grade_ok?('child', 11),
+      # 角上那只小宠物的规矩（PET-01..08、D83）：判定在 model/pet.rb 那一处。
+      'petStateNeverFromUsage' => Core::Pet.state_never_from_usage?,
+      'petNeverStateHits' => Core::Pet.never_state_hits,
+      'petNeverState' => Core::Pet::NEVER_STATE.size,
+      'petStateCarries' => Core::Pet.state_carries.size,
+      'petForbiddenSingleSource' => Core::Pet.forbidden_single_source?,
+      'petForbiddenInText' => Core::Pet.forbidden_in,
+      'petNeverStateCount' => Core::Pet::NEVER_STATE.size,
+      'petNoProgress' => Core::Pet::NO_PROGRESS.size,
+      'petAutonomy' => Core::Pet.autonomy?,
+      'petSwitchCostItems' => Core::Pet.switch_cost_items,
+      'petPickable' => Core::Pet::PICKABLE.size,
+      'petDefaultPick' => Core::Pet.default_pick(@plan && @plan['pet']),
+      'petPersonalityNeverHits' => Core::Pet.personality_never_hits,
+      'petPersonalityNeverCount' => Core::Pet::PERSONALITY_NEVER.size,
+      'petLayer' => Core::Pet.layer,
+      'petNeverAppearanceHits' => Core::Pet.never_appearance_hits,
+      'petNeverAppearanceCount' => Core::Pet::APPEAR_NEVER.size,
+      'petDefaultOn' => Core::Pet.default_on?,
+      'petEnabledHere' => Core::Pet.enabled_on('this-device'),
+      'petGateRequiresMeasured' => Core::Pet.gate_requires_measured?,
+      'petMeasuredCount' => Core::Pet.measured_devices.size,
+      'petDrawsOnlyWhenMoving' => Core::Pet.draws_only_when_moving?,
       'packTextbookFilter' => Core::Content.textbook_filter?,
       'packTextbookMarks' => Core::Content.textbook_marks.size,
       'packTextbookHit' => Core::Content.textbook_hit?('课文里的天空是什么样的？'),
@@ -1395,7 +1419,7 @@ class World
     o = {}
     # dueKinds 也在这里：这一档的约定项有哪几类是**方案参数**（默认值挑选那一处给，PROFILE-11），
     # 不加进来就等于夹具给了、模型没拿到——那条断言会绿着空转（今天就是这么撞上的）。
-    %w[allowanceMs graceMs moveFromMs inSlot groupsPerTask minutesPerGroup roundTarget dueKinds].each do |k|
+    %w[allowanceMs graceMs moveFromMs inSlot groupsPerTask minutesPerGroup roundTarget dueKinds pet].each do |k|
       next unless given.key?(k)
 
       o[k] = given[k]
@@ -1976,7 +2000,13 @@ def run(entries_filter, files)
             r = check(k, v, world, before)
             res[r] += 1
             total[r] += 1
-            failing << "#{id}.#{i + 1} #{k}=#{v.inspect}" if r == :fail
+            # 失败那一行要带实际值：只打期望值的那一行我照着猜了两轮（`value=` 那行原本只给期望）。
+            failing << if k == 'value' && v.is_a?(Hash)
+                         "#{id}.#{i + 1} #{k} " +
+                           v.map { |kk, vv| "#{kk} 期望 #{vv.inspect} 实际 #{world.value_for(kk).inspect}" }.join('；')
+                       else
+                         "#{id}.#{i + 1} #{k}=#{v.inspect}"
+                       end if r == :fail
           end
         rescue Unsupported => e
           res[:unsupported] += 1

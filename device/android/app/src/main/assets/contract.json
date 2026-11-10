@@ -18,7 +18,9 @@
     "cardinality": "每类角色同一时刻各一人，可轮值",
     "grantPath": "本机当前激活模式内的两次确认：持有人提 roleChange 动议，对方在自己的界面受理",
     "keyHolderTransfer": "必须在被控设备本机由现任当场确认，不接受远程受理",
-    "derivedFrom": [],
+    "derivedFrom": [
+
+    ],
     "spec": [
       "AUTO-07",
       "AUTO-09",
@@ -583,7 +585,9 @@
       "clearBacklogFirst"
     ],
     "writePath": "PUT /api/myPlan（仅本人）",
-    "writePathsForOthers": [],
+    "writePathsForOthers": [
+
+    ],
     "inTighteningComparison": false,
     "uiWords": {
       "groupsPerTask": "组数",
@@ -1078,7 +1082,8 @@
         "dueKinds": [
           "quiz",
           "exercise"
-        ]
+        ],
+        "pet": "sprout"
       },
       "child weekend": {
         "allowanceMs": 10800000,
@@ -1088,7 +1093,8 @@
         "dueKinds": [
           "quiz",
           "exercise"
-        ]
+        ],
+        "pet": "sprout"
       },
       "grown-up schoolday": {
         "allowanceMs": 7200000,
@@ -1097,7 +1103,8 @@
         "form": "ambient",
         "dueKinds": [
           "exercise"
-        ]
+        ],
+        "pet": "pebble"
       },
       "grown-up weekend": {
         "allowanceMs": 7200000,
@@ -1106,21 +1113,28 @@
         "form": "ambient",
         "dueKinds": [
           "exercise"
-        ]
+        ],
+        "pet": "pebble"
       },
       "senior schoolday": {
         "allowanceMs": 28800000,
         "graceMs": 28800000,
         "moveFromMs": 28800000,
         "form": "ambient",
-        "dueKinds": []
+        "dueKinds": [
+
+        ],
+        "pet": "pebble"
       },
       "senior weekend": {
         "allowanceMs": 28800000,
         "graceMs": 28800000,
         "moveFromMs": 28800000,
         "form": "ambient",
-        "dueKinds": []
+        "dueKinds": [
+
+        ],
+        "pet": "pebble"
       }
     },
     "firstRun": [
@@ -1132,7 +1146,9 @@
           "PROFILE-01",
           "PROFILE-06"
         ],
-        "asks": [],
+        "asks": [
+
+        ],
         "note": "遥控器打不出名字：这一台先叫「这一台设备上的这一档」",
         "where": "手机或另一台设备上的「这一档」那一页"
       },
@@ -1169,7 +1185,9 @@
           "DAY-08",
           "DAY-03"
         ],
-        "asks": [],
+        "asks": [
+
+        ],
         "note": "时段表在电视遥控器上改不好",
         "where": "手机上的「时段」那一页（电视遥控器上改不好）"
       },
@@ -1193,7 +1211,9 @@
           "AUTO-07",
           "AGREE-05"
         ],
-        "asks": []
+        "asks": [
+
+        ]
       }
     ],
     "firstRunEscape": "每一步都可以「先用默认」；用了默认的条目在界面上标「未签·默认」，不弹催签、不进那一页的账（`REPORT-02`）、不打分（AGREE-04、ONBOARD-05）。",
@@ -1816,5 +1836,100 @@
       "why": "这类题的题面或解析预设「手上有那一本教材」——这台设备不知道孩子用的是哪一版课本，这类题在孩子那边就是「什么课文？」（抽查 354/13339，D82）",
       "onFilter": "知识点照留（大纲是地图，不是题），只是那一题不出"
     }
+  },
+  "pet": {
+    "x-note": "电视角上那只小宠物：它是**读数的一种形状**，不是一个需要被照顾的人（PET-01..08、D83）。它的出现时机由内核那句结论决定，它自己不是一条通道。",
+    "spec": [
+      "PET-01",
+      "PET-02",
+      "PET-03",
+      "PET-04",
+      "PET-05",
+      "PET-06",
+      "PET-07",
+      "PET-08"
+    ],
+    "stateNeverDerivedFromUsage": true,
+    "stateCarries": [
+      "今天看了多久",
+      "离约定线还差多少",
+      "这一组做完没有"
+    ],
+    "neverState": [
+      "饿",
+      "困",
+      "难过",
+      "失望",
+      "想你",
+      "生病",
+      "脏了",
+      "等我",
+      "进度落后"
+    ],
+    "neverFrom": {
+      "fields": "forbiddenFields.values"
+    },
+    "noProgressFields": [
+      "bond",
+      "mood",
+      "hunger",
+      "level",
+      "xp",
+      "growth",
+      "giftDue",
+      "visitsStreak"
+    ],
+    "choiceIsAutonomy": {
+      "canPick": true,
+      "canRename": true,
+      "canSwitch": true,
+      "switchCost": "零——换一只不丢任何账、不减任何东西、不问理由",
+      "notProgress": true
+    },
+    "personalitySource": {
+      "from": "同一份清单 + 谁自己选",
+      "never": [
+        "性格测评",
+        "人格画像",
+        "问卷打分",
+        "给孩子贴标签",
+        "按档分派哪一只"
+      ]
+    },
+    "appearance": {
+      "layer": "L3",
+      "position": "那一角，与结论那条同一张卡；不重叠字幕带（LAYER-03）",
+      "idleFrames": 2,
+      "frameIntervalMs": 1000,
+      "drawOnlyWhenMoving": true,
+      "never": [
+        "入场动画",
+        "弹跳",
+        "声音",
+        "震动",
+        "系统通知",
+        "自己成为一条提示"
+      ],
+      "default": "off",
+      "measuredBeforeOn": true,
+      "measuredOn": [
+
+      ]
+    },
+    "style": {
+      "borrow": "形状语言：圆的形、无描边、暖色、可信的接触阴影（playpets 的美术方向）",
+      "assets": "本项目自己画；不搬 playpets 的素材（它 MIT，但它的美术另有 provenance：生成图 + 每图一份 icon-provenance.json）",
+      "provenance": "PROVENANCE.md 那一条"
+    },
+    "fallback": {
+      "noOverlayPermission": "没有宠物——不降级成屏内常驻、不因为「怕它不见了」而加提示（ONBOARD-06）",
+      "pausedOrQuietTier": "宠物照旧只是那角的一块像素，不因为安静档而变化——它没有状态可被影响"
+    },
+    "pickable": [
+      "sprout",
+      "pebble",
+      "moth",
+      "ink"
+    ]
   }
 }

@@ -48,6 +48,7 @@ Source Available — Personal Use Only），在此致谢。本项目与它是独
 | KaTeX（公式渲染） | MIT | 直接取上游发行物，本仓库不放副本 |
 | holiday-cn（法定节假日数据） | 见上游仓库 | 运行时同步 + 内置当年快照 |
 | 面板工具链 | MIT / Apache-2.0 | 由包管理器解析，`tools/` 出许可报告 |
+| playpets（形状语言参考，未取素材） | MIT | 只看它的 `docs/design/*` 与那条帧循环 ADR 的**方法**；素材一张没搬，本项目自己画 |
 | K12 题库与知识大纲 `k12-compulsory` | **CC BY-NC 4.0** | 由 `tools/make-pack.rb` 从本地编写源仓导出成内容包；包本体不入库（`PACK-09`） |
 
 ## 7. K12 内容的来源（第三方包，D82）

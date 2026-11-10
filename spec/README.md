@@ -23,6 +23,7 @@
 | `AUTO` | 自主性规则、协商强度与签署、主体权限、自管字段与查阅修订 | [`AUTONOMY.md`](AUTONOMY.md) |
 | `PANEL` | 面板的页面清单：页名只有一处、每页回答哪个问题、「要改去哪儿」的页名从这张表取 | [`PANEL.md`](PANEL.md) |
 | `REPORT` | 「这段时间的账」那一页：没有周报、只从事件数出来、只看自己的 | [`REPORT.md`](REPORT.md) |
+| `PET` | 角上那只小宠物：它是读数的一种形状，不是一个需要被照顾的人——状态永不由行为推出、无养成数值、清单只有一份、只走 L3 | [`PET.md`](PET.md) |
 | `ONBOARD` | 设备待确认清单：派生与装配差、随加入扩充、降级与再认证 | [`ONBOARD.md`](ONBOARD.md)（清单本体见 [`../docs/ONBOARDING.md`](../docs/ONBOARDING.md)） |
 | 隐私（无 id） | 数据存放与去向、出网清单、系统能力取值 | [`../docs/PRIVACY.md`](../docs/PRIVACY.md)——引用时写 `AUTO-11` / `CONTEXT-02` 或该页节号，**不得写 `PRIV-*`** |
 | ~~`GATE`~~ | 退役编号的迁移映射 | [`GATE.md`](GATE.md) |
