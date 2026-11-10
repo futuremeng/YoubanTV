@@ -21,6 +21,7 @@ require 'kp'
 require 'write'
 require 'agreement'
 require 'report'
+require 'panel'
 
 class Unsupported < StandardError; end
 
@@ -887,6 +888,9 @@ class World
       'watchedPerDevice' => @ledger.by_device(@profile),
       # 手机与电视的直连只为体感与视觉两件事（SENSE-06、D77）：这几项只由契约 link 那一处答。
       # 「这段时间的账」那一页（REPORT-01..04、D78）：三条开关与那批词都由契约 report 那一处答。
+      # 面板那 12 页的可用性只在 panel.availability 那一处答（PANEL-02、D80）。
+      'panelAvailable' => Core::Panel.available?,
+      'panelUnavailableStated' => Core::Panel.marker_stated? && Core::Panel.marked_in_first_run?,
       'reportPush' => Core::Report.push?,
       'reportComparison' => Core::Report.comparison?,
       'reportVisibleTo' => Core::Report.visible_to,

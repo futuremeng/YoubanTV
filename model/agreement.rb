@@ -4,6 +4,7 @@
 # 由 tools/align-core.rb 逐屏比对——一边多一句、少一句都会红（D42、D47）。
 # 界面上不出现字段名：要改哪一项，屏上带着 field 这个键，壳层原样交回 cycle。
 require 'json'
+require 'panel'
 
 module Core
   module Agreement
@@ -59,7 +60,8 @@ module Core
       if at['note']
         # 按默认的那一步必须写明去哪儿改；契约没写 where 就是这条没做完，屏幕上不留空话（AGREE-13）。
         line = UI['noteOnly'].to_s.sub('{note}', at['note'].to_s)
-        line += at['where'] ? UI['defaultsWhere'].to_s.sub('{where}', at['where'].to_s) : ''
+        # 那一页还没做界面时，这一句得带上「这条路径现在没有」（PANEL-02、D80）：可用性只在 panel.availability 那一处答。
+        line += at['where'] ? UI['defaultsWhere'].to_s.sub('{where}', Core::Panel.where_text(at['where'])) : ''
         lines << line
       elsif at['id']
         lines << UI['field'].to_s.sub('{label}', at['label'].to_s).sub('{value}', at['valueLabel'].to_s)

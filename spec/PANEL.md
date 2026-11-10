@@ -16,6 +16,10 @@
 - 条件：首启某一步按默认跑、且这一步在遥控器上改不了时，屏上那句「按默认 · 要改去……」里的页名
   由 `contract.panel.pages[].title` 拼出（`agreement.ui.defaultsWhere` 的 `{where}`，`AGREE-05`）。
 - 结论：`where` 里出现的页名查不到即红；壳层与设备端不手抄页名，也不自己编一个地方。
+- 那一页**还没有界面**时（`panel.availability.state` ≠ 可用，1.0 就是这状态，D80），那一句必须把这句话说出来：
+  屏上带「这条路径要到 2.0；这台设备上现在改不了」。可用性只在 `panel.availability` 那一处答，
+  两个内核都从那里拼（Ruby `Core::Panel.where_text`、Kotlin `Kernel.panelWhere`）；界面做出来之后把状态改成
+  「可用」，那一句自动退场——**在那之前不许把它抹空**。
 - 测试：fixtures/panel.yaml#PANEL-02
 
 ## 那条通道已经改名了

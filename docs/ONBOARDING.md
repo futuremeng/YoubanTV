@@ -80,3 +80,20 @@
 
 清单状态是账本的一部分：面板可回看每条的确认人、时刻与证据指针（`AUTO-02`）；导出「我的数据」时
 清单以一节列出（`ONBOARD-10`、`PRIVACY.md §1`）。清单本身不作为对某个成员的评价依据，也不进成长记录。
+
+## 2b. 1.0 的手工装机那几条（界面入口推到 2.0，D80）
+
+§2「在哪确认」那一列写的是**目标位置**——引导页与「设备」页要到 2.0 才有 ✓ 现阶段这两条靠命令授予，
+做完再跑一次设备自检（`tools/tv-at.rb`）确认落档：
+
+```sh
+# L3 应用外呈现（悬浮窗）。某些固件重启后把它清掉，也有固件把时限压到几秒——自检会如实报（F1、F30）。
+adb -s <序列号> shell appops set com.youban.tv SYSTEM_ALERT_WINDOW allow
+adb -s <序列号> shell appops get com.youban.tv SYSTEM_ALERT_WINDOW     # 看 mode 与 duration
+
+# 使用情况访问（当日时长与前台）。不给就按最保守档降：角标不显示，只在应用内计时（ONBOARD-06）。
+adb -s <序列号> shell appops set com.youban.tv GET_USAGE_STATS allow
+```
+
+一台设备一本账：换设备、加设备都不合并两台的数（`DAY-10`）；手机与电视之间的关联只有体感与视觉两件事
+（`SENSE-06`）✓ 这一阶段也没有共看、在场提示、家人原话那三样（`AUTO-17`）。

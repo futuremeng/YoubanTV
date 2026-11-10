@@ -169,7 +169,7 @@ object Kernel {
             .replace("{total}", total.toString()).replace("{do}", at["do"].toString()))
         if (at["note"] != null) {
             // 按默认那一行必须写明去哪儿改；契约没写 where 就是这条没做完，屏幕上不留空话（AGREE-13）。
-            val where = at["where"]?.let { ui["defaultsWhere"].toString().replace("{where}", it.toString()) } ?: ""
+            val where = at["where"]?.let { ui["defaultsWhere"].toString().replace("{where}", panelWhere(it.toString())) } ?: ""
             lines.add(ui["noteOnly"].toString().replace("{note}", at["note"].toString()) + where)
         } else if (at["id"] != null) {
             lines.add(ui["field"].toString().replace("{label}", at["label"].toString())
@@ -215,6 +215,15 @@ object Kernel {
      * 条目与取值只从两处来——契约那张默认表垫底 + 这一档存过的那份盖上；签署那一行取自账里的 PLAN_SIGNED。
      * 契约 agreement.panel.never 那些词一个都不许出现在这一屏上（设备自检逐条扫一遍）。
      */
+    /** 面板那 12 页在 1.0 里只有这张表、没有界面（D80）：指向某一页的那一句得带上这一句（PANEL-02）。
+     *  可用与否只在契约 panel.availability 那一处答；Ruby 那边是 Core::Panel.where_text。 */
+    private fun panelWhere(where: String): String {
+        val node = Json.parse(java.io.File(contractPathFile()).readText()) as Map<*, *>
+        val av = (node["panel"] as? Map<*, *>)?.get("availability") as? Map<*, *>
+        if (av?.get("state")?.toString() == "可用") return where
+        return where + (av?.get("suffix")?.toString() ?: "")
+    }
+
     @JvmStatic
     fun panel(contractJson: String, eventsJson: String, profile: String, plansJson: String = "{}"): String {
         val node = Json.parse(java.io.File(contractPathFile()).readText()) as Map<*, *>

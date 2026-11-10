@@ -69,6 +69,8 @@ fields:
   reportForbiddenWords: {type: number} # 那批不许有的词在这一页的产出里出现几次（REPORT-04）
   reportNeverSingleSource: {type: boolean} # 不许有的词是不是只有一份清单（D45）
   reportWindowDays: {type: number} # 那一页默认看几天
+  panelAvailable: {type: boolean} # 那 12 页有没有界面：1.0 里没有（D80）
+  panelUnavailableStated: {type: boolean} # 没界面时，指向某一页的那一句有没有把这句话说出来（PANEL-02）
   reportRows: {type: number} # 那一页有几行——零行就是这页在空转（REPORT-02）
   strength: {type: enum, enum: strength}
   strengths: {type: list, enum: strength}
@@ -291,6 +293,7 @@ predicates:
 
 kvKeys: [from, to, by, role, action, kind, target, minutes, accepted, verdict, reason, path,
   profile, device, tv, mobile, watchedPerDevice, linkKinds, linkCarries, frameLeavesDevice,
+  panelAvailable, panelUnavailableStated,
   reportPush, reportComparison, reportVisibleTo, reportForbiddenWords, reportRows,
   reportNeverSingleSource, reportWindowDays, subjects, levels, mode, deficit, window, size, evicted, days, version, signed,
   added, notAdded, status, owner, ownerForms, dimension, fields, paired, trigger, responseRate,

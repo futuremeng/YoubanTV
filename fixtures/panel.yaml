@@ -16,3 +16,7 @@ PANEL-02:
     - name: 首启那句「要改去」的页名出自那张表
       given: { profile: 'member:kid' }
       expect: { wherePagesResolve: true }
+
+    - name: 那 12 页还没做界面时，每一句「要改去」都带上这一句（D80）
+      given: { profile: 'member:kid' }
+      expect: { value: { panelAvailable: false, panelUnavailableStated: true } }
