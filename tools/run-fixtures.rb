@@ -933,6 +933,7 @@ class World
       'petEnabledHere' => Core::Pet.enabled_on('this-device'),
       'petGateRequiresMeasured' => Core::Pet.gate_requires_measured?,
       'petMeasuredCount' => Core::Pet.measured_devices.size,
+      'petMeasuredDocumented' => Core::Pet.measured_documented?,
       'petDrawsOnlyWhenMoving' => Core::Pet.draws_only_when_moving?,
       'packTextbookFilter' => Core::Content.textbook_filter?,
       'packTextbookMarks' => Core::Content.textbook_marks.size,

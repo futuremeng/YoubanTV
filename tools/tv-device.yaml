@@ -43,6 +43,8 @@ probes:
     why: 换这一档要落 PROFILE_SWITCH 并加载那一组的约定——kid 签过的不算 dad 签的（AGREE-08）
   - probe: startup
     why: 被桌面或开机启动项拉起来之后加载完就交回前台，不占全屏；那一个应用拉起一次（LAYER-14、ONBOARD-11/12、D81）——依据是窗口管理器那一格，不是应用自己报的那句（F30）
+  - probe: pet
+    why: 角上那一块由实测名单说了算——名单里没有这台设备就连图都不解，有就必须画出来且不压字幕；CPU 那一格是 F37 要的数字（PET-07、D83）
   - probe: apk
     why: 装到设备上的包必须是这份编译产物——装了旧包会伪装成「内核少实现一条」（F20）
   - probe: glyphs

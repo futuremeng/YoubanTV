@@ -2,6 +2,7 @@
 # 角上那只小宠物的规矩只在这里答一次（D83）。这里没有清单第二份：
 # 不许有的那批词读 forbiddenFields.values 那一处（pet.neverFrom），默认那一只由 agreement.defaults 那张表递进来。
 require 'json'
+require 'agreement'
 
 module Core
   module Pet
@@ -115,6 +116,37 @@ module Core
       return false unless gate_requires_measured?
 
       measured_devices.include?(device.to_s)
+    end
+
+    # 这台设备该不该画、画哪一只：名单里没有就是 nil（默认关说的是这个）（PET-07）。
+    # 名字由方案递进来；没存过就落那张默认表——与 state 用的是同一个 Day.default_plan，不另推一次。
+    def shown(plan, model)
+      return nil unless enabled_on(model)
+
+      name = plan.fetch('pet', nil).to_s
+      return name if pickable?(name)
+
+      default_pick(Agreement.defaults_for(plan)['pet'])
+    end
+
+    def shown_shape(plan, model)
+      { 'name' => shown(plan, model), 'layer' => layer, 'intervalMs' => frame_interval_ms,
+        'frames' => 2, 'onlyWhenMoving' => draws_only_when_moving?, 'measured' => enabled_on(model) }
+    end
+
+    # 名单里每一台都必须有一条实测事实撑着（PET-07）：往名单里塞一台没测过的，这里就红。
+    # 那份事实是设备文档里的编号段落，不是这里的判断——这里只查「写没写」。
+    def measured_documented?
+      doc = File.read(File.expand_path('../docs/facts/DEVICES.md', __dir__))
+      fact = CONF.dig('appearance', 'measuredFact').to_s
+      anchor = fact.split('#').last.to_s
+      return false if anchor.empty?
+
+      # 那一格的标题后面跟着标题文字（「## F37 角上那一块的帧与功耗…」），只锁到编号那一段。
+      section = doc[/\n## #{Regexp.escape(anchor)}\b.*?(?=\n## |\z)/m].to_s
+      return false if section.empty?
+
+      measured_devices.all? { |model| section.include?(model.to_s) }
     end
 
     def default_on?

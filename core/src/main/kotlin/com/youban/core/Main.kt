@@ -55,6 +55,12 @@ object Main {
             println(Kernel.startup(job["autoOpen"]?.toString()))
             return
         }
+        if (args.contains("--pet")) {
+            Commit.useContract(job["contract"].toString())
+            println(Kernel.petShape(Json.write(job["plan"] as? Map<*, *> ?: emptyMap<String, Any>()),
+                job["model"] as? String ?: ""))
+            return
+        }
         if (args.contains("--kernel")) {
             Commit.useContract(job["contract"].toString())
             val lines = ((job["events"] as? List<*>) ?: emptyList<Any?>())

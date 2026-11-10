@@ -1,0 +1,30 @@
+{
+  "sprout": {
+    "frames": [
+      "sprout.f0.png",
+      "sprout.f1.png"
+    ],
+    "intervalMs": 1000
+  },
+  "pebble": {
+    "frames": [
+      "pebble.f0.png",
+      "pebble.f1.png"
+    ],
+    "intervalMs": 1000
+  },
+  "moth": {
+    "frames": [
+      "moth.f0.png",
+      "moth.f1.png"
+    ],
+    "intervalMs": 1000
+  },
+  "ink": {
+    "frames": [
+      "ink.f0.png",
+      "ink.f1.png"
+    ],
+    "intervalMs": 1000
+  }
+}

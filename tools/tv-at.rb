@@ -733,13 +733,16 @@ def probe_startup(args)
   [true, "起来 #{rec['ms']}ms 就把前台交回给 #{home_pkg}（窗口管理器那一格：#{shown[/\S+\/?\S*/].to_s}）"]
 end
 
+require_relative "tv-pet-probe"
+
 PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text),
            'glyphs' => method(:probe_glyphs), 'state' => method(:probe_state),
            'apk' => method(:probe_apk), 'key' => method(:probe_key),
            'setup' => method(:probe_setup), 'switch' => method(:probe_switch),
            'overlay' => method(:probe_overlay),
            'panel' => method(:probe_panel),
-           'startup' => method(:probe_startup) }.freeze
+           'startup' => method(:probe_startup),
+           'pet' => method(:probe_pet) }.freeze
 
 args = parse_args(ARGV)
 if args[:facts]

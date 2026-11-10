@@ -11,6 +11,7 @@ require 'yaml'
 require_relative 'run-fixtures'
 require_relative '../model/agreement'
 require_relative '../model/startup'
+require_relative '../model/pet'
 
 ROOT = File.expand_path('..', __dir__)
 CLASSES = File.join(ROOT, 'core/build/classes')
@@ -170,6 +171,32 @@ Tempfile.open(['youban-align', '.json']) do |f|
         a = mine_p[k]
         bq = theirs_p[k]
         screen_diffs << "#{job0['tag']} 那一屏 #{k}: Ruby #{a.inspect} / Kotlin #{bq.inspect}" if a != bq
+      end
+    end
+  end
+
+  # 角上那一块在这台设备上画不画、画哪一只，也在这儿比（PET-07、D83）：名单说了算，两边同一个名单。
+  [
+    [{}, 'Konka 55A60', '名单之外'],
+    [{ 'pet' => 'moth' }, 'Konka 55A60', '名单之外但方案给了名字'],
+    [{ 'pet' => 'nonsense' }, 'Konka 55A60', '名单之外且名字不在清单里'],
+    [{}, 'this-device-measured', '名单之内、没存过'],
+    [{ 'pet' => 'ink' }, 'this-device-measured', '名单之内、存过'],
+    [{ 'audience' => 'grown-up' }, 'this-device-measured', '名单之内、大人那一档没存过']
+  ].each do |pl, model, tag|
+    mine_p = Core::Pet.shown_shape(pl, model)
+    job = { 'contract' => File.join(ROOT, 'contract/contract.json'), 'plan' => pl, 'model' => model }
+    Tempfile.open(['youban-pet', '.json']) do |g|
+      g.write(JSON.generate(job)); g.flush
+      raw = IO.popen(['java', '-cp', "#{CLASSES}:#{STDLIB}", 'com.youban.core.Main',
+                      '--pet', '--file', g.path], &:read)
+      unless $?.success?
+        warn raw.to_s.lines.last(4).join
+        die('Kotlin 那一块的形态跑挂了')
+      end
+      theirs_p = JSON.parse(raw.to_s.lines.last.to_s.strip)
+      mine_p.each do |k, v|
+        screen_diffs << "#{tag} 那一块 #{k}: Ruby #{v.inspect} / Kotlin #{theirs_p[k].inspect}" if v != theirs_p[k]
       end
     end
   end

@@ -6,6 +6,7 @@ import android.content.BroadcastReceiver;
 import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
+import android.os.Build;
 import android.os.Bundle;
 import android.view.KeyEvent;
 import android.widget.TextView;
@@ -138,7 +139,7 @@ public class MainActivity extends Activity {
                 // 拉起失败只说一句事实，重试次数由 startup.autoOpen.retries 那一处给（0）：这里不排退避表。
                 String said = field(shape, "failLine", "");
                 if (!said.isEmpty()) {
-                    OverlayCard.show(getApplicationContext(), said);
+                    OverlayCard.show(getApplicationContext(), said, petName(), petWhy);
                 }
             }
         }
@@ -245,7 +246,7 @@ public class MainActivity extends Activity {
                 said = field(state, "text", "");
                 if (said.isEmpty()) {
                     said = null;
-                } else if (OverlayCard.show(getApplicationContext(), said)) {
+                } else if (OverlayCard.show(getApplicationContext(), said, petName(), petWhy)) {
                     // 用 application context：在 onStop 里加窗时 activity 的窗口令牌正在拆，
                     // 用 activity 加进去的窗只有记录没有画面（mHasSurface=false，F30）。
                                         // 布局落在下一帧：等到量到真实落点为止，量不到就用预测值。
@@ -269,9 +270,10 @@ public class MainActivity extends Activity {
         } catch (RuntimeException ignored) {
             // 算不出结论就没有这一张：不在这里编一句，也不留在屏上（F21 那一条的同一家族）。
         }
+        // 那一块那三项归 OverlayCard 自己拼（它持有那三个值）：调用处排参数错过一次位。
         write(path(this, OVERLAY_NAME, true),
                 overlayRecord(OverlayCard.attempted(), shown, rect, said, OverlayCard.rendered(),
-                        OverlayCard.refuse()));
+                        OverlayCard.refuse()) + OverlayCard.petRecord() + "}");
     }
 
     /** 回到前台就收掉那一张：L3 是「离开时才在」，不是常驻（LAYERING §1）。 */
@@ -530,6 +532,49 @@ public class MainActivity extends Activity {
             }
         }
         return PUBLIC_DIR + "/" + name;
+    }
+
+    private static String petWhy;
+
+    /**
+     * 这台设备该不该画角上那一块、画哪一只：判定在 Kernel.pet 那一处（名单说了算，两个内核比过），
+     * 这里只把方案与机型递过去（spec/PET.md#PET-07、D83）。
+     */
+    private String petName() {
+        String plan = read(path(this, PLAN_NAME, false));
+        if (plan == null) {
+            plan = read(PUBLIC_DIR + "/" + PLAN_NAME);
+        }
+        try {
+            String name = Kernel.pet(plan == null ? "{}" : plan, Build.MODEL);
+            // 画与不画都要说得出为什么：名单里有它却没画，是最难查的那种错（本机看到的是哪一份契约、哪个机型）。
+            petWhy = name == null ? listedNote() : null;
+            return name;
+        } catch (RuntimeException e) {
+            // 内核没跑起来就不画：那一块不是结论，缺它不欠什么。但**为什么没画**要能报出来，
+            // 不然「名单里却没画」只剩一句猜话（refuse 那一条的同一家族，F30）。
+            StringBuilder why = new StringBuilder(e.getClass().getSimpleName()).append(": ")
+                    .append(String.valueOf(e.getMessage())).append(" @ ")
+                    .append(e.getStackTrace().length > 0 ? e.getStackTrace()[0].toString() : "?");
+            for (int k = 1; k < 4 && k < e.getStackTrace().length; k++) {
+                why.append("\n  at ").append(e.getStackTrace()[k].toString());
+            }
+            petWhy = why.toString();
+            write(path(this, "youban-pet.txt", true), petWhy);
+            return null;
+        }
+    }
+
+    /** 内核说「不画」时的两句诊断：这台设备看到的名单里有几台、本机机型是什么（PET-07）。 */
+    private String listedNote() {
+        try {
+            org.json.JSONArray list = new org.json.JSONObject(read(path(this, CONTRACT_NAME, true)))
+                    .getJSONObject("pet").getJSONObject("appearance").optJSONArray("measuredOn");
+            return "本机看到的名单 " + (list == null ? "没有这一格" : list.length() + " 台")
+                    + " · Build.MODEL=" + Build.MODEL;
+        } catch (Exception e) {
+            return "名单读不出来：" + e.getClass().getSimpleName();
+        }
     }
 
     /** 结论在设备上算出来：事件账 + 当日方案 → 内核。别人算好推上来的那份只当调试兜底。 */
@@ -886,22 +931,12 @@ public class MainActivity extends Activity {
      */
     private static String overlayRecord(boolean attempted, boolean shown, String rect, String text,
                                       String rendered, String refuse) {
+        // 那一块在不在，是自检要读的两项之一：名单说了算，所以「名单里没有它」必须能证伪（PET-07）。
         return "{\"attempted\":" + attempted + ",\"shown\":" + shown + ",\"rect\":" + rect
-                + ",\"text\":\"" + quote(text) + "\",\"rendered\":\"" + quote(rendered)
-                + "\",\"refuse\":\"" + quote(refuse) + "\"}";
+                + ",\"text\":\"" + quote(text) + "\",\"rendered\":\"" + quote(rendered) + "\""
+                + ",\"refuse\":\"" + quote(refuse) + "\"";
     }
 
-    /** 只把引号与反斜杠转掉：这一份记录很短，不必带一个 JSON 库上设备。 */
-    private static String quote(String s) {
-        StringBuilder out = new StringBuilder();
-        for (char ch : (s == null ? "" : s).toCharArray()) {
-            if (ch == '"' || ch == '\\') {
-                out.append('\\');
-            }
-            out.append(ch);
-        }
-        return out.toString();
-    }
 
     static String read(String path) {
         try {
@@ -967,6 +1002,25 @@ public class MainActivity extends Activity {
      */
     static boolean flag(String json, String key) {
         return json.contains("\"" + key + "\":true");
+    }
+
+    static String quote(String s) {
+        StringBuilder out = new StringBuilder();
+        for (char ch : (s == null ? "" : s).toCharArray()) {
+            if (ch == '"' || ch == '\\') {
+                out.append('\\');
+                out.append(ch);
+                continue;
+            }
+            // 控制字符与换行不能直接进 JSON 字符串：带着一行栈的记录读回来是 null，等于没记
+            // （自检就变成「没读到记录」，把病因遮掉了——这两天在这儿吃了两次）。
+            if (ch < 0x20) {
+                out.append(ch == '\n' ? "\\n" : " ");
+                continue;
+            }
+            out.append(ch);
+        }
+        return out.toString();
     }
 
     static String field(String json, String key, String fallback) {

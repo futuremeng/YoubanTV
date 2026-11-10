@@ -45,8 +45,9 @@
 - 测试：fixtures/pet.yaml#PET-06
 
 ### PET-07 帧与功耗先测再开
-帧循环只在**有东西动时**跑（`appearance.drawOnlyWhenMoving`），静止时按 `frameIntervalMs` 走 idle 那两帧——这一条的方法学 playpets 那条 ADR（`requestAnimationFrame` 每刷新都醒一次，成本与「画了多少像素」无关、与「第几帧变了」有关）。**它的数字一个都不引**：默认 `off`，`measuredBeforeOn = true`，Android 7 那台电视上的 CPU/温度/掉帧由真机探针给数，落进 `facts/DEVICES.md` 下一条待填的那一格（`F37`）；
-  那份名单（`appearance.measuredOn`）现在是空的，所以谁都开不了。
+帧循环只在**有东西动时**跑（`appearance.drawOnlyWhenMoving`），静止时按 `frameIntervalMs` 走 idle 那两帧——这一条的方法学 playpets 那条 ADR（`requestAnimationFrame` 每刷新都醒一次，成本与「画了多少像素」无关、与「第几帧变了」有关）。**它的数字一个都不引**：自己的数由设备自检量，量法是 `/proc/<pid>/stat` 的 tick 增量（这台电视上老那版 top 没有 `-b`、`dumpsys cpuinfo` 闲置时不列这一行）。
+- 开这一层的唯一条件是这台设备在 `appearance.measuredOn` 那份名单里，**而名单里每一台都必须有一条实测事实撑着**（`appearance.measuredFact` 指向 `facts/DEVICES.md#F37`；名单里写一台没测过的，断言 `petMeasuredDocumented` 就红）。
+- 默认仍是 `off`：名单说的是「这台设备量过、允许画」，装机第一次不画，签完约离开本应用才有。
 
 ### PET-08 风格可以学，素材不搬
 学的是**形状语言**：圆的形、无描边、暖色、可信的接触阴影。素材**本项目自己画**并记进 `PROVENANCE.md`——playpets 是 MIT，但它的美术另有 provenance（生成图 + 每图一份 `icon-provenance.json`），搬进来就得跟着那份 provenance 走，不值当。

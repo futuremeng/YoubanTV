@@ -215,6 +215,46 @@ object Kernel {
      * 条目与取值只从两处来——契约那张默认表垫底 + 这一档存过的那份盖上；签署那一行取自账里的 PLAN_SIGNED。
      * 契约 agreement.panel.never 那些词一个都不许出现在这一屏上（设备自检逐条扫一遍）。
      */
+    /**
+     * 这台设备该不该画角上那一块、画哪一只（spec/PET.md#PET-07、D83）。
+     * 名单里没有这台设备就是 null——「默认关」说的就是这个；名字由方案递进来，没存过才落那张默认表，
+     * 与 state 用的是同一个 Day.defaultPlan，不在这里另推一次。
+     */
+    @JvmStatic
+    fun pet(planJson: String?, model: String): String? {
+        val node = Json.parse(java.io.File(contractPathFile()).readText()) as Map<*, *>
+        val pet = node["pet"] as Map<*, *>
+        val ap = pet["appearance"] as Map<*, *>
+        val measured = ap["measuredOn"] as List<*>
+        if (!(ap["measuredBeforeOn"] == true && measured.contains(model))) {
+            return null
+        }
+        val pickable = (pet["pickable"] as List<*>).map { it.toString() }
+        val plan: Map<String, Any> = if (planJson == null || planJson.trim().isEmpty()) emptyMap()
+        else (Json.parse(planJson) as? Map<String, Any>) ?: emptyMap()
+        val stored = plan["pet"]?.toString()
+        if (stored != null && pickable.contains(stored)) {
+            return stored
+        }
+        val fallback = defaultsFor(plan)["pet"]?.toString()
+        return if (pickable.contains(fallback)) fallback else pickable.firstOrNull()?.toString()
+    }
+
+    /** 设备与对齐共用的那一块形态：画哪一只、落在哪一层、几帧、间隔多久。 */
+    @JvmStatic
+    fun petShape(planJson: String?, model: String): String {
+        val node = Json.parse(java.io.File(contractPathFile()).readText()) as Map<*, *>
+        val ap = ((node["pet"] as Map<*, *>)["appearance"]) as Map<*, *>
+        val out = LinkedHashMap<String, Any?>()
+        out["name"] = pet(planJson, model)
+        out["layer"] = ap["layer"]
+        out["intervalMs"] = ap["frameIntervalMs"]
+        out["frames"] = ap["idleFrames"]
+        out["onlyWhenMoving"] = ap["drawOnlyWhenMoving"]
+        out["measured"] = pet(planJson, model) != null
+        return Json.write(out)
+    }
+
     /** 这台电视上的启动形态（LAYER-14、ONBOARD-11、ONBOARD-12、D81）：只在契约 startup 那一处答。
      *  与 Ruby 的 Core::Startup.startup_shape 同源，由 tools/align-core.rb 逐字段比。 */
     @JvmStatic

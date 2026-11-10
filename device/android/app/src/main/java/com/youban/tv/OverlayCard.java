@@ -1,12 +1,18 @@
 package com.youban.tv;
 
 import android.content.Context;
+import android.graphics.BitmapFactory;
 import android.graphics.PixelFormat;
+import android.graphics.Bitmap;
 import android.os.Build;
+import android.os.Handler;
+import android.os.Looper;
 import android.provider.Settings;
 import android.view.Gravity;
 import android.view.View;
 import android.view.WindowManager;
+import android.widget.ImageView;
+import android.widget.LinearLayout;
 import android.widget.TextView;
 
 /**
@@ -26,7 +32,26 @@ final class OverlayCard {
     /** 字幕带要多高，写在契约 layering.overlay 那一处；这里不写死数字。 */
     private static final String CONTRACT_FILE = "contract.json";
 
-    private static TextView view;
+    private static LinearLayout view;
+    // 角上那一块的帧：只有这一层在显示时才走这张表，收掉就停（PET-07：只在有东西动时画）。
+    private static ImageView pet;
+    private static String petShown;
+    private static String petWhy;
+    private static String[] petFrames;
+    private static int petFrame;
+    private static final Handler ticker = new Handler(Looper.getMainLooper());
+    private static final Runnable breathing = new Runnable() {
+        @Override
+        public void run() {
+            if (pet == null || petFrames == null || petFrames.length < 2) {
+                return;
+            }
+            petFrame = (petFrame + 1) % petFrames.length;
+            paintFrame();
+            ticker.postDelayed(this, PetArt.intervalMs(pet.getContext()));
+        }
+    };
+    private static int[] petRect;
     private static int[] rect;
     // 「有没有去试」与「显示出来了没有」是两件事：装完默认不开说的是前者——不去要、不去加窗。
     // 分开记，设备自检才分得开「系统替我们挡了」与「我们压根不该去试」（F30）。
@@ -53,9 +78,22 @@ final class OverlayCard {
      * @return 显示出来了没有；第二项是那块矩形的像素边界
      */
     static boolean show(Context c, String text) {
+        return show(c, text, null, null);
+    }
+
+    /**
+     * @param petName 内核说这一档画哪一只（Kernel.pet 给）；null 就是这台设备不画——
+     *                「默认关」在这一层就是这一句：名单里没有这台设备，连那张图都不去解（PET-07）。
+     */
+    static boolean show(Context c, String text, String petName, String why) {
+        // 先把上一轮的记录清空再往下摆：hide() 里也会清一次，摆在前面的赋值会被它抹掉——
+        // 第一版就是把这个赋值写在 hide() 之前，画了那只却报「没画」（记录比画面先说谎）。
+        hide();
         attempted = false;
         rect = null;
+        petRect = null;
         refuse = null;
+        petWhy = why;
         if (text == null || text.trim().isEmpty()) {
             return false;
         }
@@ -63,24 +101,39 @@ final class OverlayCard {
         if (!allowed(c)) {
             return false;
         }
+        petShown = petName;
         attempted = true;
         WindowManager wm = (WindowManager) c.getSystemService(Context.WINDOW_SERVICE);
         if (wm == null) {
             return false;
         }
-        hide();
 
         int width = wm.getDefaultDisplay().getWidth();
         int height = wm.getDefaultDisplay().getHeight();
         int band = (int) (height * subtitleBandPct(c));
 
-        TextView card = new TextView(c);
-        card.setText(text);
-        rendered = card.getText().toString(); // 交出去的是视图真正拿到的那一句
-        card.setTextColor(0xFFFFFFFF);
-        card.setTextSize(24f); // L3 那一张仍是正文级字号（docs/ARCHITECTURE.md §字号）
-        card.setPadding(24, 18, 24, 18);
+        LinearLayout card = new LinearLayout(c);
+        card.setOrientation(LinearLayout.HORIZONTAL);
+        card.setGravity(Gravity.CENTER_VERTICAL);
+        card.setPadding(18, 14, 24, 14);
         card.setBackgroundColor(0xC0101010);
+        if (petName != null) {
+            petFrames = PetArt.frames(c, petName);
+            if (petFrames.length > 0) {
+                pet = new ImageView(c);
+                int side = Math.round(28f * c.getResources().getDisplayMetrics().density);
+                LinearLayout.LayoutParams ip = new LinearLayout.LayoutParams(side, side);
+                ip.rightMargin = 16;
+                card.addView(pet, ip);
+                paintFrame();
+            }
+        }
+        TextView words = new TextView(c);
+        card.addView(words);
+        words.setText(text);
+        rendered = words.getText().toString(); // 交出去的是视图真正拿到的那一句
+        words.setTextColor(0xFFFFFFFF);
+        words.setTextSize(24f); // L3 那一张仍是正文级字号（docs/ARCHITECTURE.md §字号）
 
         WindowManager.LayoutParams lp = new WindowManager.LayoutParams();
         lp.type = Build.VERSION.SDK_INT >= 26
@@ -126,12 +179,52 @@ final class OverlayCard {
             return false;
         }
         view = card;
+        petRect = pet == null ? null : new int[] {rect[0], rect[1], rect[0] + side(pet), rect[1] + rect[3] - rect[1]};
+        if (pet != null) {
+            ticker.removeCallbacks(breathing);
+            ticker.postDelayed(breathing, PetArt.intervalMs(c)); // 两帧之间隔着 1s：一次呼吸，不是弹跳
+        }
         return true;
     }
 
     /** 显示出来了的那块矩形；还没量到或没显示就是 null。 */
     static int[] rect() {
         return rect;
+    }
+
+    /** 角上那一块自己的矩形；这台设备不画就是 null（自检拿它判「名单说了算」那条）。 */
+    /** 真正交给视图的那一只的名字；这台设备不画就是 null。 */
+    static String petName() {
+        return petShown;
+    }
+
+    /**
+     * 那一块那三项由这里拼，不在调用处排参数：排错过一次，pet / petRect / petWhy 互相串位，
+     * 读出来的「为什么没画」其实是落点（F30 那一条的同一家族——记录错位比没记录更坏）。
+     */
+    static String petRecord() {
+        String box = petRect == null ? "null"
+                : "[" + petRect[0] + "," + petRect[1] + "," + petRect[2] + "," + petRect[3] + "]";
+        return ",\"pet\":" + (petShown == null ? "null" : "\"" + MainActivity.quote(petShown) + "\"")
+                + ",\"petRect\":" + box + ",\"petWhy\":\"" + MainActivity.quote(petWhy) + "\"";
+    }
+
+    static int[] petRect() {
+        return petRect;
+    }
+
+    private static int side(View v) {
+        return v.getWidth() > 0 ? v.getWidth() : v.getMeasuredWidth();
+    }
+
+    private static void paintFrame() {
+        try {
+            pet.setImageBitmap(BitmapFactory.decodeStream(
+                    pet.getContext().getAssets().open("pets/" + petFrames[petFrame])));
+        } catch (Exception ignored) {
+            // 图没解出来就是没有那一块：不重试、不提示（PET-06 那一条的同一家族）。
+            pet.setImageDrawable(null);
+        }
     }
 
     static String refuse() {
@@ -168,6 +261,13 @@ final class OverlayCard {
 
     /** 回到前台就收掉：这一层不是常驻，是「离开时才在」（LAYERING §1）。 */
     static void hide() {
+        ticker.removeCallbacks(breathing);
+        pet = null;
+        petShown = null;
+        petWhy = null;
+        petFrames = null;
+        petFrame = 0;
+        petRect = null;
         if (view != null) {
             try {
                 ((WindowManager) view.getContext().getSystemService(Context.WINDOW_SERVICE)).removeView(view);

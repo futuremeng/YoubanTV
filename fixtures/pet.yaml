@@ -53,6 +53,7 @@ PET-06:
   spec: [spec/PET.md#PET-06, spec/ONBOARD.md#ONBOARD-06]
   given: { profile: "member:kid" }
   cases:
-    - name: 这一层默认关；开它的唯一条件在那份实测名单上，而名单是空的
+    - name: 这一层默认关；开它的唯一条件在那份实测名单上，名单里每一台都得有一条实测事实撑着
       when: { mode: ambient }
-      expect: { value: { petDefaultOn: false, petGateRequiresMeasured: true, petMeasuredCount: 0, petEnabledHere: false, petDrawsOnlyWhenMoving: true } }
+      expect: { value: { petDefaultOn: false, petGateRequiresMeasured: true, petMeasuredCount: 2,
+                         petMeasuredDocumented: true, petEnabledHere: false, petDrawsOnlyWhenMoving: true } }

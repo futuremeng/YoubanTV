@@ -1913,8 +1913,10 @@
       "default": "off",
       "measuredBeforeOn": true,
       "measuredOn": [
-
-      ]
+        "OD103",
+        "Konka Android TV 9652"
+      ],
+      "measuredFact": "facts/DEVICES.md#F37"
     },
     "style": {
       "borrow": "形状语言：圆的形、无描边、暖色、可信的接触阴影（playpets 的美术方向）",
@@ -1930,6 +1932,7 @@
       "pebble",
       "moth",
       "ink"
-    ]
+    ],
+    "art": "tools/make-pet-art.rb 画的（脚本在仓库里，图可重画）· 四只 × 两帧 · 画布 192 · 描边一次没用"
   }
 }

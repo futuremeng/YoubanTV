@@ -331,7 +331,7 @@ kvKeys: [from, to, by, role, action, kind, target, minutes, accepted, verdict, r
   packTextbookFilter, packTextbookMarks, packTextbookHit,
   petStateNeverFromUsage, petNeverStateHits, petNeverState, petStateCarries, petForbiddenSingleSource, petForbiddenInText, petAutonomy, petSwitchCostItems, petPickable, petDefaultPick, petPersonalityNeverHits, petLayer, petNeverAppearanceHits, petDefaultOn, petEnabledHere, petDrawsOnlyWhenMoving,
   petNeverStateCount, petNoProgress, petPersonalityNeverCount, petNeverAppearanceCount,
-  petGateRequiresMeasured, petMeasuredCount,
+  petGateRequiresMeasured, petMeasuredCount, petMeasuredDocumented,
   reportPush, reportComparison, reportVisibleTo, reportForbiddenWords, reportRows,
   reportNeverSingleSource, reportWindowDays, subjects, levels, mode, deficit, window, size, evicted, days, version, signed,
   added, notAdded, status, owner, ownerForms, dimension, fields, paired, trigger, responseRate,
