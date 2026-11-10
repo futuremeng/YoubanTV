@@ -24,12 +24,18 @@
 - 内核依赖关系由构建脚本断言：`core` 只被 `device` / `panel` 依赖。
 
 
-**现在到哪一步**：`kotlinc 1.9.24` 跑通了——之前卡在 Maven 上那个裸 `kotlin-compiler.jar` 缺 intellij 依赖，
-换成 GitHub releases 的 `kotlin-compiler-1.9.24.zip`（完整发行版）就够了，`sh tools/build-core.sh` 一步编完。
-`core/` 编得出来、`Main` 能跑（支持 `--batch`，一次 JVM 跑一批任务），`tools/align-core.rb` 把两边逐字段比：
-**221 个 case × 10 个字段，当前 40 处不一致**，集中在两处——① 暂停冻结之后那档 `L1.5` Kotlin 里没有；
-② DAY-06「当日约定已满足 → honored」Kotlin 没实现。这 40 处就是 M2 剩下的全部距离。
-它**还没进 `tools/check-fixtures.sh`**（红了会被当噪声忽略），烧到 0 那天再进，之后是常设门。
+**现在到哪一步：M2 的验收过了。** `kotlinc 1.9.24`（GitHub releases 的完整发行版；Maven 那个裸 jar 缺
+intellij 依赖）→ `sh tools/build-core.sh` → `ruby tools/align-core.rb`：**221 个 case × 10 个字段逐位相同**。
+它已进 `tools/check-fixtures.sh` 当常设门，并做过反证：把 Kotlin 的 `watched < grace` 那一支改坏，
+立刻报 681 处不一致；改回来又归零——这一道是活的，不是摆设。
+
+烧的过程里有三件事值得记：
+1. 40 处里有 **27 处是比对器没把输入喂成同一份**（形态请求、已受理的暂停、探针结论、跨天）。
+   那不是内核分歧，是我的比对器在替内核做决定——把原始事实（墙钟/单调钟的增量）送过去、
+   滚不滚交给 Kotlin 自己判（DAY-07 那条），才算真的对齐。
+2. 探针那两个门槛数（0.95 / 20）只写在 Ruby 一处；比对器送的是它的结论，
+   不在比对器里另抄一份。设备端将来要自己判探针，那两个数得先进契约。
+3. 空行不是事件、`.ttc` 要选面、adb push 的文件应用读不到——这三条见 `facts/DEVICES.md`。
 
 ## M3 · 设备端最小闭环
 

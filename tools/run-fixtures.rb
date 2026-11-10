@@ -65,7 +65,7 @@ class World
               :assembly, :roles, :egress, :probe, :added, :reopened, :item, :paired, :strengths,
               :audiences
   attr_accessor :strength, :audience, :day_type, :motion_accepted, :applied, :before
-  attr_reader :authoring, :kp_state
+  attr_reader :authoring, :kp_state, :clock
   attr_reader :motion_state, :mode_requested
 
   def pick_source

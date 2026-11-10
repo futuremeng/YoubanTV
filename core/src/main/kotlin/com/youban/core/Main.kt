@@ -44,8 +44,8 @@ object Main {
             ledger.append(e["kind"].toString(), (e["profile"] as? String) ?: profile, fields)
         }
 
-        // 零点刷新：当日那几量从零起算（DAY-01、DAY-06）。补一补池不按天清，所以留着。
-        if (job["rollover"] as? Boolean == true) {
+        // 墙钟跳过了午夜不等于真的过了一天：单调钟没跟上就不滚，也不回放（DAY-07）。
+        if (job["crossedMidnight"] as? Boolean == true && rollsDay(job)) {
             ledger.events.removeAll { it.kind in DAY_SCOPED }
         }
 
@@ -63,6 +63,14 @@ object Main {
             requested = job["requested"] as? Boolean ?: false
         )
         return state
+    }
+
+    /** 与 Ruby 那边同一条：`crossed && wallClockDeltaMs > 0 && monotonicDeltaMs < wallClockDeltaMs` 就不滚。 */
+    private fun rollsDay(job: Map<*, *>): Boolean {
+        val clock = job["clock"] as? Map<*, *> ?: return true
+        val wall = Day.num(clock["wallClockDeltaMs"])
+        val mono = Day.num(clock["monotonicDeltaMs"])
+        return !(wall > 0 && mono < wall)
     }
 
     private fun readInput(args: Array<String>): String {

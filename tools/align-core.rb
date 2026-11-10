@@ -53,9 +53,14 @@ Dir[File.join(ROOT, 'fixtures', '*.yaml')].sort.each do |path|
         # 不是内核的分歧（这种假阳性烧掉过一次，别再犯）。
         'mode' => args[:mode], 'paused' => !args[:motion_state].empty?,
         'pauseMs' => args[:motion_state]['pauseMs'].to_i,
-        'requested' => args[:requested], 'probeOk' => args[:probe],
+        # 探针那条门槛规则只有一份（Ruby 的 focused_default_ok?）：这里送的是它的结论，
+        # 不在比对器里另写一条 0.95/20——设备端要自己判探针时，那两个数得先进契约再说。
+        'requested' => args[:requested],
+        'probeOk' => args[:probe].nil? ? nil : Core::Capability.focused_default_ok?(args[:probe]),
         # 这一轮做了零点刷新就得告诉内核，否则两边喂的输入不同（DAY-06）。
-        'rollover' => (c['when'] || {}).keys.any? { |k| k.to_s =~ /crossedMidnight|rollover|dayRefresh/i },
+        # 墙钟与单调钟的原始量一起送过去：滚不滚这一天归内核判（DAY-07），比对器不许替它决定。
+        'crossedMidnight' => (c['when'] || {}).any? { |k, v| k.to_s == 'crossedMidnight' && v },
+        'clock' => w.clock,
         'plan' => w.plan,
         'events' => w.ledger.events.map { |e|
           { 'kind' => e.kind.to_s, 'profile' => e.profile.to_s,
