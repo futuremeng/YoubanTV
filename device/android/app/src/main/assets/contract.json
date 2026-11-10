@@ -1228,7 +1228,7 @@
         "asks": []
       }
     ],
-    "firstRunEscape": "每一步都可以「先用默认」；用了默认的条目在界面上标「未签·默认」，不弹催签、不进周报、不打分（AGREE-04、ONBOARD-05）。",
+    "firstRunEscape": "每一步都可以「先用默认」；用了默认的条目在界面上标「未签·默认」，不弹催签、不进那一页的账（`REPORT-02`）、不打分（AGREE-04、ONBOARD-05）。",
     "perProfile": {
       "x-note": "约定按身份各立一组： PROFILE_SWITCH 之后加载那一组的 plan/版本/签署记录，互不影响（AGREE-08）。",
       "loadOnSwitch": "已有该身份的约定 → 直接加载生效版本；没有 → 走 firstRun 那六步（设备条目不重复问）。",
@@ -1643,6 +1643,61 @@
         "id": "about",
         "title": "关于",
         "answers": "这台设备随时可卸载；出处与致谢"
+      },
+      {
+        "id": "record",
+        "title": "这段时间的账",
+        "answers": "这一段时间的账：只从事件数出来，只看自己的，不做区间对比（REPORT-01..04）"
+      }
+    ]
+  },
+  "report": {
+    "x-note": "本项目没有周报——只有面板上的一页「这段时间的账」（REPORT-01..04、D78）。这一页只从事件数出来、只看自己的、不做区间对比；不许有的那批词不在这里再抄一份，见 neverFrom。",
+    "spec": [
+      "REPORT-01",
+      "REPORT-02",
+      "REPORT-03",
+      "REPORT-04"
+    ],
+    "title": "这段时间的账",
+    "row": "{label}：{value}",
+    "windowDefaultDays": 7,
+    "push": false,
+    "comparison": false,
+    "visibleTo": [
+      "self"
+    ],
+    "neverFrom": "agreement.panel.never",
+    "rows": [
+      {
+        "label": "看了多久",
+        "kind": "WATCHED",
+        "field": "ms"
+      },
+      {
+        "label": "超出约定",
+        "kind": "OVER",
+        "field": "ms"
+      },
+      {
+        "label": "完成几组",
+        "kind": "ROUND_DONE",
+        "field": "count"
+      },
+      {
+        "label": "答了几题",
+        "kind": "ANSWER",
+        "field": "count"
+      },
+      {
+        "label": "提了几条动议",
+        "kind": "MOTION",
+        "field": "count"
+      },
+      {
+        "label": "签过几版",
+        "kind": "PLAN_SIGNED",
+        "field": "count"
       }
     ]
   }

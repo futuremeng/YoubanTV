@@ -20,6 +20,7 @@ require 'pick'
 require 'kp'
 require 'write'
 require 'agreement'
+require 'report'
 
 class Unsupported < StandardError; end
 
@@ -802,7 +803,7 @@ class World
       @extras['guideIsFirstFiveItems'] = Core::Checklist.guide(items).size == Core::Checklist::GUIDE_ITEMS
       @extras['itemSources'] = Core::Checklist::ITEM_SOURCES
       @extras['fallbackRules'] = Core::Capability::FALLBACK_RULES
-      @extras['inWeeklyReport'] = Core::Checklist.in_report?
+      @extras['inWeeklyReport'] = Core::Report.includes_checklist?
       @extras['starsDelta'] = Core::Checklist.stars_delta
       @extras['masteryDelta'] = 0
       @extras['otherItemsUnaffected'] = true
@@ -842,7 +843,7 @@ class World
       'guideIsFirstFiveItems' => Core::Checklist.guide(checklist_items).size == Core::Checklist::GUIDE_ITEMS,
       'storedFields' => Core::Checklist::STORED_FIELDS,
       'derived' => Core::Checklist::DERIVED_FIELDS,
-      'inWeeklyReport' => Core::Checklist.in_report?,
+      'inWeeklyReport' => Core::Report.includes_checklist?,
       'starsDelta' => Core::Checklist.stars_delta,
       'masteryDelta' => 0,
       'otherItemsUnaffected' => true,
@@ -883,6 +884,14 @@ class World
       # 各设备各一行：这台的那行是判定用的数，另一台那行只是列出来（DAY-10）。
       'watchedPerDevice' => @ledger.by_device(@profile),
       # 手机与电视的直连只为体感与视觉两件事（SENSE-06、D77）：这几项只由契约 link 那一处答。
+      # 「这段时间的账」那一页（REPORT-01..04、D78）：三条开关与那批词都由契约 report 那一处答。
+      'reportPush' => Core::Report.push?,
+      'reportComparison' => Core::Report.comparison?,
+      'reportVisibleTo' => Core::Report.visible_to,
+      'reportForbiddenWords' => Core::Report.forbidden_words(@ledger, @profile),
+      'reportNeverSingleSource' => Core::Report.never_single_source?,
+      'reportWindowDays' => Core::Report.window_days,
+      'reportRows' => Core::Report.row_count(@ledger, @profile),
       'linkKinds' => Core::Sense.link_kinds,
       'linkCarries' => Core::Sense.link_carries,
       'frameLeavesDevice' => Core::Sense.frame_leaves_device,
@@ -904,7 +913,7 @@ class World
       'motionRequired' => @extras['motionRequired'],
       'mastery' => @extras.fetch('mastery', 'unchanged'),
       'visibleOn' => @extras['visibleOn'],
-      'inReport' => @extras['inReport'] || (Core::Checklist.in_report? ? 'familyReport' : 'none'),
+      'inReport' => @extras['inReport'] || (Core::Report.includes_checklist? ? 'familyReport' : 'none'),
       # 内核输出的形状：字段与落层都从 CommitState 这一份取（M1.4）。
       'commitStateTier' => commit_state['tier'],
       'registryTier' => (k = @capability.keys.find { |x| Core::Capability.known?(x) }) ? Core::Capability.tier(k) : nil,
@@ -1226,7 +1235,7 @@ class World
       @applied = true
       @effective = 'now'
     end
-    # 截止未达成只写 MISSED：后果只有那四类，进的是自己的周报（COMMIT-06、DAY-04）。
+    # 截止未达成只写 MISSED：后果只有那四类，进的是自己那一页的账（COMMIT-06、DAY-04、REPORT-03）。
     if when_.key?('deadlinePassed') && when_.delete('deadlinePassed')
       append('MISSED', @profile)
       @extras['inReport'] = 'ownWeekly'
@@ -1692,9 +1701,9 @@ def check(key, want, world, before)
   when 'checklistStatus' then cmp(want, world.checklist_status(world.item))
   when 'egress' then want.all? { |k, v| world.egress[k.to_s].to_s == v.to_s } ? :pass : :fail
   when 'roles' then want.all? { |r, v| world.roles[r.to_s].to_s == v.to_s } ? :pass : :fail
-  # inReport: none 是「不进任何报告」；ownWeekly 是「只进这条账自己的周报」（COMMIT-06）。
+  # inReport: none 是「不进任何一页的账」；ownWeekly 是「只进这条账自己的那一页」（COMMIT-06、REPORT-03）。
   when 'inReport'
-    want.to_s == 'none' ? (Core::Checklist.in_report? ? :fail : :pass) : cmp(want, world.derived['inReport'])
+    want.to_s == 'none' ? (Core::Report.includes_checklist? ? :fail : :pass) : cmp(want, world.derived['inReport'])
   # notify: none 是「不发任何提醒」；once 是「这条动议在面板只出现一次」（AUTO-16、COMMIT-06）。
   when 'notify' then cmp(want, world.derived['notify'])
   # 掌握状态随每次作答更新，不是一个分数；unchanged 用在「这轮什么都没动」（COMMIT-05）。

@@ -1,0 +1,35 @@
+# 「这段时间的账」那一页（spec/REPORT.md）：本项目没有周报，只有这一页（D78）。
+# 四条各问一件事；三条开关都由契约 report 那一处答，模型不自己决定。
+REPORT-01:
+  spec: [spec/REPORT.md#REPORT-01, spec/PANEL.md#PANEL-01]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 只有一个入口：一页账，没有定时推送
+      given: { watchedMs: 2400000 }
+      when: { mode: ambient }
+      expect: { value: { reportPush: false, reportWindowDays: 7 } }
+
+REPORT-02:
+  spec: [spec/REPORT.md#REPORT-02]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 每一行都从事件数出来，也没有「上一窗」那一句
+      given: { watchedMs: 2400000, overMs: 600000 }
+      when: { mode: ambient }
+      expect: { value: { reportComparison: false, reportForbiddenWords: 0, reportRows: 6 } }
+
+REPORT-03:
+  spec: [spec/REPORT.md#REPORT-03, spec/AUTONOMY.md#AUTO-10]
+  given: { profile: "member:kid", watchedMs: 2400000 }
+  cases:
+    - name: 这一页只给本人看
+      when: { mode: ambient }
+      expect: { value: { reportVisibleTo: ['self'] } }
+
+REPORT-04:
+  spec: [spec/REPORT.md#REPORT-04, spec/AGREE.md#AGREE-14]
+  given: { profile: "member:kid", watchedMs: 2400000 }
+  cases:
+    - name: 那批词在这页的产出里一次不出现，而且清单只有一份
+      when: { mode: ambient }
+      expect: { value: { reportForbiddenWords: 0, reportNeverSingleSource: true } }

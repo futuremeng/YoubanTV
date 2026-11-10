@@ -18,10 +18,9 @@
 - 结论：`where` 里出现的页名查不到即红；壳层与设备端不手抄页名，也不自己编一个地方。
 - 测试：fixtures/panel.yaml#PANEL-02
 
-## 还没定的那一页
+## 那条通道已经改名了
 
-**周报**在文档里被当成落点引用了六次（`COMMIT.md`、`AUTONOMY.md`、`PRODUCT.md`），另有六处规定某些东西
-**不进周报**（`AGREE.md`、`ONBOARD.md`、`CONTEXT.md`），但它自己没有条目、没有字段、没有页。
-这条通道恰好最容易把连击、完成度、催签请回来，所以它得先有条目再上界面——见
-[`../docs/DECISIONS.md`](../docs/DECISIONS.md)「待定」那节。在此之前它**不进这张表**，
-界面上也不出现「周报」二字（`agreement.panel.never` 已把它列进那一屏不许有的词）。
+「周报」以前被当落点引用了六次（`COMMIT.md`、`AUTONOMY.md`、`PRODUCT.md`），另有六处规定某些东西**不进那一页的账**
+（`AGREE.md`、`ONBOARD.md`、`CONTEXT.md`）。定案：**本项目没有周报**——只有这张表里的「这段时间的账」那一页，
+只从事件数出来、只看自己的、不做区间对比（[`REPORT.md`](REPORT.md)、D78）。界面上也不出现「周报」二字
+（`agreement.panel.never` 把它列进不许有的词，那一页读同一份清单，不抄第二份）。

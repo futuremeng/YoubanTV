@@ -11,8 +11,6 @@ module Core
     STATUSES = %w[pending done unknown notApplicable].freeze
     # 一台设备一份（ONBOARD-01）。
     PER_DEVICE = true
-    # 清单不打分、不进周报（ONBOARD-05）。周报里能出现的东西是封闭的：
-    REPORT_FIELDS = %w[watchedMs overMs roundsDone answeredInTask].freeze
     # 存储里只落这几项（ONBOARD-10）。
     STORED_FIELDS = %w[id owner where status evidence addedAt].freeze
     DERIVED_FIELDS = %w[owner where addedAt].freeze
@@ -229,10 +227,6 @@ module Core
 
     def completeness(items)
       [items.count { |i| i['status'] == 'done' }, items.size]
-    end
-
-    def in_report?
-      false
     end
 
     def stars_delta

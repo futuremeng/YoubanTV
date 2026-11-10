@@ -62,6 +62,14 @@ fields:
   linkKinds: {type: list} # 手机与电视之间的直连有哪几件事（SENSE-06、D77）
   linkCarries: {type: list} # 那条直连上过界的是什么：只有计数与判定
   frameLeavesDevice: {type: boolean} # 画面出不出手机——永远是否（SENSE-01、SENSE-02）
+  # —— 「这段时间的账」那一页（REPORT-01..04）：三条开关都读契约 report 那一处，模型不自己决定。
+  reportPush: {type: boolean} # 有没有定时推送——永远没有（REPORT-01）
+  reportComparison: {type: boolean} # 有没有区间对比——永远没有（REPORT-02）
+  reportVisibleTo: {type: list} # 这一页给谁看：只有本人（REPORT-03）
+  reportForbiddenWords: {type: number} # 那批不许有的词在这一页的产出里出现几次（REPORT-04）
+  reportNeverSingleSource: {type: boolean} # 不许有的词是不是只有一份清单（D45）
+  reportWindowDays: {type: number} # 那一页默认看几天
+  reportRows: {type: number} # 那一页有几行——零行就是这页在空转（REPORT-02）
   strength: {type: enum, enum: strength}
   strengths: {type: list, enum: strength}
   assembly: {type: symbol, values: [tv, mobile]}
@@ -283,7 +291,9 @@ predicates:
   answerable: {type: string, note: "这条断言回答的那个问题"}
 
 kvKeys: [from, to, by, role, action, kind, target, minutes, accepted, verdict, reason, path,
-  profile, device, tv, mobile, watchedPerDevice, linkKinds, linkCarries, frameLeavesDevice, subjects, levels, mode, deficit, window, size, evicted, days, version, signed,
+  profile, device, tv, mobile, watchedPerDevice, linkKinds, linkCarries, frameLeavesDevice,
+  reportPush, reportComparison, reportVisibleTo, reportForbiddenWords, reportRows,
+  reportNeverSingleSource, reportWindowDays, subjects, levels, mode, deficit, window, size, evicted, days, version, signed,
   added, notAdded, status, owner, ownerForms, dimension, fields, paired, trigger, responseRate,
   sampleCount, fieldsPerItem, fields, slots, tighten, moveFrom, audience,
   attempts, falseCountRate, periodMs, amplitude, capability,
