@@ -190,7 +190,16 @@
   `/sdcard/Android/data/com.youban.tv/files/youban-diag.json`，`adb shell cat` 直接读——
   上面那次读到 `{"len":9,"cps":[4eca,5929,5df2,6309,7ea6,5b9a,4f7f,7528,3002]}`，
   与源文案逐位相同，所以那阵子「每个字同一个字形」不是文本坏了，是字形映射。
-- 还剩一小条：个别字仍缺字形（角标「无到期项」少画了一个字），属字体覆盖，不是这条链的塌法。
+- **剩下的堵点不在字体上**（这一条推翻了上面我自己给的「个别字缺字形」那句）：同一屏里
+  **只有那一句大字号状态句**塌，角标那行「无到期项」和小字那行「落层 · 强度天花板 · 结论来自设备上的内核」
+  都是对的。三种字体一样塌：系统 serif 族、设备自带 `SourceHanSerifSC-Bold.otf`、随包带的单字面
+  TrueType（阿里普惠，字形齐全，测完即删）。码位由 `youban-diag.json` 证明是对的：
+  `["8d85","51fa","7ea6","5b9a","65f6","95f4","3002","4eca","5929","5df2","6309","7ea6","5b9a","4f7f","7528","5b8c","3002"]`
+  →「超出约定时间。今天已按约定使用完。」其中只有「约定完」画对，其余都成同一个字。
+  所以：同一份文本、同一台设备，小字对、大字错，与用哪个字体无关——这条链在**大字号那条 TextView** 上断。
+- 选面这条路在这台设备上走不通：`ls /system/fonts` 里**没有单字面的中文字体**，汉字只在
+  `NotoSansCJK-Regular.ttc` / `NotoSerifCJK-Regular.ttc` 里；而 `Typeface.Builder(String, int)` 在我们编译用的
+  android.jar 里没有（编译器把它解析成 `Builder(AssetManager, String)`），低版本只有 `createFromFile`，只能拿第 0 面。
 - 这两条现在进了设备清单，不用手验（`tools/tv-device.yaml` 的 `probes:`）：
   `input` 读 `/sdcard/Android/data/com.youban.tv/files/youban-input.json` 里有 `"key":"accept"`；
   `text` 读 `youban-diag.json`，码位必须全落在汉字/标点/ASCII 之内，出现 U+FFFD 就是文本在途中坏了。

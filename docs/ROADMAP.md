@@ -50,8 +50,11 @@
   `textAppearance` 时不接中文回退，另有编译期一条 `javac -encoding UTF-8`（`facts/DEVICES.md#F17`）；
   个别字仍缺字形，属字体覆盖；② **设备上跑内核这一件正在做，还没成**：Kotlin 内核与 stdlib 已 d8 进
   同一个 dex（APK 0.60 MB），事件账落在设备本地 `youban-events.jsonl`（广播带的是**事件**不是结论），
-  但 `Kernel.state()` 在设备上抛了异常，屏幕退回兜底句、`youban-diag.json` 没写出来——没跑通就是没跑通，
-  不许按「设备端已有内核」记账。下一步先把异常原文落到设备上的诊断文件再读回来。
+  **内核在设备上跑起来了**：设备本地事件账 `youban-events.jsonl` 里一条 WATCHED(ms=3600000)，
+  屏幕给出「超出约定时间。今天已按约定使用完。」，码位逐位对得上（`facts/DEVICES.md#F17`）。
+  路上三个坑都记在 F17：adb push 出来的文件属主是 shell，应用读不到（要 push 到应用自己那个目录）；
+  广播带 JSON 字符串会被两道 shell 吃掉字符（改成 `--es kind … --el ms …`）；事件账末尾的空行不是事件。
+  大字号那一句的字形还是塌的，与字体无关，见 F17。
   ③「按键落到设备」与「屏上文案的码位」已进设备清单（`tools/tv-device.yaml` 的 `probes:`，
   现在一条命令跑 8 步判定 + 2 步设备自检，两道全绿才算过）。
 - **现在能用 adb 验的部分**（M3 的呈现半边）：`ruby tools/tv-at.rb --serial=…` 跑 `tools/tv-device.yaml`，

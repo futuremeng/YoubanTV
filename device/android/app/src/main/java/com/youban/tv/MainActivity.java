@@ -66,6 +66,7 @@ public class MainActivity extends Activity {
         super.onCreate(savedInstanceState);
         setContentView(R.layout.status);
         useBundledContract();
+        useDeviceCjkFont();
         sentence = (TextView) findViewById(R.id.sentence);
         badge = (TextView) findViewById(R.id.badge);
         foot = (TextView) findViewById(R.id.foot);
@@ -161,6 +162,13 @@ public class MainActivity extends Activity {
                 return local;
             } catch (RuntimeException e) {
                 debugSource = "内核没跑起来：" + e.getClass().getSimpleName();
+                // 异常原文落到设备上：不写出来的话，屏幕上只剩一句兜底话，等于把病因藏起来。
+                StringBuilder trace = new StringBuilder(debugSource).append(" | ").append(String.valueOf(e.getMessage()));
+                for (StackTraceElement s : e.getStackTrace()) {
+                    trace.append("\n  at ").append(s.toString());
+                    if (trace.length() > 1200) break;
+                }
+                write(path(this, "youban-kernel-error.txt", true), trace.toString());
                 return null;
             }
         }
@@ -189,7 +197,7 @@ public class MainActivity extends Activity {
         StringBuilder sb = new StringBuilder("{\"len\":" + s.length() + ",\"cps\":[");
         int n = Math.min(24, s.length());
         for (int i = 0; i < n; i++) {
-            sb.append(i == 0 ? "" : ",\"").append(String.format("%04x", (int) s.charAt(i))).append(i == n - 1 ? "\"" : "\",\"");
+            sb.append(i == 0 ? "\"" : ",\"").append(String.format("%04x", (int) s.charAt(i))).append("\"");
         }
         sb.append("]}");
         write(path(this, "youban-diag.json", true), sb.toString());
@@ -231,6 +239,60 @@ public class MainActivity extends Activity {
             return "超出约定时间。今天已按约定使用完。";
         }
         return "今天已按约定使用。";
+    }
+
+    /**
+     * 用设备自带的中文字形。为什么还要显式指一次：只靠 textAppearance 时，这条链落到一个
+     * 只有零星汉字的字体上——「约定」「完」画得对，「超」「天」成一排方块（截屏为证）。
+     * 而这台机器 `ls /system/fonts` 里根本没有单字面的中文字体：汉字只在两个 .ttc 里，所以要选面（F17）。
+     */
+    private static final String[] DEVICE_CJK_FONTS = {
+            "/system/fonts/NotoSansCJK-Regular.ttc",
+            "/system/fonts/NotoSerifCJK-Regular.ttc",
+            "/system/fonts/SourceHanSerifSC-Bold.otf",
+    };
+
+    /** 这台机器上只有这两个 .ttc 带完整汉字（`ls /system/fonts` 里没有单字面的中文字体）。 */
+    private static final int[] TTC_FACES = {2, 1, 3, 0, 7, 6, 5, 4};
+
+    private void useDeviceCjkFont() {
+        // 试过了、别再试的那两条：随包带单字面 TTF（阿里普惠，字形齐全）与设备自带 .otf/.ttc，
+        // 屏幕上都是同一句里只「约定完」画对，其余成同一个字——连自带完整字体的 TTF 也一样，
+        // 堵点不在字体上（见 facts/DEVICES.md#F17）。
+        for (String p : DEVICE_CJK_FONTS) {
+            if (!new File(p).canRead()) {
+                continue;
+            }
+            for (int i : TTC_FACES) {
+                android.graphics.Typeface face = buildFace(p, i);
+                if (face == null) {
+                    continue;
+                }
+                for (android.widget.TextView t : new android.widget.TextView[]{sentence, badge, foot}) {
+                    if (t != null) {
+                        t.setTypeface(face);
+                    }
+                }
+                fontNote = "字形来自 " + p.substring(p.lastIndexOf('/') + 1) + " 第 " + i + " 面";
+                return;
+            }
+        }
+        fontNote = "设备上没找到可读的中文字体";
+    }
+
+    /**
+     * .ttc 是多字面的容器，createFromFile 只能拿到第 0 面（那一台是日文面）。选面那一步在
+     * 这台设备上做不到：`Typeface.Builder(String, int)` 在我们编译的那个 android.jar 里没有
+     * （编译器把它解析成 Builder(AssetManager, String)），低版本只有 createFromFile 这一条。
+     * 所以「同一台机器上汉字只装在 .ttc 里」就是这条链现在最后的堵点（F17）——
+     * 要么随包带一个单字面的简体字形（OFL 那条路），要么换一台自带单字面 CJK 的设备。
+     */
+    private static android.graphics.Typeface buildFace(String path, int index) {
+        try {
+            return index == 0 ? android.graphics.Typeface.createFromFile(path) : null;
+        } catch (RuntimeException e) {
+            return null;
+        }
     }
 
     /** 契约随包带：内核要从那张表取层级，路径在设备上得自己落一份。 */

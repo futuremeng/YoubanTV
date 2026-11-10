@@ -20,7 +20,9 @@ object Kernel {
     fun state(eventsJson: String, planJson: String, profile: String, strength: String, mode: String?): String {
         val ledger = Ledger()
         eventsJson.lineSequence().forEach { line ->
-            val e = Json.parse(line) as? Map<*, *> ?: return@forEach
+            val text = line.trim()
+            if (text.isEmpty() || !text.startsWith("{")) return@forEach // 空行不是事件：账是追加式的，末尾常有换行
+            val e = Json.parse(text) as? Map<*, *> ?: return@forEach
             val fields = LinkedHashMap<String, Long>()
             (e["fields"] as? Map<*, *>)?.forEach { (k, v) -> fields[k.toString()] = Day.num(v) }
             ledger.append(e["kind"].toString(), (e["profile"] as? String) ?: profile, fields)
