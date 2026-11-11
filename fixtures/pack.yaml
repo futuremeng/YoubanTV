@@ -43,6 +43,10 @@ PACK-09:
       when: { mode: ambient }
       expect: { value: { packLayerHits: true, packQuestionId: "cnb_j001_q1", packRepeat: true, packQuestionCount: 9562 } }
 
+    - name: 大纲查询那一处答的形状；绑外的年级答那一条拒绝，不回题也不回知识点（PACK-05、D76）
+      when: { mode: ambient }
+      expect: { value: { topicsFields: 6, topicsGradeNonEmpty: true, topicsRefusalOutOfWeek: true, topicsOffBindingRows: 0, topicsGradeBoundAllTrue: true, topicsDanglingPrereqs: 0, packVerified: true } }
+
     - name: 这一屏那一行说清这台设备带没带题库；带没带是契约里的声明，不是推断（PACK-03、AGREE-14）
       when: { mode: ambient }
       expect: { value: { packCarried: false, packLineKind: "absent", packLineInPanel: 1 } }

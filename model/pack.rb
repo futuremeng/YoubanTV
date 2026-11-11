@@ -163,6 +163,38 @@ module Core
       grade_in?(grade)
     end
 
+    # 大纲查询那一处（/api/topics 的名字，D86）：知识点与先修边只从包里的两张表答，
+    # 不在别处再存一份大纲（PACK-05）。年级绑不绑这一处不自己判——问 contentPack.audienceBinding 那张表。
+    # 大纲查询那一处（/api/topics 的名字，D86）：知识点与先修边只从包里的两张表答，
+    # 不在别处再存一份大纲（PACK-05）。年级绑不绑这一处不自己判——问绑定表里那批年级（那张表只有一处）。
+    # 这里不收 audience：1.0 里出题只属于那一档（D76），要问哪个年级直接问那张表，少一个分支位点。
+    def outline(grade: nil, pack: nil)
+      row = endpoint_row
+      return { 'refusal' => row['refusal'].to_s.sub('{grade}', grade.to_s) } unless in_binding?(grade)
+
+      pack ||= open
+      by_id = pack['topics'].each_with_object({}) { |x, h| h[x['id'].to_s] = x }
+      prereqs = pack['edges'].each_with_object({}) { |e, h| (h[e['topicId'].to_s] ||= []) << e['prerequisiteId'].to_s }
+      counts = pack['questions'].each_with_object(Hash.new(0)) { |q, h| h[q['topicId'].to_s] += 1 }
+      rows = pack['topics'].select { |x| grade.nil? || x['grade'].to_i == grade.to_i }.map do |x|
+        { 'grade' => x['grade'], 'topicId' => x['id'].to_s, 'title' => x['title'].to_s,
+          'gradeBound' => grade_in?(x['grade']), 'prerequisites' => prereqs[x['id'].to_s].to_a,
+          'questionCount' => counts[x['id'].to_s] }
+      end
+      { 'rows' => rows.sort_by { |r| r['topicId'] }, 'fields' => Array(row['fields']) }
+    end
+
+    # 年级绑不绑：只问那张表（D76：高中段不在绑，那一档一题不出）。判定不在这里写第二遍。
+    def in_binding?(grade)
+      return Core::Content.binding_grades.include?(grade.to_i) unless grade.nil?
+
+      Core::Content.binding_grades.any?
+    end
+
+    def endpoint_row
+      (Core::Content::CONTRACT['endpoints'] || []).find { |e| e['path'].to_s == '/api/topics' } || {}
+    end
+
     # 这一档该出哪一道：绑定年级 → 该知识点的难度那一档 → 账里答过的排除掉（ASK-01 的 pack 层）。
     # 池空了就 return nil——按 ASK-01 那一条顺序往下落一层，不在这里编一道题，也不重复出答过的。
     def pick(plan, answered_ids: [], seed: nil, pack: nil)

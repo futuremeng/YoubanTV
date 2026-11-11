@@ -829,6 +829,19 @@ class World
     @ledger.pending_motion(@profile)
   end
 
+  # 夹具读包只走这一处：验不过就当没有这个包（缓存一次，别每个 case 重开一次 1.4MB 的包）。
+  # 坏包于是读成一个干净的红（packVerified: false），不是一串栈——崩在那里会让整轮夹具没结果，
+  # 而「扫不到结果」被当成绿是今天差点犯的错（D86）。
+  def world_pack
+    return @world_pack if defined?(@world_pack)
+
+    @world_pack = begin
+      Core::Pack.present? ? Core::Pack.open : nil
+    rescue StandardError
+      nil
+    end
+  end
+
   def derived_values
     {
       # 层与能力（LAYER-01/05/06/12）
@@ -948,39 +961,54 @@ class World
       'petMeasuredDocumented' => Core::Pet.measured_documented?,
       'petDrawsOnlyWhenMoving' => Core::Pet.draws_only_when_moving?,
       # 包里那道该出的题（PACK-06、ASK-01 的 pack 层）：判定在 model/pack.rb 那一处，这里只搬读数。
-      'packPresent' => Core::Pack.present?,
-      'packLayerHits' => Core::Pick.pack_hit(plan: {}, answered: Core::Pack.answered_ids(@ledger.events)),
-      'packQuestionId' => Core::Pack.pick({}, answered_ids: Core::Pack.answered_ids(@ledger.events)).to_h['id'],
+      'packVerified' => !world_pack.nil?,
+    'packPresent' => Core::Pack.present?,
+      'packLayerHits' => world_pack && Core::Pick.pack_hit(plan: {}, answered: Core::Pack.answered_ids(@ledger.events)),
+      'packQuestionId' => world_pack && Core::Pack.pick({}, answered_ids: Core::Pack.answered_ids(@ledger.events)).to_h['id'],
       'packRepeat' => begin
-        first = Core::Pack.pick({}, answered_ids: Core::Pack.answered_ids(@ledger.events))
+        first = world_pack && Core::Pack.pick({}, answered_ids: Core::Pack.answered_ids(@ledger.events))
         raised_or_nil = first.nil? || !Core::Pack.pick({}, answered_ids: [first['id'].to_s]).to_h['id'].to_s.eql?(first['id'].to_s)
         raised_or_nil
       rescue StandardError
         nil
       end,
+      'topicsDanglingPrereqs' => begin
+        p1 = world_pack
+        ids = p1 ? p1['topics'].map { |x| x['id'].to_s } : []
+        p1 ? p1['edges'].count { |e| !ids.include?(e['prerequisiteId'].to_s) || !ids.include?(e['topicId'].to_s) } : -1
+      rescue StandardError
+        -1
+      end,
       'packOffGrade' => begin
-        p1 = Core::Pack.open
-        p1['questions'].count { |q| !Core::Pack.topic_ok?(q['topicId'], p1) }
+        p1 = world_pack
+        p1 ? p1['questions'].count { |q| !Core::Pack.topic_ok?(q['topicId'], p1) } : -1
       rescue StandardError
         -1
       end,
       'packVerifyMissing' => begin
-        Core::Pack.open['questions'].count { |q| q[Core::Content.verify_field].to_s.strip.empty? }
+        (world_pack || { 'questions' => [] })['questions'].count { |q| q[Core::Content.verify_field].to_s.strip.empty? }
       rescue StandardError
         -1
       end,
       'packLayerHitsWhenPoolEmpty' => begin
-        Core::Pick.pack_hit(plan: {}, answered: Core::Pack.open['questions'].map { |q| q['id'].to_s })
+        p1 = world_pack
+        p1 ? Core::Pick.pack_hit(plan: {}, answered: p1['questions'].map { |q| q['id'].to_s }) : true
       rescue StandardError
         true
       end,
       'sourceWhenPackPoolEmpty' => begin
-        answered = Core::Pack.open['questions'].map { |q| q['id'].to_s }
+        answered = (world_pack || { 'questions' => [] })['questions'].map { |q| q['id'].to_s }
         Core::Pick.source(pack_hit: Core::Pick.pack_hit(plan: {}, answered: answered),
                          member_authored_hit: false, llm_hit: false)
       rescue StandardError
         'unknown'
       end,
+      # /api/topics 那一处答的形状（D86）：年级绑不绑只问那张表。
+      'topicsFields' => world_pack ? (Core::Pack.outline(pack: world_pack)['fields'] || []).size : -1,
+      'topicsGradeNonEmpty' => world_pack ? Core::Pack.outline(grade: 5, pack: world_pack).fetch('rows', []).any? : false,
+      'topicsRefusalOutOfWeek' => world_pack ? Core::Pack.outline(grade: 11, pack: world_pack).key?('refusal') : false,
+      'topicsOffBindingRows' => world_pack ? Core::Pack.outline(grade: 11, pack: world_pack).fetch('rows', []).size : -1,
+      'topicsGradeBoundAllTrue' => world_pack ? Core::Pack.outline(grade: 5, pack: world_pack).fetch('rows', []).all? { |r| r['gradeBound'] } : false,
       'packCarried' => !!Core::Content::CONF.dig('onDevice', 'carried'),
       'packLineKind' => Core::Content.on_device_line_kind,
       'packLineInPanel' => begin
@@ -991,7 +1019,7 @@ class World
       end,
       'packSchemaFields' => Core::Content.question_schema.size,
       'packQuestionCount' => begin
-        Core::Pack.open['questions'].size
+        (world_pack || { 'questions' => [] })['questions'].size
       rescue StandardError
         -1
       end,
