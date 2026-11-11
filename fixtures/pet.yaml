@@ -41,6 +41,14 @@ PET-04:
       when: { mode: ambient }
       expect: { value: { petDefaultPick: "pebble" } }
 
+PET-04b:
+  spec: [spec/PET.md#PET-04, spec/PANEL.md#PANEL-01]
+  given: { profile: "member:kid" }
+  cases:
+    - name: 那四段话是四段描述：不成要求、不比较、不替它感受
+      when: { mode: ambient }
+      expect: { value: { personaLines: 4, personaNotHits: 0, personaRules: 4, personaLabelsPresent: true, personaLineFor: "新的东西先放这儿。", petRowInPanel: 1 } }
+
 PET-05:
   spec: [spec/PET.md#PET-05, spec/LAYER.md#LAYER-03, spec/LAYER.md#LAYER-10]
   given: { profile: "member:kid" }

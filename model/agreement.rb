@@ -5,6 +5,7 @@
 # 界面上不出现字段名：要改哪一项，屏上带着 field 这个键，壳层原样交回 cycle。
 require 'json'
 require 'panel'
+require 'pet'
 
 module Core
   module Agreement
@@ -176,6 +177,9 @@ module Core
 
         lines << PANEL['row'].sub('{label}', f['uiWords'].to_s).sub('{value}', shown_value(id, plan[id]))
       end
+      # 角上那一只是哪一只、它那一行说什么：只搬契约那四行里的一段，这里不组句（PET-04）。
+      persona = Pet.persona_row(plan['pet'])
+      lines << persona unless persona.nil?
       lines += history_lines(events)
       { 'title' => PANEL['title'], 'lines' => lines, 'foot' => [PANEL['timeSource'], HISTORY['foot']].join(' · '),
         'never' => (PANEL['never'].to_a + HISTORY['never'].to_a).uniq }

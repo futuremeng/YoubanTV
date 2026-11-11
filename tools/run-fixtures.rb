@@ -924,6 +924,17 @@ class World
       'petSwitchCostItems' => Core::Pet.switch_cost_items,
       'petPickable' => Core::Pet::PICKABLE.size,
       'petDefaultPick' => Core::Pet.default_pick(@plan && @plan['pet']),
+      'personaLines' => Core::Pet::PERSONAS.size,
+      'personaNotHits' => Core::Pet.persona_not_hits,
+      'personaRules' => Core::Pet.persona_rules.size,
+      'personaLabelsPresent' => Core::Pet.persona_labels_present?,
+      'personaLineFor' => Core::Pet.line_for('sprout'),
+      'petRowInPanel' => begin
+        Core::Agreement.panel(events: @ledger.events.map { |e| e.to_h }, profile: @profile, plans: @plans)
+                       .fetch('lines').count { |l| l.to_s.start_with?(Core::Pet.persona_prefix) }
+      rescue StandardError
+        -1
+      end,
       'petPersonalityNeverHits' => Core::Pet.personality_never_hits,
       'petPersonalityNeverCount' => Core::Pet::PERSONALITY_NEVER.size,
       'petLayer' => Core::Pet.layer,

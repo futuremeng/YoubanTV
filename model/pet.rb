@@ -14,13 +14,18 @@ module Core
     NO_PROGRESS = Array(CONF['noProgressFields']).freeze
     APPEAR_NEVER = CONF.dig('appearance', 'never').to_a.freeze
     PERSONALITY_NEVER = CONF.dig('personalitySource', 'never').to_a.freeze
+    # 那四段话：描述，不是数值，也不是要求（PET-04）。
+    PERSONAS = Array(CONF['personas']).freeze
+    PERSONA_NOT_WORDS = Array(CONF['personaNotWords']).freeze
     # 不许有的那批词只有一份清单，写在 forbiddenFields.values（D45）：这一节读同一份，不抄第二份。
     NEVER_SOURCE = CONF.dig('neverFrom', 'fields').to_s
     FORBIDDEN = NEVER_SOURCE.split('.').reduce(CONTRACT) { |n, k| n.is_a?(Hash) ? n[k] : nil }.to_a.freeze
 
     # 扫描面是**界面上真会出现的那些串**，不是谁临时编的一句：契约里的措辞、面板那 12 页的答句、
     # 首启那六步的每一句、拉起失败那一句……「把清单清空就绿」这种假绿就此堵住（清单条数另有断言）。
-    SURFACE_SKIP = %w[x-note spec why note never neverState noProgressFields neverFrom style forbiddenFields].freeze
+    # 那两处是「把禁令写下来」的元清单——它们必然含有那批词，扫它们等于自己抓自己。
+    SURFACE_SKIP = %w[x-note spec why note never neverState noProgressFields neverFrom style forbiddenFields
+                      personaNotWords personaRules personasWhere].freeze
 
     module_function
 
@@ -147,6 +152,44 @@ module Core
       return false if section.empty?
 
       measured_devices.all? { |model| section.include?(model.to_s) }
+    end
+
+    # 那四段话在这里答一次（PET-04）：谁选的那一只是哪段话。
+    def line_for(name)
+      row = PERSONAS.find { |r| r['name'].to_s == name.to_s }
+      row ? row['line'].to_s : nil
+    end
+
+    # 那四段话自己的四条规矩：不许成要求、不许比较、不许替它感受、不许预报——扫的是那四行自己。
+    def persona_not_hits
+      hits(PERSONA_NOT_WORDS, PERSONAS.map { |r| r['line'].to_s })
+    end
+
+    # 四个小名一个都不能空：空了那一行会拼成「这一角： —— …」那种半截话。
+    def persona_labels_present?
+      PERSONAS.size == PICKABLE.size && PERSONAS.all? { |r| !r['label'].to_s.strip.empty? && !r['line'].to_s.strip.empty? }
+    end
+
+    def persona_label(name)
+      row = PERSONAS.find { |r| r['name'].to_s == name.to_s }
+      row ? row['label'].to_s : nil
+    end
+
+    # 那一行整句在这一处拼：面板与设备都搬这一句，不各拼一遍（PET-04）。
+    def persona_row(name)
+      line = line_for(name)
+      return nil if line.nil?
+
+      CONF['personaRow'].to_s.sub('{label}', persona_label(name).to_s).sub('{line}', line)
+    end
+
+    # 那一行的开头那一段：夹具与面板用它认这一行，不重抄前缀。
+    def persona_prefix
+      CONF['personaRow'].to_s.split('{').first.to_s
+    end
+
+    def persona_rules
+      Array(CONF['personaRules'])
     end
 
     def default_on?

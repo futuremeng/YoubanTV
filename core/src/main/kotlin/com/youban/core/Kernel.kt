@@ -325,6 +325,16 @@ object Kernel {
             }
             lines.add(panel["row"].toString().replace("{label}", f["uiWords"].toString()).replace("{value}", shown))
         }
+        // 角上那一只是哪一只、它那一行说什么：只搬契约 pet.personas 里那一段，这里不组句（PET-04）。
+        // 与 Ruby 的 Core::Pet.persona_row 同一处判、同一句拼法——那一屏逐字比，多一个字就红（AGREE-14）。
+        val pet = node["pet"] as Map<*, *>
+        val personas = (pet["personas"] as List<*>).map { it as Map<*, *> }
+        val picked = personas.find { it["name"].toString() == plan["pet"].toString() }
+        if (picked != null) {
+            lines.add(pet["personaRow"].toString()
+                .replace("{label}", picked["label"].toString())
+                .replace("{line}", picked["line"].toString()))
+        }
         // 动议那一路的历史挂在同一屏的下半段（AUTO-03）：只读，种类的名字只在 motion.kinds 那一处。
         val motion = node["motion"] as Map<*, *>
         val history = motion["history"] as Map<*, *>
