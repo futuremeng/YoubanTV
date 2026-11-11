@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 大屏那一档：3 米外看的字号，实测过的那两台电视就用这一档（F17 那批截图是这一档）。 -->
+<resources>
+  <dimen name="screen_padding">64dp</dimen>
+  <dimen name="sentence_size">44sp</dimen>
+  <dimen name="badge_size">34sp</dimen>
+  <dimen name="panels_size">28sp</dimen>
+  <dimen name="foot_size">26sp</dimen>
+</resources>

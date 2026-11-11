@@ -222,6 +222,67 @@ def probe_glyphs(args)
   [true, "每个字各画各的：#{distinct} 种不同字形，没有空白"]
 end
 
+# 这一屏四块文字的边界（D87）。为什么量 dumpsys 而不是看截屏：判「叠没叠」只需要竖直方向上
+# 两块不相交，边界就够判；而且不信应用自己报的那一句（F34 那条老规矩）。三个全屏界面共用
+# 一份排布（contract.deviceScreen.oneLayout），所以这里量到的就是它们三个共同的排布。
+def screen_bounds(args)
+  out = shell(args, 'dumpsys activity top').gsub(/\r/, '')
+  bounds = {}
+  out.scan(%r{(-?\d+),(-?\d+)-(-?\d+),(-?\d+)\s+#\S*\s*app:id/(badge|sentence|panels|foot)}) do |_l1, t1, _l2, t2, id|
+    bounds[id] = [t1.to_i, t2.to_i]
+  end
+  bounds
+end
+
+# 两块在竖直方向上的交叠高度（排布是一条竖链，水平方向整块同宽，所以只看竖直）
+def overlap_px(a, b)
+  [a[1], b[1]].min - [a[0], b[0]].max
+end
+
+def probe_layout(args)
+  return [false, '没装 com.youban.tv'] if shell(args, "pm list packages #{APK_PACKAGE}").strip.empty?
+
+  shell(args, "am force-stop #{APK_PACKAGE}")
+  # 用 `am start -n` 点名的调试启动，不用广播拉起：从桌面那一路进来会在下一帧交回前台（D81），
+  # 那一帧之后 dumpsys 里就不是我们的界面了（实测：top 是 launcher）。 点名的这一路 action 为空，
+  # 不进那条交回前台的路（MainActivity:95 那一句），所以这一屏能拍到（panel 那道自检用的就是这一路）。
+  shell(args, "am start -n #{APK_PACKAGE}/.MainActivity")
+  sleep 3
+  shots = [['状态那一屏', screen_bounds(args)]]
+  shell(args, 'input keyevent 174') # 只读那一屏（15 行那一屏）——叠印就是在这屏上先看出来的
+  sleep 1.6
+  shots << ['只读那一屏', screen_bounds(args)]
+  shell(args, 'input keyevent 4')
+
+  bad = []
+  shots.each do |name, b|
+    if b.size < 4
+      bad << "#{name}只读到 #{b.size} 块（四块都要在：#{(%w[badge sentence panels foot] - b.keys).join('/')} 没见着）"
+      next
+    end
+    b.keys.combination(2).each do |x, y|
+      px = overlap_px(b[x], b[y])
+      bad << "#{name}：#{x} 与 #{y} 在竖直方向叠了 #{px}px" if px.positive?
+    end
+    bad << "#{name}：badge 落在屏外（top=#{b['badge'][0]}）" if b['badge'][0].negative?
+  end
+
+  got = shell(args, "cat #{APK_FILES}/youban-screen.json").gsub(/[\r\n]+/, '')[/\{.*\}/]
+  if got.nil? || got.empty?
+    bad << '这一屏没回写现值（youban-screen.json 不在：装了这份 APK 并起过界面吗？）'
+  else
+    over = got.include?('"scrollable":true')
+    shown = got.include?(',"noteShown":true')
+    bad << '这一屏读不完却没在 foot 里说明（静默读不到，D87）' if over && !shown
+    bad << 'foot 里写着读不完，量出来却装得下（那句是假话）' if !over && shown
+  end
+
+  return [false, bad.join('；')] unless bad.empty?
+
+  detail = shots.map { |n, b| "#{n} #{b.size} 块两两不叠" }.join(' · ')
+  [true, detail + ' · 排布是一条竖链，四块各自一段']
+end
+
 # 两端同源：把设备上的事件账读回 Mac，喂给 Ruby 那份规范模型，再与设备自己算的那份逐字段比。
 # 这是 M3 最硬的一道：设备不是在念别人算好的结论，而是在跑同一个内核——这一道红了就是不同源。
 # 先把账清成一条已知的事件流再比：留着前面八步的账，比的就是「两份不同的账」而不是同一个内核。
@@ -742,7 +803,21 @@ PROBES = { 'input' => method(:probe_input), 'text' => method(:probe_text),
            'overlay' => method(:probe_overlay),
            'panel' => method(:probe_panel),
            'startup' => method(:probe_startup),
+           'layout' => method(:probe_layout),
            'pet' => method(:probe_pet) }.freeze
+
+# 自检名字以这一张表为准：清单里写了这张表里没有的名字，当场说清是哪几个（D87）。
+# 为什么在这里：以前这个名字登在三处（这张表、tv-device.yaml、check-tv-list.rb），
+# 漏一处就是跑到一半 undefined method 'call' for nil——一半自检没跑而看不出来。
+if ARGV.include?('--list-probes')
+  puts PROBES.keys.sort
+  exit 0
+end
+
+missing = YAML.load_file(LIST).fetch('probes').map { |p| p['probe'].to_s }.uniq - PROBES.keys
+unless missing.empty?
+  abort "清单里这些自检这张表里没有：#{missing.join('/')}（在 tools/tv-at.rb 里登一行，名字不要另登一处）"
+end
 
 args = parse_args(ARGV)
 if args[:facts]

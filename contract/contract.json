@@ -2026,5 +2026,21 @@
     ],
     "personasWhere": "只读那一屏那一行（AGREE-14）与那一小块自己；L3 那一张不加字——那里只有内核那一句（PET-05）",
     "personaRow": "这一角：{label} —— {line}"
+  },
+  "deviceScreen": {
+    "x-note": "这一屏的排布契约：三个全屏界面（状态那一屏、首启那六步、只读那一屏）共用同一份排布，所以排布的规矩只有一处（D87）。",
+    "spec": [
+      "AGREE-14",
+      "ONBOARD-11"
+    ],
+    "oneLayout": true,
+    "oneLayoutWhy": "一处排布三个屏：改一次三个都成立，也意味着一处坏掉三个一起坏——所以由自检量边界，不靠眼睛",
+    "overlapMustBeZero": true,
+    "overflowNote": "这块屏读不完：下面还有一截",
+    "overflowNoteWhy": "读不完不是错，静默才是。这一句出现就说明这块屏比内容矮；上下键在这里不翻页（那两键归首启那六步与换档那一屏用，D87）。真要支持翻页，得先定这条键的归属——那是个产品决定，不在这里顺手加",
+    "measuredOn": [
+      "OD103",
+      "Konka Android TV 9652"
+    ]
   }
 }

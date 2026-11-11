@@ -1,40 +1,59 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<!-- 这一屏的排布规矩只有一条：**一条竖着的链，四块不许叠放**（D87）。
+     原来这里是 FrameLayout，四块各自 gravity——同一块屏上没事，换一块窄一点的屏，
+     内核那一句排到十几行就把 badge / panels / foot 全盖住了，屏上是一团重影，
+     而所有门都是绿的（自检比的是文本，不是这几块的边界）。
+     现在：badge 一行 → 正文（可滚，读不完时不裁字）→ panels → foot。
+     读不完这件事不许静默：底下还有一截时，foot 那句由 MainActivity 补一句说明。 -->
+<ScrollView xmlns:android="http://schemas.android.com/apk/res/android"
+    android:id="@+id/screenScroll"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="#101014"
-    android:padding="64dp">
+    android:fillViewport="true"
+    android:descendantFocusability="beforeDescendants">
 
-  <TextView
-      android:id="@+id/badge"
-      android:layout_width="wrap_content"
-      android:layout_height="wrap_content"
-      android:layout_gravity="top|end"
-      android:textSize="34sp"
-      android:textColor="#F2F2F5" />
-
-  <TextView
-      android:id="@+id/panels"
+  <LinearLayout
       android:layout_width="match_parent"
       android:layout_height="wrap_content"
-      android:layout_gravity="center_vertical"
-      android:layout_marginTop="150dp"
-      android:textSize="28sp"
-      android:textColor="#9AD0FF" />
+      android:orientation="vertical"
+      android:padding="@dimen/screen_padding">
 
-  <TextView
-      android:id="@+id/sentence"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:layout_gravity="center_vertical"
-      android:textSize="44sp"
-      android:textColor="#F2F2F5" />
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
 
-  <TextView
-      android:id="@+id/foot"
-      android:layout_width="match_parent"
-      android:layout_height="wrap_content"
-      android:layout_gravity="bottom"
-      android:textSize="26sp"
-      android:textColor="#7C7C92" />
-</FrameLayout>
+      <TextView
+          android:id="@+id/badge"
+          android:layout_width="wrap_content"
+          android:layout_height="wrap_content"
+          android:layout_gravity="end"
+          android:textSize="@dimen/badge_size"
+          android:textColor="#F2F2F5" />
+    </FrameLayout>
+
+    <TextView
+        android:id="@+id/sentence"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:textSize="@dimen/sentence_size"
+        android:textColor="#F2F2F5" />
+
+    <TextView
+        android:id="@+id/panels"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="18dp"
+        android:textSize="@dimen/panels_size"
+        android:textColor="#9AD0FF" />
+
+    <TextView
+        android:id="@+id/foot"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="22dp"
+        android:textSize="@dimen/foot_size"
+        android:textColor="#7C7C92" />
+  </LinearLayout>
+</ScrollView>

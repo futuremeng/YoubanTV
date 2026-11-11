@@ -28,7 +28,17 @@ scenarios.each do |s|
   bad['设备清单引用的用例不存在'] << s['case'].to_s unless YAML.load_file(path)[cid.split('.').first]
 end
 
-KNOWN_PROBES = %w[apk glyphs input key panel pet setup startup state switch text overlay].freeze
+# 自检名字以 tools/tv-at.rb 那张表为准，这里不另登一份（D87：一个名字登三处，漏一处就是
+# 跑到一半 nil.call——一半自检没跑而看不出来）。拿不到那张表就红，不许绿着跳过。
+KNOWN_PROBES = begin
+  out = `ruby #{File.join(__dir__, 'tv-at.rb')} --list-probes 2>/dev/null`
+  raise '拿不到自检名单' unless $?.success? && !out.strip.empty?
+
+  out.split("\n").sort.freeze
+rescue StandardError
+  []
+end
+bad['拿不到自检名单（tools/tv-at.rb --list-probes）'] << KNOWN_PROBES.inspect if KNOWN_PROBES.empty?
 probes.each do |p|
   bad['probes 的每一项都要有 probe: 名字'] << p.inspect if p['probe'].to_s.empty?
   bad['probes 的每一项也要写清验什么（why）'] << p.inspect unless p['why']

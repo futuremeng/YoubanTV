@@ -18,6 +18,9 @@ bt="$sdk/build-tools/$build_tools"
 jar="$sdk/platforms/$platform/android.jar"
 echo "SDK：build-tools $build_tools · $platform"
 
+# 上一轮的产物先删掉：编译中途失败时旧 APK 留着，apk 那道自检拿它的 md5 比设备会照样绿——
+# 「装的就是这份编译产物」于是靠上一个包满足（D87 的 P0-1 反证就是这么被骗过的）。
+rm -f "$out/youban-tv.apk"
 rm -rf "$work" && mkdir -p "$work/obj" "$work/res" "$work/apk" "$work/gen" "$root/app/src/main/assets"
 # 契约每次打包重新拷一份：留着手拷的那份会在改了契约之后悄悄带着旧表上设备，
 # 于是设备与 Mac 两边用两份契约——align 绿、设备红，最难查的那种（F19）。

@@ -46,6 +46,8 @@ public class MainActivity extends Activity {
     static final String AUTOLAUNCH_NAME = "youban-autolaunch.txt";
     /** 启动形态的自证：这一轮缩没缩、隔了多少毫秒、那一个应用拉起成没成（LAYER-14、设备自检第 11 道）。 */
     static final String STARTUP_NAME = "youban-startup.json";
+    /** 这一屏现值（「读不完」这件事的自检凭据，D87）：设备自检那第 13 道读它。 */
+    static final String SCREEN_NAME = "youban-screen.json";
     static final String PANEL_NAME = "youban-panel.json"; // 那一屏只读的条目：设备自检第 10 道读它 // 那一张到底出没出、落在哪儿：设备自检第 9 道读它 // 上一次到前台是什么时候：证据不过期那一条的凭据（ONBOARD-07）
     /** 公共目录做兜底：装了存储权限的开发机可以 adb push 到那儿直接看效果。 */
     static final String PUBLIC_DIR = "/sdcard/Download";
@@ -66,6 +68,8 @@ public class MainActivity extends Activity {
     private TextView badge;
     private TextView foot;
     private TextView panels;
+    private android.widget.ScrollView screen;
+    private String footBase = ""; // foot 本来说的那句；补那半句之前先存着，不在两处各拼一遍
 
     private final BroadcastReceiver stateReceiver = new BroadcastReceiver() {
         @Override
@@ -93,6 +97,7 @@ public class MainActivity extends Activity {
         setContentView(R.layout.status);
         useBundledContract();
         useDeviceCjkFont();
+        screen = (android.widget.ScrollView) findViewById(R.id.screenScroll);
         sentence = (TextView) findViewById(R.id.sentence);
         badge = (TextView) findViewById(R.id.badge);
         foot = (TextView) findViewById(R.id.foot);
@@ -380,7 +385,7 @@ public class MainActivity extends Activity {
         panels.setText("");
         setupField = field(screen, "field", "");
         badge.setText("立约定 · 未签");
-        foot.setText(field(screen, "foot", "") + " · 结论来自设备上的内核");
+        setFoot(field(screen, "foot", "") + " · 结论来自设备上的内核");
         dumpCodepoints(sentence.getText().toString());
     }
 
@@ -623,7 +628,7 @@ public class MainActivity extends Activity {
         sentence.setText(array(screen, "lines"));
         panels.setText(field(screen, "head", ""));
         badge.setText("换这一档");
-        foot.setText(field(screen, "foot", "") + " · 名单从设备上的事件账里读，不在这里编（PROFILE-01）");
+        setFoot(field(screen, "foot", "") + " · 名单从设备上的事件账里读，不在这里编（PROFILE-01）");
         write(path(this, "youban-setup-screen.json", true), screen);
         dumpCodepoints(sentence.getText().toString());
     }
@@ -661,7 +666,7 @@ public class MainActivity extends Activity {
         sentence.setText(array(screen, "lines"));
         panels.setText("");
         badge.setText(field(screen, "title", ""));
-        foot.setText(field(screen, "foot", ""));
+        setFoot(field(screen, "foot", ""));
         write(path(this, PANEL_NAME, true), screen);
         dumpCodepoints(sentence.getText().toString());
     }
@@ -762,9 +767,11 @@ public class MainActivity extends Activity {
             android.graphics.Bitmap bmp = android.graphics.Bitmap.createBitmap(72, 72,
                     android.graphics.Bitmap.Config.ARGB_8888);
             android.graphics.Canvas canvas = new android.graphics.Canvas(bmp);
-            if (sentence.getTypeface() != null) {
-                paint.setTypeface(sentence.getTypeface());
-            }
+            // 用屏上那块 TextView 自己的画笔。原来那句「getTypeface() 不为 null 才换」看着更严，
+            // 换成这条之后答案没变（14 → 15 种）——所以「屏上是同一个缺字字形」的原因不在这里，
+            // 这条自检答不出屏上那条通路（2026-07-31 用原分辨率截屏重证，见 facts/DEVICES.md#F39）。
+            paint.set(sentence.getPaint());
+            paint.setColor(0xFFFFFFFF); // 离屏那张底色透明，笔画要用不透明的白
             canvas.drawText(String.valueOf(c), 4f, 56f, paint);
             int[] px = new int[72 * 72];
             bmp.getPixels(px, 0, 72, 0, 0, 72, 72);
@@ -784,7 +791,8 @@ public class MainActivity extends Activity {
             bmp.recycle();
         }
         write(path(this, "youban-glyphs.json", true), "{\"distinct\":" + distinct.size()
-                + ",\"blank\":\"" + which + "\",\"font\":\"" + String.valueOf(fontNote) + "\"}");
+                + ",\"blank\":\"" + which + "\",\"font\":\"" + String.valueOf(fontNote)
+                + "\"}");
     }
 
     private void dumpCodepoints(String s) {
@@ -797,12 +805,47 @@ public class MainActivity extends Activity {
         write(path(this, "youban-diag.json", true), sb.toString());
     }
 
+    /**
+     * foot 那句的唯一出口：先存下本来的话，再决定要不要补「这一屏读不完」那半句（D87）。
+     * 为什么要它：换一块窄一点的屏，内容比屏高，以前是**静默读不到**——屏上看着正常，
+     * 下面还有一截没人知道。读不完不是错，静默才是。
+     * 措辞不在这里编：读 assets 那份契约里的 deviceScreen.overflowNote（屏上不许自己编句，D71）。
+     * 现值回写 youban-screen.json：自检用 dumpsys 量边界，量不出「这半句有没有露出来」。
+     */
+    private void setFoot(String base) {
+        footBase = base == null ? "" : base;
+        if (foot != null) {
+            foot.setText(footBase);
+        }
+        if (screen == null || foot == null) {
+            return;
+        }
+        screen.post(new Runnable() {
+            @Override
+            public void run() {
+                final boolean over = screen.canScrollVertically(1);
+                String note = "";
+                try {
+                    note = new org.json.JSONObject(read(path(MainActivity.this, CONTRACT_NAME, true)))
+                            .optJSONObject("deviceScreen").optString("overflowNote", "");
+                } catch (Exception ignored) {
+                    // 契约读不出来就不补那半句：宁缺一句说明，也不在屏上编一句
+                }
+                final boolean shown = over && !note.isEmpty();
+                foot.setText(footBase + (shown ? " · " + note : ""));
+                writeText(path(MainActivity.this, SCREEN_NAME, true),
+                        "{\"scrollable\":" + (over ? "true" : "false")
+                                + ",\"noteShown\":" + (shown ? "true" : "false") + "}");
+            }
+        });
+    }
+
     private void render() {
         String json = stateJson();
         if (json == null) {
             sentence.setText("还没有读到内核的结论：这一屏不做任何判定。");
             badge.setText("");
-            foot.setText("状态来源：adb broadcast com.youban.STATE 或 " + STATE_NAME);
+            setFoot("状态来源：adb broadcast com.youban.STATE 或 " + STATE_NAME);
             return;
         }
         // 只取契约里那几个字段（commitState.fields）；界面不从 status 反推层，层是内核给的。
@@ -824,7 +867,7 @@ public class MainActivity extends Activity {
         dumpCodepoints(said + (notes.isEmpty() ? "" : " · " + notes));
         dumpGlyphCoverage(said);
         badge.setText(tier + " · " + ("due".equals(status) ? "待做" : "无到期项"));
-        foot.setText("落层 " + tier + " · 强度天花板 " + ceiling
+        setFoot("落层 " + tier + " · 强度天花板 " + ceiling
                 + (reason.isEmpty() ? "" : " · " + reason)
                 + (debugSource == null ? " · 结论来自设备上的内核" : " · " + debugSource)
                 + (noPlan ? " · 这台设备还没读到已存的约定，按默认跑" : "")
