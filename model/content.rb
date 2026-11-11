@@ -22,6 +22,30 @@ module Core
       SOURCE['license'].to_s
     end
 
+    # 这台设备带没带题库那一行（D82、D84）：措辞只在这里拼一处，两个内核都从这一处拼。
+    # 带没带是**声明**不是推断——包体不入库、APK 里不带，拿「本地有没有 packs/」去推断，
+    # 在 Mac 上会报成「带了」，而那恰恰是设备上错的那一句。
+    def on_device_line
+      node = CONF['onDevice'] || {}
+      return node['absent'].to_s unless node['carried']
+
+      row = (Array(CONF['attributionVisible']).find { |r| r['check'].to_s == 'pack' } || {})
+      node['present'].to_s.sub('{packId}', row['packId'].to_s)
+              .sub('{source}', SOURCE['project'].to_s)
+              .sub('{license}', pack_license)
+    end
+
+    # 那一行的开头那一小段（「题库：」）：夹具与面板用它认这一行，不重抄前缀。
+    def on_device_prefix
+      line = (CONF.dig('onDevice', 'carried') ? CONF.dig('onDevice', 'present') : CONF.dig('onDevice', 'absent')).to_s
+      line.split('：').first.to_s + '：'
+    end
+
+    # 那一行属于哪一类（夹具用这个，不拿整句比：拼两句就多出一处措辞）。
+    def on_device_line_kind
+      CONF.dig('onDevice', 'carried') ? 'present' : 'absent'
+    end
+
     # 白名单 + 那唯一一条条件条目。禁词先判：带 ND/SA/保留所有权利的，一律拒。
     def license_ok?(lic, dist = distribution)
       l = lic.to_s.strip

@@ -37,6 +37,12 @@ found.each do |qpack|
   puts "  #{File.basename(qpack)}：知识点 #{c['topics']} · 边 #{c['edges']} · 题 #{c['questions']} · 许可 #{c['license']} · audience #{Array(Core::Content.binding_grades).join('/')}"
 end
 
+# 契约说设备上带了包，那 APK 的 assets 里就得真有这个包：那一行不许说假话（D84）。
+if Core::Content::CONF.dig('onDevice', 'carried')
+  dir = File.join(root, Core::Content::CONF.dig('onDevice', 'carriedCheck').to_s)
+  bad << "契约说设备上带了题库（onDevice.carried），而 #{dir.sub("#{root}/", '')} 里没有包——那一行会说假话" if Dir.glob(File.join(dir, '*.qpack')).empty?
+end
+
 landed = Core::Content.attribution_landed
 broken = Core::Content.attribution_broken
 bad << "署名落点里有 #{broken} 处写着「已落」却在文件里找不到（contentPack.attributionVisible）" unless broken.zero?

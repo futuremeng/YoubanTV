@@ -136,9 +136,16 @@ Kotlin 一份，连「默认算不算在时段内」都只有一边写）。
 
 已落：`contract.contentPack`（白名单 + 唯一一条条件条目 + 按年级绑定 + 署名落点状态）、`model/content.rb`（判定只在这一处，
 门与夹具都调它）、`tools/make-pack.rb`（从编写源仓导出并按年级过滤）、`tools/check-packs.rb`（**空目录不算绿**）、
-一个真的在跑的包 `packs/k12-compulsory.qpack`（点 2591 · 边 3663 · 题 10511 · CC BY-NC 4.0 · audience child · **不入库**）。
-**未落**：出题与「收下这题」、`/api/topics`、题目 schema 落到契约、署名在屏上那两处；自创 CC0 种子题库仍按
-D19 走旧 fork 当草稿纸。
+一个真的在跑的包 `packs/k12-compulsory.qpack`（点 2591 · 边 3663 · **题 9562**（滤掉预设课本的 382 与
+机检那格空的 567）· CC BY-NC 4.0 · audience child · **不入库**）。
+**落了第二片**（`D84`）：题的字段那一节进了契约（`contentPack.schemas`）、取题那一处（`model/pack.rb`：
+绑定年级 → 难度阶梯 → 排除账里答过的；`ANSWER` 因此带 `questionId`）、池空就往 ASK-01 下一层落。
+**落了第三片**（`D85`）：只读那一屏多一行「这台设备带没带题库」（`contentPack.onDevice`）——带没带是**声明**
+不是推断，`carried` 改成 true 而 APK 的 assets 里没包，那道门就红（那一行不许说假话）。屏上因此是 15 行，
+两个内核逐字比。
+**未落**：`/api/topics`；「收下这题」那一步的记账；**屏上没有题面**（电视端不出题——题库不入库也不进 APK，
+安装那一屏按 `D80` 推到 2.0），所以署名落点里「题面角落那一处」仍然未落，不拿别的落点顶；
+自创 CC0 种子题库仍按 D19 走旧 fork 当草稿纸。
 
 `.qpack` 格式（含 `audience`、`presentationHints`）与许可校验；自创 CC0 种子题库（300–800 题，编写位置按
 D19 与 `PROVENANCE.md §2`）；按身份绑定与统计；实时出题与「收下这题」；`/api/topics`。

@@ -43,6 +43,10 @@ PACK-09:
       when: { mode: ambient }
       expect: { value: { packLayerHits: true, packQuestionId: "cnb_j001_q1", packRepeat: true, packQuestionCount: 9562 } }
 
+    - name: 这一屏那一行说清这台设备带没带题库；带没带是契约里的声明，不是推断（PACK-03、AGREE-14）
+      when: { mode: ambient }
+      expect: { value: { packCarried: false, packLineKind: "absent", packLineInPanel: 1 } }
+
     - name: 包里取不到题就是这一层落空——按那条顺序往下走一层，不在这里编一道题
       when: { mode: ambient }
       expect: { value: { packLayerHitsWhenPoolEmpty: false, sourceWhenPackPoolEmpty: "outlineRandom" } }

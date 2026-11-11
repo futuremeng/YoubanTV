@@ -335,6 +335,20 @@ object Kernel {
                 .replace("{label}", picked["label"].toString())
                 .replace("{line}", picked["line"].toString()))
         }
+        // 这台设备带没带题库那一行（D84）：带没带是契约里的声明，不是 here 推断——
+        // 包体不入库、APK 里不带，拿「这台有没有 packs/」去猜，在规范模型那边会报成「带了」。
+        val pack = node["contentPack"] as Map<*, *>
+        val onDevice = pack["onDevice"] as Map<*, *>
+        if (onDevice["carried"] == true) {
+            val row = (pack["attributionVisible"] as List<*>).map { it as Map<*, *> }
+                .find { it["check"].toString() == "pack" } ?: emptyMap<String, Any>()
+            lines.add(onDevice["present"].toString()
+                .replace("{packId}", row["packId"].toString())
+                .replace("{source}", ((pack["source"] as Map<*, *>)["project"]).toString())
+                .replace("{license}", ((pack["source"] as Map<*, *>)["license"]).toString()))
+        } else {
+            lines.add(onDevice["absent"].toString())
+        }
         // 动议那一路的历史挂在同一屏的下半段（AUTO-03）：只读，种类的名字只在 motion.kinds 那一处。
         val motion = node["motion"] as Map<*, *>
         val history = motion["history"] as Map<*, *>

@@ -981,6 +981,14 @@ class World
       rescue StandardError
         'unknown'
       end,
+      'packCarried' => !!Core::Content::CONF.dig('onDevice', 'carried'),
+      'packLineKind' => Core::Content.on_device_line_kind,
+      'packLineInPanel' => begin
+        Core::Agreement.panel(events: @ledger.events.map { |e| e.to_h }, profile: @profile, plans: @plans)
+                       .fetch('lines').count { |l| l.to_s.start_with?(Core::Content.on_device_prefix) }
+      rescue StandardError
+        -1
+      end,
       'packSchemaFields' => Core::Content.question_schema.size,
       'packQuestionCount' => begin
         Core::Pack.open['questions'].size

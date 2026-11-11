@@ -6,6 +6,7 @@
 require 'json'
 require 'panel'
 require 'pet'
+require 'content'
 
 module Core
   module Agreement
@@ -180,6 +181,8 @@ module Core
       # 角上那一只是哪一只、它那一行说什么：只搬契约那四行里的一段，这里不组句（PET-04）。
       persona = Pet.persona_row(plan['pet'])
       lines << persona unless persona.nil?
+      # 这台设备带没带题库那一行：措辞出自 contract.contentPack.onDevice 那一处（D82、D84）。
+      lines << Content.on_device_line
       lines += history_lines(events)
       { 'title' => PANEL['title'], 'lines' => lines, 'foot' => [PANEL['timeSource'], HISTORY['foot']].join(' · '),
         'never' => (PANEL['never'].to_a + HISTORY['never'].to_a).uniq }
