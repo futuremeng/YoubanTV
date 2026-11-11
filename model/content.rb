@@ -59,6 +59,16 @@ module Core
     end
 
     # 预设「手上有那一本教材」的那类题：不进给出的题集（导出时滤掉，门再验一遍）。
+    # 题的字段那一节只在这里答一次：门与导出都读它，两边各写一份就会漂（PACK-06）。
+    # 机检那一格的字段名只在这里答：门与导出读同一格（ASK-08、PACK-06）。
+    def verify_field
+      CONF.dig('verifyRequired', 'field').to_s
+    end
+
+    def question_schema
+      Array(CONF['schemas'])
+    end
+
     def textbook_filter?
       CONF.dig('textbookDependent', 'filter') == true
     end

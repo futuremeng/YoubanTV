@@ -50,7 +50,9 @@ dropped_edges = edges.size - kept_edges.size
 in_scope = questions.select { |q| kept_ids.include?(q['topicId'].to_s) }
 # 看的是整道题——选项里那句「不必看课文」同样是预设（第一版只看题面与解析，门当场抓到 32 道漏网）。
 dropped_textbook = in_scope.select { |q| Core::Content.textbook_filter? && Core::Content.textbook_hit?(JSON.generate(q)) }
-kept_questions = in_scope - dropped_textbook
+# 四、机检那一格空着的题不进包（ASK-08：机检不过 = 不出、不入库、不重试——不是进来了再拒）。
+dropped_noverify = in_scope.select { |q| q[Core::Content.verify_field].to_s.strip.empty? }
+kept_questions = in_scope - dropped_textbook - dropped_noverify
 
 FileUtils.rm_rf(STAGE)
 FileUtils.mkdir_p(STAGE)
@@ -95,6 +97,8 @@ manifest = {
   'checksums' => checksums,
   'signature' => nil,
   'audience' => CONF.fetch('audienceBinding').map { |b| b['audience'] },
+  # 题的字段那一节从契约那一处抄进 manifest：门拿它对，两边不各写一份（PACK-06）。
+  'schemas' => Core::Content.question_schema,
   'presentationHints' => { 'byDueKind' => { 'quiz' => 'focused' } }, # 内容类型决定默认 mode（COMMITMENTS.md §4）
   'outline' => { 'topics' => 'outline_topics.jsonl', 'edges' => 'outline_edges.jsonl' },
   'questionCount' => kept_questions.size,
@@ -112,6 +116,6 @@ abort '打包失败：zip 没跑成' unless ok
 FileUtils.rm_rf(STAGE)
 
 puts "导出 #{QPACK}"
-puts "  知识点 #{kept_topics.size}（裁 #{dropped_nodes}）· 先修边 #{kept_edges.size}（裁 #{dropped_edges}）· 题 #{kept_questions.size}（滤掉预设课本的 #{dropped_textbook.size}）"
+puts "  知识点 #{kept_topics.size}（裁 #{dropped_nodes}）· 先修边 #{kept_edges.size}（裁 #{dropped_edges}）· 题 #{kept_questions.size}（滤掉预设课本的 #{dropped_textbook.size}、机检那格空的 #{dropped_noverify.size}）"
 puts "  年纪 #{manifest['gradesIncluded'].inspect} · 许可 #{manifest['license']}（#{Core::Content.distribution} 那一条下#{Core::Content.license_ok?(manifest['license']) ? '可装' : '拒装'}）"
 puts '  下一步：ruby tools/check-packs.rb'

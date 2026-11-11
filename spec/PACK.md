@@ -32,6 +32,14 @@ APK 内只含自创 CC0 种子包；任何第三方内容都必须以包的形�
 - **预设「手上有那一本教材」的那类题不进题集**（`contentPack.textbookDependent`）：题面或解析里出现
   「课文 / 原文 / 教材」那批标记的，导出时滤掉、门再验一遍（抽查 354 / 13339，D82）。**大纲里的知识点照留**——
   大纲是地图不是题，只是那一题不出。这台设备不知道孩子用的是哪一版课本，这类题在孩子那边就是「什么课文？」。
+- **题的字段那一节**（`contentPack.schemas`：id / topicId / difficulty / type / prompt / answer / verify）
+  在装包时判一次：少一格就红——少 `id` 没法判重，少 `verify` 没法机检（`ASK-08`）。
+  `verify` 空着的题**在导出那一步就滤掉**，不是进来了再拒：那条纪律是「机检不过：不出、不入库、不重试」。
+  这一格空着的题在源库里是 567 道，装包那道门当场报出来的（`D84`）。
+- **取题只有一处**（`model/pack.rb` 的 `pick`）：绑定年级（那张表只有 `contentPack.audienceBinding` 一处）
+  → 难度阶梯（`contentPack.pick.difficultyLadder`）→ 把账里答过的排除（靠 `ANSWER` 带的 `questionId`）。
+  顺序是**确定**的（按 id 排，同一天的同一轮跑两次出同一道题），不靠随机数。池空了就是这一层落空——
+  按 `ASK-01` 往下走一层，**不在这里编一道题，也不重复出答过的那道**。
 - 测试：fixtures/pack.yaml#PACK-09
 
 ### PACK-03 署名与来源的显示位置

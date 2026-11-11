@@ -85,47 +85,11 @@
 | D79 | 共看、在场提示、家人原话这三样**不做**；设备之间的关联只剩体感与视觉 | ✅ 用户决定 · 上一轮把「计时不跨设备合并」定成 D77 之后，这三样我按「不走直连、走面板那套 API」归类并留了话。这次明确：**不做，也不留那条后门**。做法是退役而不是重写——`POST /api/cowatch`、``POST /api/messages`` 进 `retired.endpoints`；动议种类里的 `coWatch` 与 在场形态 `presence` 那档进 `retired.motionKinds` / `retired.values`；面板页表里那一页撤掉（12 页）；能力登记表两行撤掉。**如实记两条张力**：① 依据侧 `EVIDENCE.md §2` 引的正是「一起看能降低孤独感」那批研究，D29 当年把 `withMs` 写成对偶量就是为了不对照羞辱——这条通道不做之后，**那个对偶量没有来源，一起看了多久不再显示**；② 家人写的句子仍**标注到人**（`LAYER-09`），但撰写入口是面板，不做送达。运动邀请（`SENSE-07` 的 `inviteTier`）不受影响，档位从此不看任何设备协同字段。反证：把端点或种类加回来，AUTO-17 四条与 PANEL-01 立刻红。 | `spec/AUTONOMY.md#AUTO-17`、`contract.json#retired`、`fixtures/commit.yaml#AUTO-17`、`spec/SENSE.md`、`spec/PANEL.md`、`MOBILE.md §2`、`COMMITMENTS.md §4b`、`ARCHITECTURE.md`、`PRIVACY.md`、`LAYERING.md` 场景 18/19、`research/EVIDENCE.md §2`、D27、D29、D77 |
 | D80 | 面板那 12 页的界面、L3 授权入口、其他人那一档的录入——**这一阶段不做**，推到 2.0 / 3.0 | ✅ **用户决定** · 电视端 1.0 的验收口径是四条：设备内算结论、设备内记事件流、措辞由内核与契约给、设备测试自动跑——四条都已达成，这三项是界面里程，不是设计缺口。 推迟有一条必须说清楚：首启那句「按默认 · 要改去手机上的「时段」那一页」在 1.0 里指的是一条**不存在的路**。做法是加一处 `panel.availability`（`state: 未实现`、`stage: 2.0`、`suffix` 那一句），两个内核的 where 那一行都从这里拼（Ruby `Core::Panel.where_text`、Kotlin `Kernel.panelWhere`），屏上于是写明「这条路径要到 2.0；这台设备上现在改不了」；界面真做出来时把 state 改成「可用」，那句自动退场。`ONBOARDING.md` 新增 §2b 那几条 adb 手工授权，§2「在哪确认」那一列标明是目标位置。反证三道：把状态改成已实现、把那一句抹空、那一行绕开这一处自己拼——最后一道同时让首启逐屏对齐变红。 | `contract.json#panel.availability`、`model/panel.rb`、`fixtures/panel.yaml#PANEL-02`、`spec/PANEL.md`、`ROADMAP.md M4 / M7`、`ONBOARDING.md §2b`、D74、D78 |
 | D81 | 电视端做成**开机启动的那一个 app**：被拉起来就加载完交回前台，并可以指定自动打开那一个应用 | ✅ 用户决定 · 电视的固件把别的路子锁了（用户实测），所以开机启动这一条由**电视设置里的开机启动项**指过来。本应用不自启：不声明 `RECEIVE_BOOT_COMPLETED`、不起 `<service>`（`check-manifest.rb` 那两条门原样守着，F3 的重探规矩不变）。随之必须改的一条是**不占全屏**——这条不只是礼貌：前台计时看的是「现在前面是什么」（`AUTO-11`），自己占着全屏就把要计时的东西挡在外面。全屏例外只有两处，写在 `startup.coldStart.exceptions`（首启那六步、只读那一屏）。拉起那一个应用是这台设备上的人指定的**一次**动作，不是 L5、不是切源、不是动议（`AUTO-16`）；失败只说一句事实，重试次数在 `startup.autoOpen.retries`（0）。实测：起来到交回前台 **190ms**（Smartisan）/ **287ms**（Konka），依据用窗口管理器那一格，不用应用自己报的那句（F36）。 路上三个真机坑：`monkey` 第二次进来走 `onNewIntent` 不是 `onCreate`；`cmd package resolve-activity` 在两台都答 `No activity found`，桌面包名改由设备自己答（`@home`）；`getLaunchIntentForPackage` 对桌面返回 `null`。 | `spec/LAYER.md#LAYER-14`、`spec/ONBOARD.md#ONBOARD-11、ONBOARD-12`、`contract.json#startup`、`model/startup.rb`、`fixtures/layer.yaml#LAYER-14`、`fixtures/onboard.yaml#ONBOARD-11、ONBOARD-12`、`tools/tv-device.yaml` 自检 `startup`、`ONBOARDING.md §2b`、`facts/DEVICES.md#F36`、D34、D80、F1、F3、F30 |
-|D82 | K12 的知识库与题库以**第三方内容包**装入：来源 `cn-math-taxonomy`（CC BY-NC 4.0），靠白名单的**唯一一条条件条目**  | ✅ 用户决定（「以合理的方式利用」） · 它的许可带 NC，不在 `PACK-02` 白名单里；家庭自用就是非商业，NC 的实质条件在这台设备上成立，于是开一条**带硬约束的条件条目**：只在 `contentPack.distribution = private` 时可装，**跟着 D29/D30 走**——转公开、开始收费、对家庭之外分发，任一发生即变拒装并按 `revokeIf` 三条卸干净（`PACK-04`）。取的是义务教育段（点 2591、边 3663、题 10511；裁掉点 707、边 1205——指向未装知识点的边不留，`PACK-05`），**高中段 g10–g16 一题不绑**（D76：那两档的约定项不含题目）。包本体不入库（`trackedInRepo = false`）：它是本地一次导出的产物，编写源在别人的仓（`PACK-08`）。签名是本地随机 key 的 HMAC，**只防误改、不作信任锚**——这条如实写明，家里没有公钥体系。署名落点逐条带状态：`THIRD_PARTY_NOTICES.md` 那一节与包内 `ATTRIBUTION.md` 已落；题面角落那一行与只读那一屏那一行**未落**，随出题那一片一起做——「未落」不许写成「已落」（那条断言就是为此）。门 `tools/check-packs.rb` 扫本地 `packs/`，**空目录不算绿**：报「本地未导出」并以红收。反证六道：目录空、`distribution` 改公开、题面改一字（校验和）、只动 manifest（签名 + 题数双红）、署名造假、高中段绑进来。  | `contract.json#contentPack`、`model/content.rb`、`spec/PACK.md#PACK-02、#PACK-09`、`fixtures/pack.yaml`、`tools/make-pack.rb`、`tools/check-packs.rb`、`THIRD_PARTY_NOTICES.md`、`docs/PROVENANCE.md §4`、D19、D29、D30、D76  |
+| D82 | K12 的题库与知识大纲以**第三方内容包**装进来：靠白名单里唯一那条**条件条目**（仅限私人家庭使用），门先于题 | ✅ 用户决定 · 源是 `cn-math-taxonomy`（CC BY-NC 4.0），不是自作的 CC0 内容，所以走 `license.conditional` 那一条：只在 `distribution: private` 时下发，公开发布 / 商用 / 发给家庭以外任一发生就要撤（`model/content.rb` 那一条判定只有一处，夹具与门都调它——写成两份就会一边改一边没改）。只绑义务教育段（`audienceBinding`），高中段一题不绑（D76：大人与老人没有出题这一档）。**预设「手上有那一本教材」的题在导出时滤掉**——设备不知道孩子用的是哪一版课本；滤的是整道题的 JSON（第一版只扫题面与解析，门当场报「没滤干净」：选项里写「不必看课文」的那种也算）。包体不入库、只留导出脚本：签名用本地 key 算，只防误改，不是信任根。已知没滤的：358 道语文题的题面引《…》，一刀切会连课文之外的经典一起切掉，写在 PROVENANCE 里不含糊。反证六道：空包目录要红（「扫不到东西」不等于绿）、distribution 改 public、改一道题、只改 manifest、署名落点坏掉、绑上高中段。 | `contract.json#contentPack`、`model/content.rb`、`model/pack.rb`、`tools/make-pack.rb`、`tools/check-packs.rb`、`fixtures/pack.yaml`、`spec/PACK.md`、`docs/PROVENANCE.md`、`NOTICE`、D76 |
+| D83 | 角上那只小宠物：**它是读数的一种形状，不是一个需要被照顾的人**；四段性格是描述，不是数值 | ✅ 用户决定 · 看过的参照是 playpets（MIT）：借它的**形状语言**（圆、无线条、暖色、 believable 的接触阴影）与**帧循环节省法**（不动就不走帧，静止两帧 1s 一跳），**不搬它的养成件**——`bondLevels` / `digOdds` / `giftEveryDays` / 树的那套定时器一个都不进。三条钉住：`pet.stateNeverDerivedFromUsage`（**没有任何一条路径**让孩子没做什么变成它少了什么）、`pet.noProgressFields`（bond/mood/hunger/level/xp/growth/giftDue/visitsStreak 不许存在）、`pet.neverState`（饿/困/难过/失望/想你/生病/脏了/等我/进度落后）。「培养」只有选一只、改名字、换一只，**换的成本是 0**：不丢账、不扣东西、不问原因。只有一份可挑的名单（芽/石/蛾/墨），没有按受众分配、没有性格测评、不贴标签；四段性格各一小名一句描述（`pet.personas`），四条规矩（不成要求、不比较、不替它感受、不预报），只落在只读那一屏那一行与那一小块自己——**L3 那一张不加字**（PET-05：那里只有内核那一句）。默认关：只有 `appearance.measuredOn` 里列出的机型画，列进去的前提是 `facts/DEVICES.md#F37` 有实测（关着 0 tick/2s、开着 4–5 tick/2s）。图全部由 `tools/make-pet-art.rb` 在本仓库生成，playpets 的图一张不搬。反证：把没测过的机型加进名单、撤 measuredFact、默认改 on、measuredBeforeOn 改 false、某行写成「等你回来」、小名留空、四条规矩清空、少一只——全红。 | `contract.json#pet`、`model/pet.rb`、`fixtures/pet.yaml`、`spec/PET.md`、`core/.../Kernel.kt`、`device/.../OverlayCard.java`、`PetArt.java`、`tools/make-pet-art.rb`、`tools/tv-pet-probe.rb`、`facts/DEVICES.md#F37`、`docs/PROVENANCE.md`、`THIRD_PARTY_NOTICES.md`、D79、D80、F34、F37 |
+| D84 | 包里那道题**真的被取出来**：取题与验包同一处，答过的靠 `questionId` 不再出 | ✅ 用户决定 · D82 装完包就停了——包里 9562 道题，一行代码都没取。三条选择：**取题与验包同一个 `model/pack.rb`**（门调它、模型也调它；写两遍会出「门绿着而模型取到没验过的题」）；**顺序确定**（按 id 排，同一天的同一轮跑两次出同一道题——随机抽会让夹具钉不住）；**答没答过不另存表**，`ANSWER` 补 `questionId` 这一格（这是真缺：没有它「答过的不再出」根本没法判）。取题三步：绑定年级（那张表只有一处）→ 难度阶梯（`pick.difficultyLadder`）→ 排除账里答过的。池空 ⇒ 这一层落空，按 ASK-01 往下走一层，**不在这里编题、也不重复出答过的**。路上抓到两件：① **567 道题的 `verify` 是空的**——按 ASK-08「机检不过：不出、不入库、不重试」它们本就不该进包，改为导出时滤掉（10129 → 9562）；② **取一道题 1.8 秒**——`topic_ok?` 在 2591 个知识点里线性找父节点，9562 题乘一遍是 2500 万次比较，改成开包时一次建索引。位点扫描的豁免随之收窄：`REQUIRED = %w[... audience ...]` 那种**列名字**的常量行不再算按受众分支的位点，同一行里若出现判断（`==`/`select`/`find`…）豁免立刻失效。反证：题的年级越界、`verify` 留空、字段少一格、把「排除答过的」关掉、池空还硬出题——全红。 | `contract.json#contentPack.schemas`、`contract.json#contentPack.pick`、`model/pack.rb`、`model/pick.rb`、`tools/check-packs.rb`、`tools/make-pack.rb`、`fixtures/pack.yaml`、`spec/PACK.md#PACK-06`、`spec/ASK.md#ASK-01`、`spec/ASK.md#ASK-08`、`docs/ROADMAP.md M5`、D82 |
 
-|D83 | 电视角上那只小宠物：**它是读数的一种形状，不是一个需要被照顾的人**  | ✅ 用户决定（可爱风格 + 呈现技术可学 + 不是催而是陪伴） · 想要那种可爱风格与常驻一小块的呈现，这两件都能要；拦住的是第三件——「培养」。分界钉成一条布尔：`pet.stateNeverDerivedFromUsage = true`，**没有一条路让「孩子没做什么」变成「宠物少了什么」**；不饿、不困、不难过、不想你、不等你、不「进度落后」，那九个词在界面上一字不许出现（扫的是契约与面板那 12 页里真会出现的串，不是临时编的一句）。养成数值那八个名字（亲密度、心情、饥饿、等级、经验、成长、待领取、回访连击）在契约里不存在，不许有的那批词**读 `forbiddenFields.values` 那一处**（D45）。「培养」在本项目里的定义是**自主权三件**：选一只、起名字、换一只，换的代价是零——不丢账、不减东西、不问理由；想要数值成长是另一条决定。「不同性格选到不同宠物」那句里**「选」是主语**：清单只有一份，默认那一只挂在 `agreement.defaults` 那张表（默认值挑选那个位点），**不新开第三处按受众分岔的地方**；性格测评、人格画像、问卷打分、贴标签一律不许有。呈现只走 L3 那一角、与内核那句结论同一张卡，**它自己不是一条通道**——出现时机由那句结论决定；无入场动画、无声、无震动、无系统通知。帧循环只在有东西动时跑（方法学 playpets 那条 ADR，数字一个不引）：**默认关**，开它的唯一条件是这台设备在实测名单里，而名单为空——Android 7 那台电视的 CPU/温度/掉帧没进 `F37` 之前谁都开不了。风格学它的形状语言（圆的形、无描边、暖色），**素材不搬**：它 MIT，但它的美术另有 provenance（生成图 + 每图一份 `icon-provenance.json`）。反证十道：那条布尔改 false、清单第二份、换一只要问理由、那批词清空、界面出现「想你」、性格清单清空、面板页写「性格测评」、 appearance 多一项「弹跳」、实测门关掉、只把 default 改 on。   落了呈现：四只由 tools/make-pet-art.rb 自己画；量完才开——不画 0 tick/2s、画着 5 tick/2s（两台一样，F37）。名单的键是 Build.MODEL：新设备要先跑一次那条自检、把数记进 F37 再进名单；没进名单就别提这句话是开着的。路上三个真 bug 都由这条自检抓到：show() 把 hide() 写在赋值之后（画了却报「没画」）、那条记录拼参数串位、petWhy 带着一行栈进 JSON 字符串读回来是 null。| `spec/PET.md`、`contract.json#pet`、`model/pet.rb`、`fixtures/pet.yaml`、`agreement.defaults` 那张表加 `pet` 一列、`docs/PRODUCT.md` 范围内外、`THIRD_PARTY_NOTICES.md`、`PROVENANCE.md §6`、D45、D78、D31、D76、F36   |
 
-## 转为公开前要补齐的事（D30 触发时）
-
-| # | 事项 | 现在的位置 |
-|---|---|---|
-| P1 | 仓库从私有转公开的历史检查（`git log`、issue、附件里是否残留设备日志或题库数据） | 现在还没有代码，成本最低 |
-| P2 | 标识待核 N1–N5（商店与包名占用、商标、域名、GitHub/注册表） | [`NAMING.md §4`](NAMING.md) |
-| P3 | 更新通道与产物清单：`update.json` 的宿主、签名 key 轮换、可复现构建的公开校验 | [`ARCHITECTURE.md §7`](ARCHITECTURE.md) |
-| P4 | 文案与隐私页从「自家设备」措辞改为面向第三方的表述，并把「本项目不托管任何服务」与「**本应用不替代监护人**」写在页首（依据见 `PRIVACY.md §6`） | [`PRIVACY.md`](PRIVACY.md) |
-| P5 | 内容许可复核：种子包的 CC0 声明、来源声明与 `ATTRIBUTION` | [`PACK.md`](../spec/PACK.md) |
-
-## 暂定取值（用户同意先这么定，后续按数据调）
-
-| 取值 | 现在定在哪 | 何时复核 |
-|---|---|---|
-| 能力探针样本 ≥20 次才算 `done` | `ONBOARDING.md §2`（`tv.probe.pause`）、`ONBOARD-09` | M3 实机验收后；样本量影响清单重开的烦人程度 |
-| 首启引导 = 固定项前五项 | `ONBOARDING.md §4`「新设备加入」行、`LAYER-02` | 引导页实测后（一步一项，不夹带额外授权） |
-| 暂停响应率 ≥95% 才用 `focused` | D36、`LAYER-07`、`probes/f12.yaml` 的 `threshold` | F12 回填后按机型分档；跑法见 `PROBES.md`，一致性由 `tools/probe-gate.sh` 守 |
-| 标定自检连续 20 次、误计率 ≤5% | D36、`SENSE-02`、`probes/f13.yaml` 的 `threshold` | F13 回填后；同上 |
-
-调这些数字不需要改设计：它们只决定**什么时候把默认档抬上去**，不改变任何判定与功能集合。
-
-## 待定（这三条是产品决定，助手不代定）
-
-这次产品回顾留下的。三条都不影响现有判定与门，但都卡在**下一个界面**上：
-
-| 待定 | 缺的是哪一条 | 定在哪一处 | 不定会怎样 |
-|---|---|---|---|
-| ~~周报是什么~~ | **已定：D78**——没有周报，只有「这段时间的账」那一页（`REPORT-01..04`） | `spec/REPORT.md` | 已闭合 |
-| ~~同一身份的跨设备一本账~~ | **已定：D77**——不合并，各是各的；关联只有体感与视觉 | `spec/DAY.md#DAY-10` | 已闭合 |
-| ~~非儿童 audience 的内容从哪来~~ | **已定：D76**——这两档的约定项不含题目，内容是可选的；「给大人写一套题与大纲」不再是里程碑 | `spec/PROFILE.md#PROFILE-11` | 已闭合 |
-
-## 实测与探测项
-
-没有一项阻塞默认值：每一项都先给出「探不到或未达标时怎么落」，实测只用来把默认档抬上去。
-
-| 项 | 测什么 | 门槛与判据 | 现在怎么落 |
-|---|---|---|---|
 | F12 | 各机型「请求播放器暂停」的响应率 | 后台探针逐机型统计，≥95% 才算可用 | `focused` 只在达标机型作默认档，否则按 `ambient` 呈现并写明原因（D36） |
 | F13 | 手机端姿态计次的误计率 | 首次标定连续 20 次自测，误计率 ≤5% | 摄像头通道默认关；未达标停在加速度计节律 + 手动确认（D36、D4） |
 | E1 | 事件账的读放大 | 硬顶 = 不掉帧（单帧 16ms）；软顶 = 状态端点 P95 ≤ 60ms；超线即改为按天物化投影 | 投影表在同一事务内维护，M2 跑基线（`DAY-06`） |

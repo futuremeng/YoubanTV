@@ -1821,6 +1821,40 @@
       ],
       "why": "这类题的题面或解析预设「手上有那一本教材」——这台设备不知道孩子用的是哪一版课本，这类题在孩子那边就是「什么课文？」（抽查 354/13339，D82）",
       "onFilter": "知识点照留（大纲是地图，不是题），只是那一题不出"
+    },
+    "schemas": [
+      "id",
+      "topicId",
+      "difficulty",
+      "type",
+      "prompt",
+      "answer",
+      "verify"
+    ],
+    "verifyRequired": {
+      "field": "verify",
+      "why": "这一格空着就没法机检——按 ASK-08「机检不过：不出、不入库、不重试」，它在导出那一步就该被滤掉，不是进来了再拒"
+    },
+    "pick": {
+      "x-note": "ASK-01 那条顺序里 pack 这一层的取题规矩；顺序本身不在这里写第二遍。",
+      "spec": [
+        "ASK-01",
+        "PACK-06"
+      ],
+      "gradeFrom": "contentPack.audienceBinding（那张表只有一处，不在这里另判）",
+      "difficultyOrder": [
+        "basic",
+        "standard"
+      ],
+      "difficultyLadder": {
+        "default": "basic",
+        "answeredRightOnce": "standard"
+      },
+      "excludeAnswered": true,
+      "deterministic": true,
+      "whenPoolEmpty": "这一层落空，按 ASK-01 往下走一层——不在这里编一道题，也不重复出答过的那道",
+      "eventIdField": "questionId",
+      "eventKind": "ANSWER"
     }
   },
   "pet": {

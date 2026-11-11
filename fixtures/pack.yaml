@@ -34,3 +34,15 @@ PACK-09:
     - name: 预设「手上有那一本教材」的那类题要滤掉（这道过滤是开的）
       when: { mode: ambient }
       expect: { value: { packTextbookFilter: true, packTextbookMarks: 3, packTextbookHit: true } }
+
+    - name: 题的字段照契约那一节齐；机检那一格不许空着进包（PACK-06、ASK-08）
+      when: { mode: ambient }
+      expect: { value: { packSchemaFields: 7, packOffGrade: 0, packVerifyMissing: 0, packPresent: true } }
+
+    - name: 取题那一处取到题，答过的那一道不再出（ASK-01 的 pack 层）
+      when: { mode: ambient }
+      expect: { value: { packLayerHits: true, packQuestionId: "cnb_j001_q1", packRepeat: true, packQuestionCount: 9562 } }
+
+    - name: 包里取不到题就是这一层落空——按那条顺序往下走一层，不在这里编一道题
+      when: { mode: ambient }
+      expect: { value: { packLayerHitsWhenPoolEmpty: false, sourceWhenPackPoolEmpty: "outlineRandom" } }

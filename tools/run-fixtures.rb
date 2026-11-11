@@ -25,6 +25,7 @@ require 'panel'
 require 'startup'
 require 'content'
 require 'pet'
+require 'pack'
 
 class Unsupported < StandardError; end
 
@@ -946,6 +947,46 @@ class World
       'petMeasuredCount' => Core::Pet.measured_devices.size,
       'petMeasuredDocumented' => Core::Pet.measured_documented?,
       'petDrawsOnlyWhenMoving' => Core::Pet.draws_only_when_moving?,
+      # 包里那道该出的题（PACK-06、ASK-01 的 pack 层）：判定在 model/pack.rb 那一处，这里只搬读数。
+      'packPresent' => Core::Pack.present?,
+      'packLayerHits' => Core::Pick.pack_hit(plan: {}, answered: Core::Pack.answered_ids(@ledger.events)),
+      'packQuestionId' => Core::Pack.pick({}, answered_ids: Core::Pack.answered_ids(@ledger.events)).to_h['id'],
+      'packRepeat' => begin
+        first = Core::Pack.pick({}, answered_ids: Core::Pack.answered_ids(@ledger.events))
+        raised_or_nil = first.nil? || !Core::Pack.pick({}, answered_ids: [first['id'].to_s]).to_h['id'].to_s.eql?(first['id'].to_s)
+        raised_or_nil
+      rescue StandardError
+        nil
+      end,
+      'packOffGrade' => begin
+        p1 = Core::Pack.open
+        p1['questions'].count { |q| !Core::Pack.topic_ok?(q['topicId'], p1) }
+      rescue StandardError
+        -1
+      end,
+      'packVerifyMissing' => begin
+        Core::Pack.open['questions'].count { |q| q[Core::Content.verify_field].to_s.strip.empty? }
+      rescue StandardError
+        -1
+      end,
+      'packLayerHitsWhenPoolEmpty' => begin
+        Core::Pick.pack_hit(plan: {}, answered: Core::Pack.open['questions'].map { |q| q['id'].to_s })
+      rescue StandardError
+        true
+      end,
+      'sourceWhenPackPoolEmpty' => begin
+        answered = Core::Pack.open['questions'].map { |q| q['id'].to_s }
+        Core::Pick.source(pack_hit: Core::Pick.pack_hit(plan: {}, answered: answered),
+                         member_authored_hit: false, llm_hit: false)
+      rescue StandardError
+        'unknown'
+      end,
+      'packSchemaFields' => Core::Content.question_schema.size,
+      'packQuestionCount' => begin
+        Core::Pack.open['questions'].size
+      rescue StandardError
+        -1
+      end,
       'packTextbookFilter' => Core::Content.textbook_filter?,
       'packTextbookMarks' => Core::Content.textbook_marks.size,
       'packTextbookHit' => Core::Content.textbook_hit?('课文里的天空是什么样的？'),
@@ -1595,7 +1636,8 @@ class World
     @extras['gradedBy'] = 'self'
     @extras['selfGrade'] = verdict
     @extras['mastery'] = 'updated'
-    append('ANSWER', @profile, gradedBy: 'self', correct: verdict.to_s == 'pass')
+    append('ANSWER', @profile, gradedBy: 'self', correct: verdict.to_s == 'pass',
+           questionId: Core::Pack.pick({}, answered_ids: Core::Pack.answered_ids(@ledger.events)).to_h['id'])
   end
 
   # 修订：面板与对方都能提，提的是「怎么看这一份」，不改约定也不改账里的量（PROFILE-06、AUTO-04、AUTO-15）。
@@ -1929,6 +1971,10 @@ def audience_branch_scan
     lines.each_with_index do |line, i|
       next unless line =~ /\baudience\b/
       next if line =~ %r{^\s*(//|/\*|\*|#)} # 注释与文档句不算位点
+      # 名字清单不算位点：`REQUIRED = %w[... audience ...]` 那是在列包的字段名，不是在拿受众做判断。
+      # 豁免只收这一种形状（常量赋值接 %w 字面量），不收写法像判断的任何一行——
+      # 拿这个当缺口把 `audience == 'child'` 包进数组里是躲不掉的（反证试过）。
+      next if line =~ /^\s*[A-Z_]+\s*=\s*%w\[/ && line !~ /(==|!=|<=|>=|<[a-z ]|>|\?\s|\bif\b|\belse\b|\bwhen\b|\.select|\.reject|\.find|\.map|\.each)/
 
       # 标记要么写在这一行上，要么往回看五行之内——只往回看，不许往前看（往前看等于让后面某处
       # 一句标记把整片都洗白，反证「删掉一处标记」就是这么暴露的）。三行太紧：函数里加两行

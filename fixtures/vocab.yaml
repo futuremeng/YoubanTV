@@ -326,6 +326,8 @@ kvKeys: [from, to, by, role, action, kind, target, minutes, accepted, verdict, r
   autoOpenCount, autoOpenNeverHits, autoOpenTarget, autoOpenRetries,
   packLicenseOk, packDistribution, packConditional, packConditionalRequires, packRevokeRules,
   packRevoked, packLicenseBlockedND, packLicenseBlockedCCBY, packBindingGrades, packExcludedGrades,
+  packPresent, packLayerHits, packQuestionId, packRepeat, packOffGrade, packVerifyMissing,
+  packSchemaFields, packQuestionCount, packLayerHitsWhenPoolEmpty, sourceWhenPackPoolEmpty,
   packHighSchoolBound, packGradeOkG5, packGradeOkG7, packGradeOkG11,
   packAttributionLanded, packAttributionPending, packAttributionBroken,
   packTextbookFilter, packTextbookMarks, packTextbookHit,

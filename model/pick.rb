@@ -17,6 +17,16 @@ module Core
 
     module_function
 
+    # 包这一层是不是真取得到题：包在、验过、绑定年级里还有没答过的题——三者齐了才算取到（ASK-01）。
+    # 取不到就是这一层落空，按上面那条顺序往下走；不在这里编一道题，也不重复出答过的那道。
+    def pack_hit(plan: {}, answered: [])
+      return false unless Core::Pack.present?
+
+      !Core::Pack.pick(plan, answered_ids: answered).nil?
+    rescue StandardError
+      false
+    end
+
     def source(pack_hit:, member_authored_hit:, llm_hit:, egress: {})
       return 'pack' if pack_hit
       return 'member' if member_authored_hit
